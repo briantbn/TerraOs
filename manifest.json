@@ -1,12 +1,12 @@
 {
   "name": "TerraOS — Monitor de Incendios",
   "short_name": "TerraOS",
-  "description": "Prevención y monitoreo de incendios para productores",
-  "start_url": "./index.html",
+  "description": "Monitor satelital de incendios e inundaciones para productores rurales.",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#1a3b22",
   "theme_color": "#1a3b22",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "lang": "es",
   "icons": [
     {
@@ -22,12 +22,12 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["utilities", "weather"],
-  "shortcuts": [
+  "screenshots": [
     {
-      "name": "Monitor",
-      "url": "./index.html",
-      "description": "Ver monitor de riesgo"
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow"
     }
   ]
 }
