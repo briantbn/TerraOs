@@ -2499,6 +2499,66 @@ async function aplicarFiltrosGEE() {
   const nubes = document.getElementById('gee-nubes').value;
   geeFiltros.nubes = nubes;
 
+  if (!mapa) {
+    msg.textContent = 'El mapa todavía no está listo, esperá un momento...';
+    msg.style.color = '#ca8a04';
+    return;
+  }
+
+  btn.textContent = 'Cargando...';
+  btn.disabled = true;
+  msg.textContent = '';
+
+  try {
+    // FIX: en vez de centrar siempre en el GPS del usuario, se usa el
+    // centro actual del mapa — así la capa se aplica a donde sea que
+    // estés mirando (incluso en otro país), no a un círculo fijo
+    // alrededor de tu ubicación.
+    const centroMapa = mapa.getCenter();
+    const bordeMapa = mapa.getBounds().getNorthEast();
+    // Radio = distancia del centro al borde visible + 40% de margen,
+    // con un mínimo de 30 km, para que el área con datos siempre
+    // exceda lo que se ve en pantalla a cualquier nivel de zoom.
+    const radioVisibleKm = centroMapa.distanceTo(bordeMapa) / 1000;
+    const radiusKm = Math.max(30, radioVisibleKm * 1.4);
+
+    const params = new URLSearchParams({
+      dataset: geeFiltros.dataset,
+      band:    geeFiltros.banda,
+      start:   geeFiltros.fechaInicio,
+      end:     geeFiltros.fechaFin,
+      cloud:   geeFiltros.nubes,
+      lat:     centroMapa.lat,
+      lon:     centroMapa.lng,
+      radius_km: radiusKm.toFixed(1),
+    });
+
+    const r = await fetch(`${GEE_SERVER}/gee_tiles?${params.toString()}`);
+    const j = await r.json();
+
+    if (!r.ok) {
+      msg.textContent = '⚠️ ' + (j.error || 'No se pudo cargar la capa');
+      msg.style.color = '#dc2626';
+      return;
+    }
+
+    aplicarCapaGEE(j.tile_url, `${geeFiltros.dataset} · ${geeFiltros.banda}`);
+    msg.textContent = `✅ Capa aplicada: ${geeFiltros.dataset} · ${geeFiltros.banda}`;
+    msg.style.color = '#16a34a';
+
+  } catch (e) {
+    msg.textContent = '🔴 Sin conexión al servidor Earth Engine. Las capas satelitales no están disponibles ahora.';
+    msg.style.color = '#dc2626';
+  } finally {
+    btn.textContent = 'Aplicar capa satelital';
+    btn.disabled = false;
+  }
+}
+  const btn = document.getElementById('gee-btn-aplicar');
+  const msg = document.getElementById('gee-mensaje');
+  const nubes = document.getElementById('gee-nubes').value;
+  geeFiltros.nubes = nubes;
+
   if (!gpsListo) {
     msg.textContent = 'Esperando ubicación GPS...';
     msg.style.color = '#ca8a04';
