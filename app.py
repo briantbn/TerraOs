@@ -310,6 +310,23 @@ def gee_tiles():
         if not start or not end:
             return jsonify({'error': 'Faltan parámetros start y end (YYYY-MM-DD)'}), 400
 
+        # FIX: ventana mínima de búsqueda. Sentinel-2/Landsat cubren la
+        # superficie en "cuadrantes" (granules) que se fotografían en días
+        # distintos. Con rangos cortos (ej. preset "7 días") es común que
+        # un cuadrante vecino no tenga NINGUNA pasada en ese lapso, dejando
+        # un borde recto sin datos en el mapa. Para evitarlo, si el rango
+        # pedido es menor a MIN_DIAS_COBERTURA, lo extendemos hacia atrás
+        # (manteniendo la fecha "end" tal cual la pidió el usuario) — así
+        # siempre hay suficientes pasadas para cubrir toda la zona, y el
+        # mosaico ordenado por nubosidad sigue priorizando lo más reciente
+        # y menos nublado en cada pixel.
+        MIN_DIAS_COBERTURA = 45
+        fecha_fin_dt = datetime.date.fromisoformat(end)
+        fecha_inicio_dt = datetime.date.fromisoformat(start)
+        if (fecha_fin_dt - fecha_inicio_dt).days < MIN_DIAS_COBERTURA:
+            fecha_inicio_dt = fecha_fin_dt - datetime.timedelta(days=MIN_DIAS_COBERTURA)
+            start = fecha_inicio_dt.isoformat()
+
         region = ee.Geometry.Point([lon, lat]).buffer(radius_km * 1000)
 
         if dataset == 'Sentinel':
