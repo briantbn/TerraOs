@@ -1,5 +1,0 @@
-{
-  "redirects": [
-    { "source": "/", "destination": "/pc.html", "permanent": false }
-  ]
-}
