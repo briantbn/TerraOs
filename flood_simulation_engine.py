@@ -15,11 +15,14 @@ Qué cambia respecto del enfoque anterior:
            distancia pura.
     AHORA: costo = 1 (base) + resistencia continua (0-4), donde la
            resistencia combina pendiente, cobertura vegetal/edificios,
-           rugosidad, un sesgo direccional aproximado (hacia dónde escurre
-           el agua) y el peso de acumulación de flujo (MERIT 'upa'). El
-           mismo cumulativeCost() ahora encuentra el camino de MENOR
+           un sesgo direccional aproximado (hacia dónde escurre el agua)
+           y el peso de acumulación de flujo (MERIT 'upa'). El mismo
+           cumulativeCost() ahora encuentra el camino de MENOR
            RESISTENCIA, no solo el más corto — el agua "prefiere" avanzar
            por cauces y a favor de la pendiente/drenaje.
+           (La versión inicial incluía además rugosidad del terreno vía
+           reduceNeighborhood(), sacada luego por costo de cómputo — ver
+           nota de rendimiento en calculate_resistance()).
 
 Limitación conocida y asumida a propósito (ver charla de diseño):
     Earth Engine no tiene cost-distance direccional/anisotrópico nativo.
@@ -67,11 +70,17 @@ WORLDCOVER_URBANO = 50
 WORLDCOVER_HUMEDAL_HERBACEO = 90
 
 # Pesos del índice de resistencia hidráulica combinado (deben sumar 1.0).
+# NOTA DE RENDIMIENTO: originalmente incluía un término de "rugosidad" vía
+# reduceNeighborhood() con kernel circular -- se sacó (ver
+# calculate_resistance) porque las operaciones de vecindad son mucho más
+# caras que operaciones pixel-a-pixel en Earth Engine, y en la práctica
+# estaban provocando error 429 (rate limit) del tile server con carga
+# normal de uso (varias teselas pedidas en simultáneo al mover/hacer zoom
+# en el simulador). Su peso se redistribuyó entre los criterios restantes.
 PESOS_RESISTENCIA = {
-    'pendiente': 0.30,
-    'cobertura': 0.20,
-    'rugosidad': 0.15,
-    'direccion': 0.20,
+    'pendiente': 0.35,
+    'cobertura': 0.25,
+    'direccion': 0.25,
     'acumulacion': 0.15,
 }
 
@@ -95,7 +104,7 @@ def calculate_slope(elevacion):
     return ee.Terrain.slope(elevacion)
 
 
-def calculate_flow_direction_bias(elevacion, agua_fuente, region):
+def calculate_flow_direction_bias(elevacion, agua_fuente, region, escala=ESCALA_COSTO_M):
     """
     Sesgo direccional aproximado, 0-1 (1 = el aspect de la celda apunta
     hacia el agua conocida más cercana -> favorece avance; 0 = apunta en
@@ -108,25 +117,36 @@ def calculate_flow_direction_bias(elevacion, agua_fuente, region):
     de X; el sentido hacia el agua es el opuesto, por eso se invierte).
     La similitud entre ambos vectores (coseno) se normaliza a 0-1.
 
+    RENDIMIENTO: elevación y agua_fuente se reproyectan a `escala` (90 m
+    por defecto, igual que el resto del motor) ANTES de aspect/distance
+    transform/gradient. Esto no es cosmético: hacer estas operaciones a
+    la resolución nativa de SRTM (30 m) multiplica por 9 la cantidad de
+    píxeles que Earth Engine tiene que procesar por tesela, comparado con
+    90 m -- eso, sumado al radio de búsqueda del distance transform, fue
+    lo que estaba disparando error 429 (rate limit) del tile server bajo
+    uso normal. El radio de búsqueda también se redujo de 256 a 96
+    píxeles (a 90 m de escala, ~8.6 km -- de sobra para esta aproximación,
+    que no necesita más alcance que el de la propia propagación).
+
     Ver limitación conocida en el docstring del módulo: esto no reemplaza
     un flow-routing D8 real, es una aproximación intencional.
     """
-    aspect_rad = ee.Terrain.aspect(elevacion).multiply(math.pi / 180.0)
+    elevacion_90 = elevacion.reproject(crs='EPSG:4326', scale=escala)
+    agua_90 = agua_fuente.reproject(crs='EPSG:4326', scale=escala)
+
+    aspect_rad = ee.Terrain.aspect(elevacion_90).multiply(math.pi / 180.0)
     dx_terreno = aspect_rad.sin()
     dy_terreno = aspect_rad.cos()
 
-    distancia_agua = agua_fuente.fastDistanceTransform(256).sqrt()
+    distancia_agua = agua_90.fastDistanceTransform(96).sqrt()
     gradiente = distancia_agua.gradient()
     norma = gradiente.select('x').hypot(gradiente.select('y')).max(1e-6)
-    # Se invierte el signo: el gradiente de la distancia apunta hacia
-    # donde la distancia CRECE (alejándose del agua); el sentido de
-    # escurrimiento hacia el agua es el contrario.
     dx_agua = gradiente.select('x').divide(norma).multiply(-1)
     dy_agua = gradiente.select('y').divide(norma).multiply(-1)
 
     alineacion = (dx_terreno.multiply(dx_agua)
-                  .add(dy_terreno.multiply(dy_agua)))  # coseno, rango -1..1
-    bias = alineacion.add(1).divide(2)  # normalizado a 0..1
+                  .add(dy_terreno.multiply(dy_agua)))
+    bias = alineacion.add(1).divide(2)
     return bias.rename('flow_direction_bias')
 
 
@@ -140,43 +160,44 @@ def calculate_flow_accumulation_weight(region):
     """
     upa = ee.Image('MERIT/Hydro/v1_0_1').select('upa').clip(region)
     log_upa = upa.add(1).log10()
-    # unitScale(0, 4): 10^4 = 10.000 km² cubre holgadamente cauces
-    # principales de la región (Paraná, Iberá, etc.) sin saturar en 1.0
-    # demasiado rápido para arroyos chicos.
     return log_upa.unitScale(0, 4).clamp(0, 1).rename('flow_accum_weight')
 
 
-def calculate_resistance(elevacion, region, flow_dir_bias, flow_accum_weight):
+def calculate_resistance(elevacion, region, flow_dir_bias, flow_accum_weight,
+                          escala=ESCALA_COSTO_M):
     """
     Índice de resistencia hidráulica combinado, 0-1 (0 = el agua avanza
     libre, 1 = resistencia máxima). Combina pendiente, cobertura del suelo
-    (bosque/urbano como proxy de rugosidad de Manning), rugosidad del
-    terreno, y el INVERSO del sesgo direccional y del peso de acumulación
-    (una celda bien alineada con el drenaje real, o sobre un cauce, tiene
-    BAJA resistencia).
+    (bosque/urbano como proxy de rugosidad de Manning), y el INVERSO del
+    sesgo direccional y del peso de acumulación (una celda bien alineada
+    con el drenaje real, o sobre un cauce, tiene BAJA resistencia).
+
+    RENDIMIENTO: la elevación se reproyecta a `escala` (90 m) antes de
+    calcular la pendiente, por la misma razón que en
+    calculate_flow_direction_bias -- 9x menos píxeles que a la resolución
+    nativa de SRTM. Se sacó el término de rugosidad por vecindad
+    (reduceNeighborhood con kernel circular) que tenía la primera versión:
+    era, con diferencia, la operación más cara del motor y estaba
+    provocando error 429 (rate limit) del tile server de Earth Engine bajo
+    uso normal. Ver nota en PESOS_RESISTENCIA sobre cómo se redistribuyó
+    su peso.
     """
-    pendiente = calculate_slope(elevacion)
+    elevacion_90 = elevacion.reproject(crs='EPSG:4326', scale=escala)
+    pendiente = calculate_slope(elevacion_90)
     lc = (ee.ImageCollection('ESA/WorldCover/v200')
             .mosaic().select('Map').clip(region))
     es_urbano = lc.eq(WORLDCOVER_URBANO)
     es_bosque = lc.eq(WORLDCOVER_ARBOLADO)
 
-    rugosidad = elevacion.reduceNeighborhood(
-        reducer=ee.Reducer.stdDev(),
-        kernel=ee.Kernel.circle(radius=90, units='meters'),
-    )
-
     r_pendiente = pendiente.divide(RESISTENCIA_PENDIENTE_MAX_DEG).clamp(0, 1)
     r_cobertura = (ee.Image(0.1)
                    .where(es_bosque, 0.6)
                    .where(es_urbano, 0.9))
-    r_rugosidad = rugosidad.divide(10).clamp(0, 1)
     r_direccion = ee.Image(1).subtract(flow_dir_bias)
     r_acumulacion = ee.Image(1).subtract(flow_accum_weight)
 
     resistencia = (r_pendiente.multiply(PESOS_RESISTENCIA['pendiente'])
                    .add(r_cobertura.multiply(PESOS_RESISTENCIA['cobertura']))
-                   .add(r_rugosidad.multiply(PESOS_RESISTENCIA['rugosidad']))
                    .add(r_direccion.multiply(PESOS_RESISTENCIA['direccion']))
                    .add(r_acumulacion.multiply(PESOS_RESISTENCIA['acumulacion'])))
     return resistencia.clamp(0, 1).rename('resistencia')
@@ -284,29 +305,12 @@ def simulate_flood(region, hand, agua_fuente, radius_km, umbral_m, perfil=None):
     conectividad_ok), más los datos nuevos (perfil, umbral efectivo) para
     que el endpoint los agregue a la respuesta JSON de forma opcional, sin
     romper a ningún consumidor del frontend que no los espere.
-
-    Parámetros:
-        region        ee.Geometry ya recortada (viene de app.py)
-        hand          ee.Image HAND ya corregida por dosel/edificios (viene
-                      de app.py, _hand_corregido_por_dosel)
-        agua_fuente   ee.Image binaria de agua permanente conocida (JRC)
-        radius_km     radio de la consulta, en km
-        umbral_m      metros de subida sobre el cauce normal (antes de
-                      aplicar el ajuste regional)
-        perfil        dict de infer_regional_profile(); si es None, se
-                      calcula acá mismo (así el endpoint lo puede reusar
-                      entre llamadas si ya lo tiene, ej. en la animación)
     """
     if perfil is None:
         perfil = infer_regional_profile(region)
 
     umbral_efectivo = umbral_m * perfil['factor_umbral_hand']
 
-    # DEM crudo (sin corrección de dosel) para pendiente/aspect de apoyo del
-    # sesgo direccional y la resistencia -- son variables de FORMA del
-    # terreno, no de cota absoluta, así que la corrección de dosel (que
-    # ajusta cota) no es necesaria acá. El umbral que sí importa (HAND) ya
-    # viene corregido desde app.py.
     dem_crudo = ee.Image('USGS/SRTMGL1_003').select('elevation').clip(region)
 
     flow_dir_bias = calculate_flow_direction_bias(dem_crudo, agua_fuente, region)
@@ -316,11 +320,6 @@ def simulate_flood(region, hand, agua_fuente, radius_km, umbral_m, perfil=None):
 
     candidatas = hand.lte(umbral_efectivo)
 
-    # Superficie de costo: antes cada celda candidata costaba 1 (uniforme).
-    # Ahora cuesta 1 + resistencia*4 (rango ~1-5): las celdas candidatas
-    # "fáciles" (cauce, llano, sin bosque) siguen costando ~1, las
-    # "resistentes" (bosque denso, pendiente, lejos del drenaje) cuestan
-    # hasta 5x más atravesarlas -> cumulativeCost() prefiere rodearlas.
     costo_superficie = candidatas.selfMask().add(resistencia.multiply(4))
 
     costo_acumulado = calculate_hydraulic_distance(
@@ -349,12 +348,8 @@ def simulate_flood(region, hand, agua_fuente, radius_km, umbral_m, perfil=None):
 def generate_animation_frames(costo_acumulado, candidatas, region, frames,
                                escala_max_costo=150):
     """
-    Reparte 'costo_acumulado' (ahora en unidades de resistencia acumulada,
-    no metros puros) en `frames` bandas proporcionales, igual que hacía
-    /inundacion_animacion original con distancia en metros. Devuelve una
-    lista de (orden, valor_costo_acumulado, porcentaje, ee.Image del
-    fotograma) — app.py se encarga de llamar a getMapId() sobre cada
-    imagen, igual que antes.
+    Reparte 'costo_acumulado' en `frames` bandas proporcionales, igual que
+    hacía /inundacion_animacion original con distancia en metros.
     """
     max_costo_dict = costo_acumulado.reduceRegion(
         reducer=ee.Reducer.percentile([95]),
