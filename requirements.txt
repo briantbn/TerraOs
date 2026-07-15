@@ -1,0 +1,8 @@
+flask==3.0.3
+flask-cors==4.0.1
+earthengine-api==1.0.0
+gunicorn==22.0.0
+requests==2.32.3
+shapely==2.0.7
+pyproj==3.6.1
+groq==1.5.0
