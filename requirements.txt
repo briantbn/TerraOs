@@ -7,3 +7,4 @@ shapely==2.0.7
 pyproj==3.6.1
 groq==1.5.0
 rasterio==1.5.0
+pysheds==0.5
