@@ -3,6 +3,7 @@
   "builds": [
     { "src": "app.py", "use": "@vercel/python" },
     { "src": "index.html", "use": "@vercel/static" },
+    { "src": "pc.html", "use": "@vercel/static" },
     { "src": "manifest.json", "use": "@vercel/static" },
     { "src": "sw.js", "use": "@vercel/static" },
     { "src": "icon-192.png", "use": "@vercel/static" },
@@ -11,6 +12,7 @@
   "routes": [
     { "src": "/$", "dest": "/index.html" },
     { "src": "/index.html", "dest": "/index.html" },
+    { "src": "/pc.html", "dest": "/pc.html" },
     { "src": "/manifest.json", "dest": "/manifest.json" },
     { "src": "/sw.js", "dest": "/sw.js" },
     { "src": "/icon-192.png", "dest": "/icon-192.png" },
