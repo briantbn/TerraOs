@@ -2886,6 +2886,17 @@ def inundacion_animacion():
         if not max_costo_m or max_costo_m <= 0:
             return jsonify({'error': 'No se pudo determinar el alcance de la crecida en esta zona.'}), 422
 
+        # FIX: costo_acumulado viene de un cumulativeCost() (uno de los
+        # cálculos más caros de EE). Si se usa tal cual dentro de cada
+        # tile de cada fotograma, Earth Engine intenta RE-EVALUAR ese
+        # cálculo pesado cada vez que el navegador pide un tile — y sigue
+        # rechazando con 400 en varios zooms/tiles aunque ya esté
+        # recortado a `region`. Se fija ("hornea") a una resolución fija
+        # de 200m ANTES de generar los tiles, así EE no vuelve a rehacer
+        # el cumulativeCost completo por cada tile — solo lee el
+        # resultado ya calculado a esa resolución.
+        costo_acumulado_vis = costo_acumulado.reproject(crs='EPSG:4326', scale=200)
+
         fotogramas = []
         for i in range(1, frames + 1):
             umbral_costo = max_costo_m * (i / frames)
@@ -2895,7 +2906,7 @@ def inundacion_animacion():
             # (flood_simulation_engine.py) que no necesariamente preserva
             # el recorte de `hand`/`agua_fuente`, así que se recorta acá
             # de nuevo para estar seguros sin importar qué motor se usó.
-            frame_img = candidatas.updateMask(costo_acumulado.lte(umbral_costo)).selfMask().clip(region)
+            frame_img = candidatas.updateMask(costo_acumulado_vis.lte(umbral_costo)).selfMask().clip(region)
             map_id = frame_img.getMapId({'palette': ['#1e40af']})
             fotogramas.append({
                 'orden'        : i,
