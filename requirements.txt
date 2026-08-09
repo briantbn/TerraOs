@@ -10,4 +10,3 @@ rasterio==1.5.0
 Pillow==11.1.0
 numpy==2.4.4
 affine==2.4.0
-pysheds==0.5
