@@ -544,7 +544,24 @@ SUELO_CAPAS = [
         'escala': '1:50.000',
         'confiabilidad': 'alta',
         'bbox': (-59.6517, -26.3887, -58.9259, -25.4734),
-        'simplificar_grados': 0.0005,
+        # FIX (OOM en Render, plan de 512MB): esta carta venía con
+        # 'simplificar_grados': 0.0005 igual que el resto de las 1:50.000,
+        # pero es semidetallada sobre ~5.100 km² con muchos vértices por
+        # polígono. La lectura del GeoJSON crudo (r.json()) igual pasa por
+        # un pico de memoria transitorio antes de poder simplificar nada
+        # -- eso no lo cambia esta tolerancia -- pero lo que SÍ queda
+        # viviendo en el caché LRU (hasta _MAX_CAPAS_EN_CACHE=3 capas a la
+        # vez, más Earth Engine y el resto del proceso) es la geometría YA
+        # simplificada. Con 0.0005 esa geometría en memoria seguía siendo
+        # pesada; sumada a otras 2 capas + EE, cruzaba los 512MB del plan
+        # ("Ran out of memory" en los logs de Render) y el proceso se
+        # reiniciaba a mitad de un pedido -- por eso la capa nunca llegaba
+        # al frontend. Se sube la tolerancia a 0.0015 (~3x más gruesa) para
+        # que la geometría que queda cacheada pese bastante menos.
+        # Sacrifica algo de precisión visual en el contorno de cada
+        # polígono, pero a la escala en que se ve esta capa en el mapa
+        # (departamento/provincia) no debería notarse.
+        'simplificar_grados': 0.0015,
     },
     # ── Corrientes 1:100.000 (geo-nodo09) ──
     {
