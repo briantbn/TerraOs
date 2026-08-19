@@ -9095,6 +9095,28 @@ function simActualizarUIBaseHidro() {
   }
 }
 
+// FIX: pinta Área inundada / % del área / Volumen est. con los valores
+// REALES que devuelve el backend (area_inundada_ha / pct_area_inundada /
+// volumen_estimado_m3, calculados sobre el raster HAND en /inundacion_local)
+// cuando están disponibles. Si `respuesta` es null o no trae esos campos
+// (ej. escenario satelital histórico, o se usó el motor GEE de respaldo que
+// no los calcula), se muestra "—" para no dejar pegado un número que no
+// corresponde a lo que realmente se dibujó en el mapa.
+function _simhActualizarPanelResultado(respuesta) {
+  const areaEl = document.getElementById('simh-area');
+  const pctEl  = document.getElementById('simh-pct');
+  const volEl  = document.getElementById('simh-vol');
+  if (respuesta && respuesta.area_inundada_ha != null) {
+    if (areaEl) areaEl.textContent = respuesta.area_inundada_ha.toLocaleString('es-AR') + ' ha';
+    if (pctEl)  pctEl.textContent  = respuesta.pct_area_inundada + ' %';
+    if (volEl)  volEl.textContent  = Math.round(respuesta.volumen_estimado_m3).toLocaleString('es-AR') + ' m³';
+  } else {
+    if (areaEl) areaEl.textContent = '—';
+    if (pctEl)  pctEl.textContent  = '—';
+    if (volEl)  volEl.textContent  = '—';
+  }
+}
+
 function actualizarSimuladorHidro(val) {
   const alturaM = Math.max(0, parseFloat(val) || 0);
   const slider = document.getElementById('simh-nivel-slider');
@@ -9211,6 +9233,10 @@ async function _aplicarEscenarioHistoricoRealHidro(escenario) {
       msg.textContent = `🛰️ ${escenario.etiqueta} — extensión REAL observada por satélite (${j.fuente}), no una simulación. Referencia de la escala hidrométrica: ${escenario.alturaM.toFixed(2)} m.`;
       msg.style.color = '#1E5E3A';
     }
+    // Este camino (satelital observado) no calcula área/%/volumen — se
+    // limpian los 3 números para no dejar pegada la estimación inventada
+    // del slider en vivo (ver _simhActualizarPanelResultado).
+    _simhActualizarPanelResultado(null);
 
     if (campoCoords && mapaHidrologia && campoPoligono) {
       mapaHidrologia.fitBounds(campoPoligono.getBounds(), { padding: [40, 40] });
@@ -9278,6 +9304,17 @@ async function aplicarSimuladorInundacionHidro() {
   _leyendaOverrideDemHidro = 'dem_simulador'; // leyenda propia (degradé azul), no la de "Zona Baja"
   const respuestaGEE = await aplicarZonasInundablesHidro({}, { umbralM });
   _capaOrigenSimuladorHidro = true;
+
+  // FIX: "Área inundada / % del área / Volumen est." mostraban una fórmula
+  // inventada (ver actualizarSimuladorHidro, pensada solo para el arrastre
+  // en vivo del slider) que nunca se actualizaba con el resultado real de
+  // esta capa — por eso podía decir "46,3 ha" junto con "100% del área" en
+  // un círculo de cientos de miles de hectáreas. Ahora, si la respuesta
+  // trae los números reales (calculados sobre el raster HAND, ver
+  // /inundacion_local en app.py), se muestran esos; si no vinieron (ej.
+  // se usó el motor GEE de respaldo, que no los calcula), se marca "—" en
+  // vez de dejar el número inventado del slider.
+  _simhActualizarPanelResultado(respuestaGEE);
 
   const msg = document.getElementById('simh-mensaje');
   if (msg) {
@@ -10906,9 +10943,17 @@ function rhAplicarHumedal(clas, humedalPct) {
 // se descargan una sola vez (GeoJSON alojado en Hugging Face) y el point-in-polygon
 // se resuelve local en el navegador con Turf.js. Más rápido y no depende de que un
 // servidor externo esté arriba. Se agregan más provincias acá a medida que estén listas.
+// bbox: [minLon, minLat, maxLon, maxLat] — filtro rápido opcional. Si el punto consultado
+// cae fuera del bbox de una capa, ni se descarga ni se escanea (más rápido con muchas capas).
+// Si una capa no tiene bbox definido, se la consulta siempre (comportamiento anterior).
 const RH_SUELO_DETALLE_CAPAS = [
   { nombre: 'Buenos Aires', url: 'https://huggingface.co/datasets/Briant97/GeoSentinel/resolve/main/Suelos_detalle_Buenos_Aires.geojson' },
   { nombre: 'Córdoba',       url: 'https://huggingface.co/datasets/Briant97/GeoSentinel/resolve/main/Suelos_detalle_Cordoba.geojson' },
+  { nombre: 'Valle de Lerma (Norte, Salta)',  url: 'https://huggingface.co/datasets/Briant97/GeoSentinel/resolve/main/Suelos_detalle_Valle_de_Lerma_Norte_Salta.geojson',   bbox: [-65.5350, -25.0217, -65.3606, -24.7687] },
+  { nombre: 'Valle de Lerma (Centro, Salta)', url: 'https://huggingface.co/datasets/Briant97/GeoSentinel/resolve/main/Suelos_detalle_Valle_de_Lerma_Centro_Salta.geojson',  bbox: [-65.5404, -25.1625, -65.3598, -24.8190] },
+  { nombre: 'Valle de Lerma (Sur, Salta)',    url: 'https://huggingface.co/datasets/Briant97/GeoSentinel/resolve/main/Suelos_detalle_Valle_de_Lerma_Sur_Salta.geojson',     bbox: [-65.5519, -25.3902, -65.4165, -25.1327] },
+  { nombre: 'Valles Calchaquíes (Salta)',     url: 'https://huggingface.co/datasets/Briant97/GeoSentinel/resolve/main/Suelos_detalle_Valles_Calchaquies_Salta.geojson',     bbox: [-66.2606, -26.2418, -65.7766, -24.6809] },
+  { nombre: 'Miraflores / El Galpón (Salta)', url: 'https://huggingface.co/datasets/Briant97/GeoSentinel/resolve/main/Suelos_detalle_Miraflores_El_Galpon_Salta.geojson',  bbox: [-64.8870, -25.4486, -64.5934, -25.3109] },
 ];
 // Capa de aptitud regional del NOA: informativa, no participa del cálculo de riesgo
 // (son solo 9 zonas grandes, mucho más gruesas que el resto de las cartas de detalle).
@@ -10951,6 +10996,10 @@ async function rhBuscarSueloDetalle(lat, lon) {
   try { await rhAsegurarTurf(); } catch (e) { console.warn('[Suelo detalle]', e.message || e); return null; }
   const punto = turf.point([lon, lat]);
   for (const capa of RH_SUELO_DETALLE_CAPAS) {
+    if (capa.bbox) {
+      const [minLon, minLat, maxLon, maxLat] = capa.bbox;
+      if (lon < minLon || lon > maxLon || lat < minLat || lat > maxLat) continue; // fuera de esta capa, ni se descarga
+    }
     const geojson = await rhCargarCapaDetalle(capa);
     if (!geojson) continue;
     for (const feat of geojson.features) {
@@ -11172,6 +11221,36 @@ function rhRecalcularClasificacion() {
   rhActualizarResumen(conteo, celdas.length, P);
 }
 
+// Nombres legibles para las columnas normalizadas que puede traer una carta de detalle,
+// sin importar la provincia de origen (cada una usa sus propias columnas crudas).
+const RH_SUELO_DETALLE_ETIQUETAS = [
+  ['nombre', 'Unidad'], ['nombre_suelo', 'Unidad de suelo'], ['clase', 'Clase'], ['subclase', 'Subclase'],
+  ['cap_uso', 'Capacidad de uso'], ['tipo_unidad', 'Tipo de unidad'], ['drenaje_estimado', 'Drenaje estimado'],
+  ['Ind_Prod', 'Índice productivo'], ['Orden', 'Orden USDA'], ['Suborden', 'Suborden USDA'], ['Grangrup', 'Gran grupo USDA'],
+  ['u_aptitud', 'Aptitud'], ['u_nombre', 'Nombre de la unidad'], ['u_serie', 'Serie'], ['tipo', 'Tipo'],
+  ['Ap_Agricol', 'Aptitud agrícola'], ['Ap_Riego', 'Aptitud de riego'], ['aso', 'Asociación de suelos'],
+];
+function rhSueloDetallePopupHTML(c) {
+  const sd = c.sueloDetalle;
+  let filas = '';
+  if (sd) {
+    for (const [campo, etiqueta] of RH_SUELO_DETALLE_ETIQUETAS) {
+      const v = sd[campo];
+      if (v === null || v === undefined || v === '') continue;
+      filas += `<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;">
+        <span style="color:#727971;">${etiqueta}</span><b style="text-align:right;">${v}</b></div>`;
+    }
+  }
+  const fuente = sd ? `<p style="font-size:10px;color:#9ca3af;margin:8px 0 0;">Fuente: carta de detalle · ${sd._provincia || '—'}</p>`
+                     : `<p style="font-size:11px;color:#727971;margin:6px 0 0;">Sin carta de detalle para este punto — se usó solo el mapa nacional de suelo 1:500.000.</p>`;
+  return `<div style="font-size:12px;min-width:200px;max-width:260px;">
+    <div style="font-weight:800;margin-bottom:4px;">🌱 Suelo (INTA)</div>
+    ${c.clasificacion ? `<div style="margin-bottom:6px;"><span style="background:${c.clasificacion.color};color:#fff;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;">${c.clasificacion.label || c.clasificacion.cat}</span></div>` : ''}
+    ${filas || '<p style="font-size:11px;color:#727971;margin:2px 0;">Sin columnas de detalle disponibles.</p>'}
+    ${fuente}
+  </div>`;
+}
+
 function rhPintarGrid(celdas) {
   if (!mapaHidrologia) return;
   if (rhCapaGrid) { mapaHidrologia.removeLayer(rhCapaGrid); rhCapaGrid = null; }
@@ -11181,9 +11260,10 @@ function rhPintarGrid(celdas) {
     const opacidad = c.clasificacion.cat === 'sin_riesgo' ? 0.22
       : c.clasificacion.cat === 'humedal_natural' ? 0.5
       : 0.4; // 35–45% para las 3 categorías de riesgo, 50% para humedal natural (más visible)
-    L.rectangle([[c.lat0, c.lon0], [c.lat1, c.lon1]], {
-      stroke: false, fillColor: c.clasificacion.color, fillOpacity: opacidad, interactive: false
+    const rect = L.rectangle([[c.lat0, c.lon0], [c.lat1, c.lon1]], {
+      stroke: false, fillColor: c.clasificacion.color, fillOpacity: opacidad, interactive: true
     }).addTo(rhCapaGrid);
+    rect.bindPopup(() => rhSueloDetallePopupHTML(c), { maxWidth: 280 });
   });
 }
 
@@ -11453,8 +11533,23 @@ async function rhIrALote(i) {
 
 // ── Analiza el riesgo hidrológico del lote actualmente activo en proyectoActual ──
 // (campoGuardado ya apunta a ese lote gracias a showCurrentLayer(); reutiliza calcularRiesgoHidrologico() tal cual).
-async function rhAnalizarLoteActual() {
+// reiniciarSiHayLote=true SOLO en la llamada de arranque (clic en el botón); las
+// llamadas recursivas de la cadena pasan false para no reiniciar en cada vuelta.
+async function rhAnalizarLoteActual(reiniciarSiHayLote = true) {
   if (typeof proyectoActual === 'undefined' || !proyectoActual || proyectoActual.files.length === 0) return;
+
+  const auto = $el('rh-proyecto-autoavanzar');
+
+  // FIX: con "Ir al siguiente al finalizar" tildado, la corrida en lote debe
+  // recorrer TODOS los lotes en orden — Monte Caseros → Curuzu Cuatia → Esquina.
+  // Antes arrancaba desde el lote que hubiera quedado activo en proyectoActual
+  // (compartido con el resto de la app, ej. el último visto en Incendios), así
+  // que si ese era el último de la lista, no había "siguiente" y la corrida
+  // terminaba ahí mismo — daba la sensación de "empieza desde abajo y no avanza".
+  if (reiniciarSiHayLote && auto && auto.checked && proyectoActual.currentIndex !== 0) {
+    await proyectoActual.goTo(0);
+  }
+
   const btn = $el('rh-btn-analizar-lote');
   const htmlOriginal = btn ? btn.innerHTML : null;
   if (btn) {
@@ -11471,7 +11566,6 @@ async function rhAnalizarLoteActual() {
   if (lote) { lote.analizado = true; } // marca visual en la lista, aunque el resultado en sí vive en rhDatosCampo
   rhRenderListaProyectos();
 
-  const auto = $el('rh-proyecto-autoavanzar');
   if (auto && auto.checked && proyectoActual.currentIndex < proyectoActual.files.length - 1) {
     rhNavegandoProyecto = true;
     try {
@@ -11479,7 +11573,7 @@ async function rhAnalizarLoteActual() {
     } finally {
       rhNavegandoProyecto = false;
     }
-    await rhAnalizarLoteActual(); // encadena: analiza también el siguiente lote, y así hasta el final de la lista
+    await rhAnalizarLoteActual(false); // encadena: analiza también el siguiente lote, sin volver a reiniciar, y así hasta el final de la lista
   }
 }
 
@@ -11898,11 +11992,11 @@ const GEE_BANDAS = [
   { value: 'GNDVI',      label: 'GNDVI · NDVI verde',         color: '#059669', desc: 'Sensible a estrés por nitrógeno/clorofila (solo Sentinel)' },
   { value: 'NBR',        label: 'NBR · Áreas quemadas',       color: '#ea580c', desc: 'Normalized Burn Ratio' },
   { value: 'FalseColor', label: 'Falso color',                color: '#8b5cf6', desc: 'RGB infrarrojo' },
-  { value: 'Thermal',    label: 'Térmico',                    color: '#dc2626', desc: 'Temperatura superficial (no disp. en Sentinel-2)' },
+  { value: 'Thermal',    label: 'Térmico',                    color: '#dc2626', desc: 'Temperatura superficial (solo MODIS y Landsat 8)' },
 ];
 
 const GEE_PRESETS = [
-  { nombre: 'Incendios actuales', dias: 1,  dataset: 'VIIRS',    banda: 'Thermal' },
+  { nombre: 'Incendios actuales', dias: 1,  dataset: 'MODIS',    banda: 'Thermal' },
   { nombre: 'Sequedad (7 días)',  dias: 7,  dataset: 'Sentinel', banda: 'NDVI' },
   { nombre: 'Análisis mensual',   dias: 30, dataset: 'Sentinel', banda: 'NDVI' },
   { nombre: 'Áreas quemadas',     dias: 30, dataset: 'Sentinel', banda: 'NBR' },
@@ -11970,8 +12064,10 @@ function renderDatasetsGEE() {
     btn.textContent = d.label;
     btn.onclick = () => {
       geeFiltros.dataset = d.value;
-      // Sentinel no tiene banda térmica
-      if (d.value === 'Sentinel' && geeFiltros.banda === 'Thermal') geeFiltros.banda = 'NDVI';
+      // Térmico rompe en el backend con Sentinel (no tiene banda LST) y con
+      // VIIRS (usa un patrón de banda distinto a 'LST_1KM' → Earth Engine
+      // tira "Image with no bands"). Solo MODIS y Landsat 8 lo soportan.
+      if ((d.value === 'Sentinel' || d.value === 'VIIRS') && geeFiltros.banda === 'Thermal') geeFiltros.banda = 'NDVI';
       renderDatasetsGEE();
       renderBandasGEE();
     };
@@ -11983,7 +12079,7 @@ function renderBandasGEE() {
   const el = $el('gee-bandas');
   el.innerHTML = '';
   GEE_BANDAS.forEach(b => {
-    const deshabilitado = (b.value === 'Thermal' && geeFiltros.dataset === 'Sentinel');
+    const deshabilitado = (b.value === 'Thermal' && (geeFiltros.dataset === 'Sentinel' || geeFiltros.dataset === 'VIIRS'));
     const sel = geeFiltros.banda === b.value;
     const btn = document.createElement('button');
     btn.className = 'gee-band-btn w-full px-3 py-2 text-left flex items-center gap-3 border-2 rounded-xl transition-all' + (sel ? ' selected' : '');
@@ -17155,6 +17251,120 @@ async function _aptitudFetchINTA(lat, lon) {
   } catch (e) { return null; }
 }
 
+// ── Fallback LOCAL de Aptitud Productiva (cartas de detalle de Hugging Face) ──
+// El backend nacional (GEE_SERVER) todavía no conoce las cartas departamentales
+// de Salta (Valle de Lerma, Valles Calchaquíes, Miraflores/El Galpón) que se
+// subieron para el módulo de Riesgo Hidrológico. En vez de duplicar la descarga,
+// se reutilizan las mismas capas cacheadas (RH_SUELO_DETALLE_CAPAS) y se
+// traducen sus columnas al esquema que ya espera el resto del motor de Aptitud
+// Productiva (ind_prod, drenaje_s1, anegab_s1, limit_ppal, ...). Se prioriza
+// sobre el backend nacional porque es una escala más fina (departamental vs.
+// 1:500.000), igual que hacen las fuentes regionales que ya vive en el server.
+function _aptitudLetras(val) {
+  return new Set(String(val || '').toLowerCase().split('').filter(c => /[a-z]/.test(c)));
+}
+
+function _aptitudNormalizarPropsLocal(capaNombre, p) {
+  if (capaNombre.startsWith('Valle de Lerma')) {
+    const claseNum = (String(p.cap_uso || '').match(/^(\d)/) || [])[1] || null;
+    const letras = _aptitudLetras(p.cap_uso);
+    return {
+      clase: claseNum ? _aptitudClaseDesdeTexto(claseNum) : null,
+      props: {
+        ind_prod: p.Ind_Prod ?? null,
+        drenaje_s1: letras.has('d') ? 'Deficiente' : null,
+        anegab_s1: letras.has('d') ? 'Si' : 'No',
+        limit_ppal: letras.has('d') ? 'Exceso de agua / drenaje deficiente'
+                  : letras.has('s') ? 'Suelo poco profundo / pedregoso'
+                  : letras.has('t') ? 'Relieve con riesgo de erosión' : null,
+        limit_secu: null, profund_s1: null, text_sups1: null,
+        provincia: 'Salta', nombre_suelo: p.Nomb_ || p.Nomb_otros || p.Suelo_1 || null,
+        orden_usda: p.Orden || null, suborden_usda: p.Suborden || null,
+      }
+    };
+  }
+  if (capaNombre.startsWith('Valles Calchaquíes')) {
+    if (['Río', 'Arroyo', 'Represa', 'Antiguo Cauce'].includes(p.tipo)) return null; // agua: no es un dato de suelo
+    if (p.tipo === 'Población') {
+      return {
+        clase: null,
+        props: {
+          ind_prod: 5, drenaje_s1: null, anegab_s1: null,
+          limit_ppal: 'Suelo urbanizado / superficie impermeable', limit_secu: null,
+          profund_s1: null, text_sups1: null, provincia: 'Salta', nombre_suelo: p.u_nombre || null,
+        }
+      };
+    }
+    const val = p.u_aptitud;
+    const claseNum = val === '6' ? '6' : (String(val || '').match(/^(\d)/) || [])[1] || null;
+    const letras = _aptitudLetras(val);
+    return {
+      clase: claseNum ? _aptitudClaseDesdeTexto(claseNum) : null,
+      props: {
+        ind_prod: null,
+        drenaje_s1: letras.has('d') ? 'Deficiente' : null,
+        anegab_s1: letras.has('d') ? 'Si' : 'No',
+        limit_ppal: val === '6' ? 'Suelo no apto / salinidad-rocosidad severa'
+                  : letras.has('d') ? 'Exceso de agua / drenaje deficiente'
+                  : letras.has('s') ? 'Suelo poco profundo / pedregoso'
+                  : letras.has('t') ? 'Relieve con riesgo de erosión' : null,
+        limit_secu: null, profund_s1: null, text_sups1: null,
+        provincia: 'Salta', nombre_suelo: p.u_nombre || null, serie: p.u_serie || null,
+        descripcion: p.u_descripc || null,
+      }
+    };
+  }
+  if (capaNombre.startsWith('Miraflores')) {
+    const AGRICOL_IDX = { A: 90, B: 70, C: 45, D: 20, 'C/D': 32 };
+    const letras = _aptitudLetras(p.Ap_Riego);
+    return {
+      clase: null,
+      props: {
+        ind_prod: AGRICOL_IDX[p.Ap_Agricol] ?? null,
+        drenaje_s1: letras.has('d') ? 'Deficiente' : null,
+        anegab_s1: letras.has('d') ? 'Si' : 'No',
+        limit_ppal: letras.has('d') ? 'Exceso de agua / drenaje deficiente'
+                  : letras.has('s') ? 'Suelo poco profundo / pedregoso'
+                  : letras.has('t') ? 'Relieve con riesgo de erosión' : null,
+        limit_secu: null, profund_s1: null, text_sups1: null,
+        provincia: 'Salta', nombre_suelo: p.aso || null,
+        aptitud_agricola: p.Ap_Agricol || null, aptitud_riego: p.Ap_Riego || null,
+      }
+    };
+  }
+  return null;
+}
+
+async function _aptitudBuscarLocal(lat, lon) {
+  try { await rhAsegurarTurf(); } catch (e) { return null; }
+  const punto = turf.point([lon, lat]);
+  for (const capa of RH_SUELO_DETALLE_CAPAS) {
+    if (capa.bbox) {
+      const [minLon, minLat, maxLon, maxLat] = capa.bbox;
+      if (lon < minLon || lon > maxLon || lat < minLat || lat > maxLat) continue;
+    }
+    const geojson = await rhCargarCapaDetalle(capa);
+    if (!geojson) continue;
+    for (const feat of geojson.features) {
+      let dentro = false;
+      try { dentro = turf.booleanPointInPolygon(punto, feat); } catch (e) { continue; }
+      if (!dentro) continue;
+      const norm = _aptitudNormalizarPropsLocal(capa.nombre, feat.properties);
+      if (!norm) return null; // ej. cuerpo de agua: no hay dato de suelo, se prueba el backend nacional
+      return {
+        features: [{ properties: norm.props }],
+        _fuente: { provincia: 'Salta', depto: capa.nombre, escala: 50000 },
+        _clase: norm.clase, _indice_prod: norm.props.ind_prod,
+        _limitante: norm.props.limit_ppal, _drenaje: norm.props.drenaje_s1,
+        _anegabilidad: norm.props.anegab_s1,
+        _advertenciaEscala: 'Aproximación basada en la clasificación INTA de capacidad de uso de esta carta departamental; no incluye una medición directa de drenaje en terreno.',
+        _confiabilidad: 'media',
+      };
+    }
+  }
+  return null; // ninguna carta local cubre este punto -> se usa el backend nacional
+}
+
 async function _aptitudPrecipitacion(lat, lon) {
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
@@ -17455,14 +17665,17 @@ async function aptitudConsultarPunto(lat, lon, mapaObjetivo) {
   $el('aptitud-sindata').style.display = 'none';
   overlay.classList.add('activo');
 
-  const [dataINTA, clima, precip, dem, gee, lugarTxt] = await Promise.all([
+  const [dataINTANacional, dataLocal, clima, precip, dem, gee, lugarTxt] = await Promise.all([
     _aptitudFetchINTA(lat, lon),
+    _aptitudBuscarLocal(lat, lon),
     (typeof obtenerClima === 'function' ? obtenerClima(lat, lon).catch(() => null) : Promise.resolve(null)),
     _aptitudPrecipitacion(lat, lon),
     _aptitudPendienteDEM(lat, lon),
     (typeof obtenerGEE === 'function' ? obtenerGEE(lat, lon).catch(() => null) : Promise.resolve(null)),
     (typeof obtenerLugar === 'function' ? obtenerLugar(lat, lon).catch(() => null) : Promise.resolve(null)),
   ]);
+  // La carta local (departamental) es más fina que el backend nacional 1:500.000 — se prioriza si cubre el punto.
+  const dataINTA = dataLocal || dataINTANacional;
 
   $el('aptitud-loading').style.display = 'none';
 
@@ -17598,6 +17811,90 @@ function _aptitudActualizarCapaDebounced() {
   clearTimeout(_aptitudCapaTimeout);
   _aptitudCapaTimeout = setTimeout(aptitudActualizarCapa, 600);
 }
+// Convierte las features de una carta LOCAL (Salta) al mismo esquema ya-normalizado
+// que usa _aptitudClasificarProps para pintar la capa (indice_prod, drenaje,
+// anegabilidad, limitante, clase). Solo se usa mientras el viewport actual se
+// solapa con el bbox de alguna carta local — así la capa de colores también
+// pinta Salta, sin depender de que el backend (GEE_SERVER) la conozca.
+async function _aptitudCapaLocalFeatures(bounds) {
+  const west = bounds.getWest(), east = bounds.getEast(), south = bounds.getSouth(), north = bounds.getNorth();
+  const out = [];
+  for (const capa of RH_SUELO_DETALLE_CAPAS) {
+    if (!capa.bbox) continue; // por ahora solo las cartas locales (Salta) traen bbox
+    const [minLon, minLat, maxLon, maxLat] = capa.bbox;
+    const solapa = !(maxLon < west || minLon > east || maxLat < south || minLat > north);
+    if (!solapa) continue;
+    const geojson = await rhCargarCapaDetalle(capa);
+    if (!geojson) continue;
+    for (const feat of geojson.features) {
+      const norm = _aptitudNormalizarPropsLocal(capa.nombre, feat.properties);
+      if (!norm) continue; // ej. cuerpo de agua: sin dato de suelo, no se pinta
+      out.push({
+        type: 'Feature',
+        geometry: feat.geometry,
+        properties: {
+          indice_prod: norm.props.ind_prod ?? 45,
+          drenaje: norm.props.drenaje_s1,
+          anegabilidad: norm.props.anegab_s1,
+          limitante: norm.props.limit_ppal,
+          clase: norm.clase,
+          capacidad_uso: norm.clase,
+        }
+      });
+    }
+  }
+  return out;
+}
+
+function _aptitudConstruirCapaLayer(features) {
+  // FIX: si UNA sola feature trae una geometría rara (tipo mixto, anillo
+  // degenerado, etc. — puede pasar con cartas remotas de INTA que vienen
+  // con auto-intersecciones), L.geoJSON() construyendo TODO el
+  // FeatureCollection de una sola vez tira una excepción y ninguna de las
+  // 50+ features se llega a pintar, aunque el backend haya devuelto datos
+  // válidos (200 OK) para el resto. Se arma la capa feature por feature
+  // dentro de un try/catch para que una geometría puntualmente mala se
+  // descarte sola (con aviso en consola) sin tumbar toda la capa.
+  const layer = L.geoJSON(null, {
+    style: (feature) => {
+      const clasif = _aptitudClasificarProps(feature.properties);
+      return { fillColor: clasif.color, color: '#1E5E3A', weight: 1.5, fillOpacity: 0.62, opacity: 0.85 };
+    },
+    onEachFeature: (feature, layer) => {
+      const clasif = _aptitudClasificarProps(feature.properties);
+      layer.bindTooltip(`${clasif.emoji} ${clasif.categoria}`, { sticky: true });
+      layer.on('click', (ev) => {
+        L.DomEvent.stopPropagation(ev);
+        _aptitudActiva = true; // habilita el flujo de consulta puntual para este clic
+        aptitudConsultarPunto(ev.latlng.lat, ev.latlng.lng);
+      });
+    }
+  });
+  let descartadas = 0;
+  for (const feature of features) {
+    try {
+      layer.addData(feature);
+    } catch (e) {
+      descartadas++;
+    }
+  }
+  if (descartadas > 0) {
+    console.warn(`[aptitud-capa] ${descartadas} de ${features.length} polígonos se descartaron por geometría inválida (el resto se pintó igual).`);
+  }
+  layer.addTo(mapa);
+  layer.bringToBack();
+  return layer;
+}
+
+// Contador de secuencia: cada llamada a aptitudActualizarCapa() se numera.
+// Como las respuestas pueden tardar tiempos MUY distintos (nacional casi
+// instantáneo vs. cartas remotas en vivo que tardan 10-20s), sin esto la
+// llamada más vieja podía terminar DESPUÉS de una más nueva y pisarle el
+// resultado bueno con uno vacío o desactualizado -- ganaba quien terminaba
+// último, no quien se pidió último. Ahora cada llamada descarta su propio
+// resultado si para cuando termina ya no es la más reciente.
+let _aptitudCapaReqId = 0;
+
 async function aptitudActualizarCapa() {
   if (!_aptitudCapaActiva || !mapa) return;
   if (mapa.getZoom() < APTITUD_ZOOM_MIN_CAPA) {
@@ -17607,44 +17904,42 @@ async function aptitudActualizarCapa() {
   }
   $el('aptitud-aviso-zoom').classList.remove('visible');
 
+  const miReqId = ++_aptitudCapaReqId;
+
   const b = mapa.getBounds();
   const params = new URLSearchParams({
     west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth(),
   });
 
+  let featuresNacional = [];
   try {
-    const res = await fetch(`${GEE_SERVER}/suelo_capa_aptitud?${params}`, { signal: AbortSignal.timeout(20000) });
+    const res = await fetch(`${GEE_SERVER}/suelo_capa_aptitud?${params}`, { signal: AbortSignal.timeout(30000) });
     const data = await res.json();
-    if (!_aptitudCapaActiva) return; // se apagó la capa mientras cargaba
-    if (_aptitudCapaLayer) { mapa.removeLayer(_aptitudCapaLayer); _aptitudCapaLayer = null; }
-    if (!data.features || !data.features.length) {
-      console.warn('[aptitud-capa] respuesta sin features', data);
-      return;
-    }
-
-    _aptitudCapaLayer = L.geoJSON(data, {
-      style: (feature) => {
-        const clasif = _aptitudClasificarProps(feature.properties);
-        return { fillColor: clasif.color, color: '#1E5E3A', weight: 1.5, fillOpacity: 0.62, opacity: 0.85 };
-      },
-      onEachFeature: (feature, layer) => {
-        const clasif = _aptitudClasificarProps(feature.properties);
-        layer.bindTooltip(`${clasif.emoji} ${clasif.categoria}`, { sticky: true });
-        layer.on('click', (ev) => {
-          L.DomEvent.stopPropagation(ev);
-          _aptitudActiva = true; // habilita el flujo de consulta puntual para este clic
-          aptitudConsultarPunto(ev.latlng.lat, ev.latlng.lng);
-        });
-      }
-    }).addTo(mapa);
-    _aptitudCapaLayer.bringToBack();
+    featuresNacional = data.features || [];
   } catch (e) {
-    // Antes tragaba el error en silencio, lo que hacía imposible depurar
-    // fallas reales (timeout, geometría corrupta, etc.) desde afuera.
-    // Se deja logueado en consola — capa accesoria, no debe interrumpir
-    // el resto de la app, pero al menos ahora queda rastro del motivo.
-    console.error('[aptitud-capa] falló al cargar/dibujar la capa:', e);
+    // Capa accesoria: si falla el backend nacional, se sigue con lo que haya en local (Salta).
+    console.error('[aptitud-capa] falló al cargar la capa nacional:', e);
   }
+
+  let featuresLocal = [];
+  try { featuresLocal = await _aptitudCapaLocalFeatures(b); }
+  catch (e) { console.error('[aptitud-capa] falló al cargar cartas locales:', e); }
+
+  // Si mientras esperábamos ya se disparó una consulta más nueva (el usuario
+  // siguió moviendo/zoomeando el mapa), esta respuesta quedó vieja -- se
+  // descarta en silencio para no pisar el resultado de la consulta actual.
+  if (miReqId !== _aptitudCapaReqId) return;
+
+
+  if (!_aptitudCapaActiva) return; // se apagó la capa mientras cargaba
+  if (_aptitudCapaLayer) { mapa.removeLayer(_aptitudCapaLayer); _aptitudCapaLayer = null; }
+
+  const features = featuresNacional.concat(featuresLocal);
+  if (!features.length) {
+    console.warn('[aptitud-capa] sin features (ni backend nacional ni cartas locales) para este viewport');
+    return;
+  }
+  _aptitudCapaLayer = _aptitudConstruirCapaLayer(features);
 }
 // ════════════════════════════════════════════════════════════════
 
