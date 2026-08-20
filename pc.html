@@ -2853,49 +2853,347 @@
       </button>
     </div>
 
-    <!-- ── BARRA INFERIOR: solo ZOOM (izq) ── -->
-    <div id="barra-inferior-mapa">
-      <!-- Botones zoom a la izquierda -->
-      <div id="zoom-btns">
-        <button id="btn-medidor" class="btn-zoom" onclick="toggleMedidorMapa()" title="Medir distancia en el mapa">
-          <span class="material-symbols-outlined" style="font-size:18px">straighten</span>
+    <!-- ══════════════════════════════════════════════════════════════
+         PANEL DE HERRAMIENTAS AGRUPADAS (lado derecho del mapa)
+         ══════════════════════════════════════════════════════════════
+         Reorganización visual de los botones que antes vivían sueltos
+         en el borde derecho del mapa (btn-centrar, btn-fullscreen,
+         btn-buscar-focos-zona, btn-ir-hidrologia, btn-gee,
+         btn-aptitud-capa, btn-etiquetas, btn-delimitar) + los que vivían
+         en la barra inferior izquierda junto al zoom (btn-medidor,
+         btn-capas-io, zoom +/-). Los botones son LOS MISMOS elementos
+         (mismo id, mismo onclick) -- solo cambia el contenedor visual y
+         el layout, no la lógica. btn-leyenda-gee (aparece solo con una
+         capa GEE activa) queda donde estaba: es un helper contextual,
+         no una "herramienta" fija. -->
+    <style>
+      #tg-panel {
+        position: absolute; top: 72px; right: 16px; z-index: 1000;
+        width: 240px; max-width: calc(100vw - 32px);
+        display: flex; flex-direction: column; gap: 8px;
+        font-family: 'Inter', sans-serif;
+        max-height: calc(100% - 88px);
+      }
+      #tg-panel-toprow {
+        display: flex; justify-content: flex-end; gap: 6px;
+      }
+      .tg-toprow-btn {
+        width: 30px; height: 30px; border-radius: 9px;
+        background: rgba(255,255,255,0.92); border: 1.5px solid #E2E8F0;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; transition: all .15s; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        color: #424841;
+      }
+      .tg-toprow-btn:hover { background: #EAF4ED; border-color: #1E5E3A; color: #1E5E3A; }
+      .tg-toprow-btn:active { transform: scale(0.92); }
+
+      #tg-groups-scroll {
+        display: flex; flex-direction: column; gap: 8px;
+        overflow-y: auto; overflow-x: hidden;
+        padding-right: 2px;
+      }
+      .tg-group {
+        background: rgba(255,255,255,0.92);
+        border: 1.5px solid #E2E8F0;
+        border-radius: 16px;
+        box-shadow: 0 2px 14px rgba(0,0,0,0.10);
+        overflow: hidden;
+        flex-shrink: 0;
+        backdrop-filter: blur(6px);
+      }
+      .tg-group-header {
+        width: 100%; display: flex; align-items: center; gap: 9px;
+        padding: 11px 12px; background: transparent; border: none;
+        cursor: pointer; font-family: inherit; text-align: left;
+        transition: background .15s;
+      }
+      .tg-group-header:hover { background: rgba(30,94,58,0.06); }
+      .tg-group-header:active { transform: none; }
+      .tg-group-icon {
+        font-size: 18px !important; flex-shrink: 0;
+        color: var(--tg-accent, #1E5E3A);
+      }
+      .tg-group-title {
+        flex: 1; font-size: 12.5px; font-weight: 800; letter-spacing: .03em;
+        color: #1a1c1a; text-transform: uppercase;
+      }
+      .tg-group-chevron {
+        font-size: 18px !important; color: #9ca3af;
+        transition: transform .2s ease; flex-shrink: 0;
+      }
+      .tg-group.tg-open .tg-group-chevron { transform: rotate(180deg); }
+
+      .tg-group-body {
+        display: grid;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows .2s ease;
+      }
+      .tg-group.tg-open .tg-group-body { grid-template-rows: 1fr; }
+      .tg-group-body-inner {
+        overflow: hidden;
+        display: flex; flex-direction: column;
+        padding: 0 8px;
+      }
+      .tg-group.tg-open .tg-group-body-inner { padding: 0 8px 8px; }
+
+      .tg-item-slot { display: block; }
+      .tg-item {
+        width: 100%; display: flex; align-items: center; gap: 10px;
+        padding: 8px 9px; border-radius: 11px; border: 1.5px solid transparent;
+        background: transparent; cursor: pointer; font-family: inherit;
+        text-align: left; transition: background .15s, border-color .15s;
+        color: #1a1c1a;
+      }
+      .tg-item:hover { background: #F4F7F4; }
+      .tg-item:active { transform: scale(0.98); }
+      .tg-item.activo { background: rgba(30,94,58,0.08); border-color: rgba(30,94,58,0.3); }
+      .tg-item .material-symbols-outlined {
+        font-size: 17px !important; flex-shrink: 0;
+        color: var(--tg-item-color, #1E5E3A);
+      }
+      .tg-item-texts { display: flex; flex-direction: column; min-width: 0; }
+      .tg-item-nombre { font-size: 12.5px; font-weight: 700; color: #1a1c1a; line-height: 1.25; }
+      .tg-item-desc { font-size: 10.5px; color: #838a82; line-height: 1.2; }
+      .tg-item[disabled] { opacity: .45; cursor: not-allowed; }
+      .tg-item[disabled]:hover { background: transparent; }
+
+      /* Los botones originales quedan con su mismo id/onclick, pero al
+         vivir ahora dentro de una fila .tg-item pierden el posicionamiento
+         absoluto/circular que tenían sueltos sobre el mapa. */
+      .tg-item-slot #btn-centrar, .tg-item-slot #btn-fullscreen,
+      .tg-item-slot #btn-gee, .tg-item-slot #btn-etiquetas,
+      .tg-item-slot #btn-buscar-focos-zona, .tg-item-slot #btn-ir-hidrologia,
+      .tg-item-slot #btn-aptitud-capa, .tg-item-slot #btn-delimitar,
+      .tg-item-slot #btn-medidor, .tg-item-slot #btn-capas-io,
+      .tg-item-slot .btn-zoom {
+        position: static !important; width: 100% !important; height: auto !important;
+        border-radius: 11px !important; border: 1.5px solid transparent !important;
+        background: transparent !important; box-shadow: none !important;
+        display: flex !important; align-items: center !important; gap: 10px !important;
+        padding: 8px 9px !important; justify-content: flex-start !important;
+        font-size: 12.5px !important; font-weight: 700 !important; color: #1a1c1a !important;
+      }
+      .tg-item-slot #btn-delimitar { color: white !important; }
+      .tg-item-slot button:hover { background: #F4F7F4 !important; }
+      .tg-item-slot #btn-gee.activo, .tg-item-slot #btn-aptitud-capa.activa,
+      .tg-item-slot .btn-zoom.activa {
+        background: rgba(30,94,58,0.08) !important; border-color: rgba(30,94,58,0.3) !important;
+      }
+      .tg-item-slot .material-symbols-outlined { font-size: 17px !important; }
+
+      /* Botón flotante para abrir/cerrar el panel en pantallas chicas */
+      #tg-mobile-toggle { display: none; }
+
+      @media (max-width: 720px) {
+        #tg-panel {
+          top: auto; bottom: 16px; right: 16px;
+          width: min(280px, calc(100vw - 76px));
+          max-height: min(70vh, 520px);
+          transform-origin: bottom right;
+          transition: transform .2s ease, opacity .2s ease;
+        }
+        #tg-panel.tg-panel-cerrado {
+          transform: scale(0.9); opacity: 0; pointer-events: none;
+        }
+        #tg-mobile-toggle {
+          display: flex; position: absolute; bottom: 16px; right: 16px; z-index: 1001;
+          width: 48px; height: 48px; border-radius: 50%;
+          background: #1E5E3A; border: none; box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+          align-items: center; justify-content: center; cursor: pointer;
+          transition: transform .15s;
+        }
+        #tg-mobile-toggle:active { transform: scale(0.92); }
+        #tg-mobile-toggle .material-symbols-outlined { color: #fff; font-size: 22px; }
+      }
+    </style>
+
+    <button id="tg-mobile-toggle" onclick="tgTogglePanelMobile()" title="Herramientas">
+      <span class="material-symbols-outlined">construction</span>
+    </button>
+
+    <div id="tg-panel">
+      <div id="tg-panel-toprow">
+        <button class="tg-toprow-btn" onclick="toolGroupsExpandAll()" title="Expandir todos los grupos">
+          <span class="material-symbols-outlined" style="font-size:16px">unfold_more</span>
         </button>
-        <button id="btn-capas-io" class="btn-zoom" onclick="toggleCapasIOPanel()" title="Cargar o exportar capas (KML / GeoJSON)">
-          <span class="material-symbols-outlined" style="color:#1E5E3A;font-size:18px">folder_open</span>
+        <button class="tg-toprow-btn" onclick="toolGroupsCollapseAll()" title="Contraer todos los grupos">
+          <span class="material-symbols-outlined" style="font-size:16px">unfold_less</span>
         </button>
-        <button class="btn-zoom" onclick="if(mapa) mapa.zoomIn()" title="Acercar">+</button>
-        <button class="btn-zoom" onclick="if(mapa) mapa.zoomOut()" title="Alejar">−</button>
+      </div>
+
+      <div id="tg-groups-scroll">
+        <!-- ══ GRUPO 1 — ANÁLISIS ══ -->
+        <div class="tg-group" data-tg-group="analysis" style="--tg-accent:#c62828">
+          <button class="tg-group-header" onclick="toolGroupToggle('analysis')">
+            <span class="material-symbols-outlined tg-group-icon">local_fire_department</span>
+            <span class="tg-group-title">Análisis</span>
+            <span class="material-symbols-outlined tg-group-chevron">expand_more</span>
+          </button>
+          <div class="tg-group-body">
+            <div class="tg-group-body-inner">
+              <div class="tg-item-slot" style="--tg-item-color:#c62828" data-tooltip="Índice y focos activos">
+                <!-- btn-buscar-focos-zona: función original intacta -->
+                <button id="btn-buscar-focos-zona" onclick="manejarClickFuego()" title="Buscar focos NASA FIRMS en la zona visible del mapa">
+                  <span id="icon-fuego" class="material-symbols-outlined">local_fire_department</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Riesgo de incendio</span><span class="tg-item-desc">Índice y focos activos</span></span>
+                </button>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#0e7490" data-tooltip="Lluvias y desbordes">
+                <button id="btn-ir-hidrologia" onclick="irAAnalisisHidrologico()" title="Enviar al Análisis Hidrológico">
+                  <span class="material-symbols-outlined">water_drop</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Riesgo de inundación</span><span class="tg-item-desc">Lluvias y desbordes</span></span>
+                </button>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#2F855A" data-tooltip="NDVI y estado del cultivo">
+                <!-- Acceso directo: abre la hoja GEE con NDVI/Sentinel preseleccionado (misma lógica que los presets existentes) -->
+                <button class="tg-item" onclick="abrirGEEconPreset('Sentinel','NDVI',7)" title="Vegetación — NDVI y estado del cultivo">
+                  <span class="material-symbols-outlined">eco</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Vegetación</span><span class="tg-item-desc">NDVI y estado del cultivo</span></span>
+                </button>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#0891b2" data-tooltip="Humedad de la vegetación (NDMI)">
+                <button class="tg-item" onclick="abrirGEEconPreset('Sentinel','NDMI',7)" title="Humedad del suelo — NDMI">
+                  <span class="material-symbols-outlined">humidity_mid</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Humedad del suelo</span><span class="tg-item-desc">Humedad de la vegetación (NDMI)</span></span>
+                </button>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#ea580c" data-tooltip="Temperatura superficial (MODIS)">
+                <button class="tg-item" onclick="abrirGEEconPreset('MODIS','Thermal',1)" title="Temperatura superficial (MODIS)">
+                  <span class="material-symbols-outlined">thermostat</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Temperatura</span><span class="tg-item-desc">Temperatura superficial</span></span>
+                </button>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#7c3aed" data-tooltip="Ver capas satelitales">
+                <button class="tg-item" onclick="abrirGEEconPreset('Sentinel','FalseColor',7)" title="Imágenes satelitales">
+                  <span class="material-symbols-outlined">satellite_alt</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Imágenes satelitales</span><span class="tg-item-desc">Ver capas satelitales</span></span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ GRUPO 2 — HERRAMIENTAS DE TRABAJO ══ -->
+        <div class="tg-group" data-tg-group="work" style="--tg-accent:#7c3aed">
+          <button class="tg-group-header" onclick="toolGroupToggle('work')">
+            <span class="material-symbols-outlined tg-group-icon">edit</span>
+            <span class="tg-group-title">Herramientas de trabajo</span>
+            <span class="material-symbols-outlined tg-group-chevron">expand_more</span>
+          </button>
+          <div class="tg-group-body">
+            <div class="tg-group-body-inner">
+              <div class="tg-item-slot" style="--tg-item-color:#7c3aed" data-tooltip="Trazar el contorno de un campo">
+                <button id="btn-delimitar" onclick="activarModoDelimitar()" title="Delimitar mi campo"
+                  style="background:#1E5E3A !important;">
+                  <span class="material-symbols-outlined" style="color:#fff !important;">draw</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre" style="color:#fff !important;">Delimitar lote</span><span class="tg-item-desc" style="color:rgba(255,255,255,0.75) !important;">Trazar el contorno de un campo</span></span>
+                </button>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#14b8a6" data-tooltip="Próximamente">
+                <button class="tg-item" disabled title="Marcar punto — Próximamente">
+                  <span class="material-symbols-outlined">location_on</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Marcar punto</span><span class="tg-item-desc">Próximamente</span></span>
+                </button>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#d97706" data-tooltip="Medir distancia en el mapa">
+                <button id="btn-medidor" class="btn-zoom" onclick="toggleMedidorMapa()" title="Medir distancia en el mapa">
+                  <span class="material-symbols-outlined" style="font-size:17px">straighten</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Medir distancia</span><span class="tg-item-desc">Trazá una línea en el mapa</span></span>
+                </button>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#dc2626" data-tooltip="Próximamente">
+                <button class="tg-item" disabled title="Eliminar elementos — Próximamente">
+                  <span class="material-symbols-outlined">delete</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Eliminar elementos</span><span class="tg-item-desc">Próximamente</span></span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ GRUPO 3 — DATOS Y CAPAS ══ -->
+        <div class="tg-group" data-tg-group="layers" style="--tg-accent:#7c3aed">
+          <button class="tg-group-header" onclick="toolGroupToggle('layers')">
+            <span class="material-symbols-outlined tg-group-icon">layers</span>
+            <span class="tg-group-title">Datos y capas</span>
+            <span class="material-symbols-outlined tg-group-chevron">expand_more</span>
+          </button>
+          <div class="tg-group-body">
+            <div class="tg-group-body-inner">
+              <div class="tg-item-slot" style="--tg-item-color:#7c3aed" data-tooltip="Capas satelitales (Earth Engine)">
+                <button id="btn-gee" onclick="toggleGeeSheet()" title="Capas satelitales (Earth Engine)">
+                  <span class="material-symbols-outlined">satellite_alt</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Google Earth Engine</span><span class="tg-item-desc">Capas satelitales</span></span>
+                </button>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#1E5E3A" data-tooltip="Capa de aptitud del suelo">
+                <button id="btn-aptitud-capa" onclick="toggleCapaAptitud()" title="Capa: Aptitud Productiva del Suelo">
+                  <span class="material-symbols-outlined">grass</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Aptitud productiva</span><span class="tg-item-desc">Capa de aptitud del suelo</span></span>
+                </button>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#0d9488" data-tooltip="Cargar o exportar capas (KML / GeoJSON)">
+                <button id="btn-capas-io" class="btn-zoom" onclick="toggleCapasIOPanel()" title="Cargar o exportar capas (KML / GeoJSON)">
+                  <span class="material-symbols-outlined" style="font-size:17px">folder_open</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Agregar / exportar capa</span><span class="tg-item-desc">KML, GeoJSON</span></span>
+                </button>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#9ca3af" data-tooltip="Próximamente">
+                <button class="tg-item" disabled title="Datos disponibles — Próximamente">
+                  <span class="material-symbols-outlined">dataset</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Datos disponibles</span><span class="tg-item-desc">Próximamente</span></span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ GRUPO 4 — NAVEGACIÓN ══ -->
+        <div class="tg-group" data-tg-group="nav" style="--tg-accent:#6b7280">
+          <button class="tg-group-header" onclick="toolGroupToggle('nav')">
+            <span class="material-symbols-outlined tg-group-icon">explore</span>
+            <span class="tg-group-title">Navegación</span>
+            <span class="material-symbols-outlined tg-group-chevron">expand_more</span>
+          </button>
+          <div class="tg-group-body">
+            <div class="tg-group-body-inner">
+              <div class="tg-item-slot" style="--tg-item-color:#6b7280" data-tooltip="Centrar en mi posición">
+                <button id="btn-centrar" onclick="centrarMapa()" title="Centrar en mi posición">
+                  <span class="material-symbols-outlined">my_location</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Centrar mapa</span><span class="tg-item-desc">En mi posición</span></span>
+                </button>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#6b7280" data-tooltip="Pantalla completa">
+                <button id="btn-fullscreen" onclick="toggleFullscreenMapa()" title="Pantalla completa">
+                  <span id="icon-fullscreen" class="material-symbols-outlined">fullscreen</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Pantalla completa</span><span class="tg-item-desc"></span></span>
+                </button>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#6b7280" data-tooltip="Acercar / alejar">
+                <div style="display:flex; gap:6px;">
+                  <button class="btn-zoom" onclick="if(mapa) mapa.zoomIn()" title="Acercar" style="flex:1;justify-content:center !important;">+</button>
+                  <button class="btn-zoom" onclick="if(mapa) mapa.zoomOut()" title="Alejar" style="flex:1;justify-content:center !important;">−</button>
+                </div>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#6b7280" data-tooltip="Próximamente">
+                <button class="tg-item" disabled title="Vista inicial — Próximamente">
+                  <span class="material-symbols-outlined">home_pin</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Vista inicial</span><span class="tg-item-desc">Próximamente</span></span>
+                </button>
+              </div>
+              <div class="tg-item-slot" style="--tg-item-color:#6b7280" data-tooltip="Provincias, rutas y nombres">
+                <button id="btn-etiquetas" onclick="toggleEtiquetasBtn()" title="Mostrar/ocultar provincias, rutas y nombres de calles">
+                  <span class="material-symbols-outlined">label</span>
+                  <span class="tg-item-texts"><span class="tg-item-nombre">Etiquetas</span><span class="tg-item-desc">Provincias, rutas y nombres</span></span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <button id="btn-centrar" onclick="centrarMapa()" title="Centrar en mi posición">
-      <span class="material-symbols-outlined" style="color:#1E5E3A;font-size:20px">my_location</span>
-    </button>
-    <!-- Botón pantalla completa -->
-    <button id="btn-fullscreen" onclick="toggleFullscreenMapa()" title="Pantalla completa">
-      <span id="icon-fullscreen" class="material-symbols-outlined" style="color:#1E5E3A;font-size:20px">fullscreen</span>
-    </button>
-    <!-- Botón buscar focos / toggle direcciones -->
-    <button id="btn-buscar-focos-zona" onclick="manejarClickFuego()"
-      title="Buscar focos NASA FIRMS en la zona visible del mapa"
-      style="position:absolute;bottom:132px;right:12px;z-index:1000;
-             background:#c62828;border:1.5px solid #b71c1c;
-             border-radius:50%;width:44px;height:44px;
-             display:flex;align-items:center;justify-content:center;
-             box-shadow:0 2px 10px rgba(0,0,0,0.25);cursor:pointer;transition:all .2s;">
-      <span id="icon-fuego" class="material-symbols-outlined" style="color:#fff;font-size:20px">local_fire_department</span>
-    </button>
-    <!-- Botón enviar campo/lote activo al Análisis Hidrológico -->
-    <button id="btn-ir-hidrologia" onclick="irAAnalisisHidrologico()"
-      title="Enviar al Análisis Hidrológico"
-      style="position:absolute;bottom:184px;right:12px;z-index:1000;
-             background:#0e7490;border:1.5px solid #0c6178;
-             border-radius:50%;width:44px;height:44px;
-             display:flex;align-items:center;justify-content:center;
-             box-shadow:0 2px 10px rgba(0,0,0,0.25);cursor:pointer;transition:all .2s;">
-      <span class="material-symbols-outlined" style="color:#fff;font-size:20px">water_drop</span>
-    </button>
-    <!-- Botón leyenda GEE (visible solo cuando hay capa activa) -->
+    <!-- Botón leyenda GEE (contextual: solo aparece con una capa satelital activa; no es parte de los grupos) -->
     <button id="btn-leyenda-gee" onclick="toggleLeyendaGEE()" title="Ver leyenda de la capa satelital">
       <span class="material-symbols-outlined" style="color:#fff;font-size:20px">palette</span>
     </button>
@@ -2908,17 +3206,6 @@
       </div>
       <p id="leyenda-nota-pie" class="leyenda-nota-pie"></p>
     </div>
-    <button id="btn-gee" onclick="toggleGeeSheet()" title="Capas satelitales (Earth Engine)">
-      <span class="material-symbols-outlined" style="color:#1E5E3A;font-size:20px">satellite_alt</span>
-    </button>
-    <!-- Botón capa Aptitud Productiva (polígonos coloreados, módulo independiente) -->
-    <button id="btn-aptitud-capa" onclick="toggleCapaAptitud()" title="Capa: Aptitud Productiva del Suelo"
-      style="position:absolute;bottom:300px;right:12px;z-index:1000;width:40px;height:40px;
-             background:rgba(255,255,255,0.95);border:1.5px solid rgba(0,0,0,0.1);border-radius:10px;
-             display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;
-             box-shadow:0 2px 10px rgba(0,0,0,0.15);">
-      <span class="material-symbols-outlined" style="color:#1E5E3A;font-size:20px">grass</span>
-    </button>
     <!-- Leyenda de colores de la capa Aptitud Productiva -->
     <div id="aptitud-leyenda">
       <div style="font-weight:800;margin-bottom:4px;color:#1E5E3A;">Aptitud Productiva</div>
@@ -2930,20 +3217,6 @@
       <div class="aptitud-leyenda-fila"><span class="aptitud-leyenda-punto" style="background:#fbfbf6;border:1px solid #d1d9c4"></span>Conservación</div>
     </div>
     <div id="aptitud-aviso-zoom">Acercá el mapa para ver la capa de aptitud productiva</div>
-    <!-- Botón nombres: provincias, pueblos, ciudades (estilo Google Earth) -->
-    <button id="btn-etiquetas" onclick="toggleEtiquetasBtn()" title="Mostrar/ocultar provincias, rutas y nombres de calles">
-      <span class="material-symbols-outlined" style="color:#fff;font-size:20px">label</span>
-    </button>
-    <!-- Botón delimitar campo -->
-    <button id="btn-delimitar" onclick="activarModoDelimitar()" title="Delimitar mi campo"
-      style="position:absolute;bottom:352px;right:12px;z-index:1000;
-        background:#1E5E3A;border:none;
-        border-radius:20px;padding:0 16px;height:36px;
-        display:flex;align-items:center;justify-content:center;
-        box-shadow:0 2px 10px rgba(0,0,0,0.25);cursor:pointer;transition:all .2s;
-        color:white;font-size:13px;font-weight:700;font-family:Inter,sans-serif;white-space:nowrap;">
-      Delimitar
-    </button>
 
     <!-- Toolbar modo delimitar -->
     <div id="toolbar-delimitar"
@@ -3850,6 +4123,100 @@ function $el(id) {
   return new Proxy({}, { get: () => new Proxy(() => {}, { get: () => () => {} }), set: () => true });
 }
 
+// ════════════════════════════════════════════════
+//  PANEL DE HERRAMIENTAS AGRUPADAS (grupos plegables del lado derecho)
+// ════════════════════════════════════════════════
+// No toca ninguna función existente del mapa/análisis: solo controla
+// abrir/cerrar los 4 grupos visuales y recuerda el estado en localStorage.
+// Cada grupo es independiente (NO es un acordeón exclusivo) -- se puede
+// tener varios abiertos o cerrados a la vez, como pide el diseño.
+const TG_GRUPOS = ['analysis', 'work', 'layers', 'nav'];
+const TG_STORAGE_KEY = 'geosentinel_tg_estado';
+
+function tgLeerEstado() {
+  try {
+    const guardado = JSON.parse(localStorage.getItem(TG_STORAGE_KEY) || '{}');
+    return guardado;
+  } catch (e) {
+    return {};
+  }
+}
+
+function tgGuardarEstado(estado) {
+  try { localStorage.setItem(TG_STORAGE_KEY, JSON.stringify(estado)); } catch (e) { /* localStorage no disponible: se ignora, no rompe nada */ }
+}
+
+function toolGroupToggle(nombreGrupo) {
+  const grupoEl = document.querySelector(`.tg-group[data-tg-group="${nombreGrupo}"]`);
+  if (!grupoEl) return;
+  const abrir = !grupoEl.classList.contains('tg-open');
+  grupoEl.classList.toggle('tg-open', abrir);
+  const estado = tgLeerEstado();
+  estado[nombreGrupo] = abrir;
+  tgGuardarEstado(estado);
+}
+
+function toolGroupsCollapseAll() {
+  const estado = tgLeerEstado();
+  TG_GRUPOS.forEach(g => {
+    document.querySelector(`.tg-group[data-tg-group="${g}"]`)?.classList.remove('tg-open');
+    estado[g] = false;
+  });
+  tgGuardarEstado(estado);
+}
+
+function toolGroupsExpandAll() {
+  const estado = tgLeerEstado();
+  TG_GRUPOS.forEach(g => {
+    document.querySelector(`.tg-group[data-tg-group="${g}"]`)?.classList.add('tg-open');
+    estado[g] = true;
+  });
+  tgGuardarEstado(estado);
+}
+
+function tgInicializarPanel() {
+  const estado = tgLeerEstado();
+  // Por defecto, si el usuario nunca lo tocó, arranca con ANÁLISIS abierto
+  // (el grupo que más se usa al entrar) y el resto cerrado.
+  const abiertosPorDefecto = { analysis: true, work: false, layers: false, nav: false };
+  TG_GRUPOS.forEach(g => {
+    const abrir = Object.prototype.hasOwnProperty.call(estado, g) ? !!estado[g] : abiertosPorDefecto[g];
+    document.querySelector(`.tg-group[data-tg-group="${g}"]`)?.classList.toggle('tg-open', abrir);
+  });
+}
+
+function tgTogglePanelMobile() {
+  $el('tg-panel').classList.toggle('tg-panel-cerrado');
+}
+
+// Arranca cerrado en pantallas chicas (se abre con el botón flotante); en
+// desktop el panel siempre está visible.
+function tgInicializarMobile() {
+  if (window.innerWidth <= 720) $el('tg-panel').classList.add('tg-panel-cerrado');
+}
+
+// Acceso directo desde el grupo ANÁLISIS: abre la hoja de Earth Engine y
+// preselecciona un dataset/banda (reutiliza geeFiltros + renderDatasetsGEE/
+// renderBandasGEE, que ya existen -- no se agrega lógica nueva de negocio).
+function abrirGEEconPreset(datasetVal, bandaVal, dias) {
+  const sheet = $el('gee-sheet');
+  if (sheet && sheet.offsetHeight <= 52) toggleGeeSheet(); // solo abre si estaba cerrada, nunca la cierra
+  else iniciarPanelGEE(); // por si ya estaba abierta pero nunca se inicializó (idempotente)
+  geeFiltros.dataset = datasetVal;
+  geeFiltros.banda = bandaVal;
+  if (dias) {
+    geeFiltros.fechaFin = fmtFecha(new Date());
+    geeFiltros.fechaInicio = fechaHaceNDias(dias);
+  }
+  renderDatasetsGEE();
+  renderBandasGEE();
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  tgInicializarPanel();
+  tgInicializarMobile();
+});
+
 const SHEETS_URL  = 'https://script.google.com/macros/s/AKfycbzThYdaZKqse_ofXaHv-3MUHrUpv_U2YqMTwDL9j9FQQYpXKLhSTVWyoc9NNjTUISk/exec';
 const OWM_KEY     = '0123141040503a84ddc4ea2913c6a24b';
 const FIRMS_KEY   = 'a1f9e35c67c4cd5b1118bcc674ec2e73';
@@ -3895,6 +4262,11 @@ function historialLimpiar() {
 // ════════════════════════════════════════════════════════════════
 
 let gpsLat = null, gpsLon = null, gpsListo = false;
+// Posición GPS real del dispositivo (WiFi/IP/GPS del navegador), separada de
+// gpsLat/gpsLon: estas últimas son "la ubicación que la app está analizando"
+// (clima, focos, riesgo) y cambian al navegar lotes de un proyecto. gpsRealLat/Lon
+// es solo lo que reporta el navegador, para no pisar el lote activo (ver iniciarGPS()).
+let gpsRealLat = null, gpsRealLon = null;
 let inicioId = null;
 let climaActual = null;
 let ultimoRiesgoInundacion = null; // { riesgo, datosOM, datosGEE } — usado por el Informe Express
@@ -4250,20 +4622,36 @@ function iniciarGPS() {
     return;
   }
   navigator.geolocation.watchPosition(pos => {
-    gpsLat  = pos.coords.latitude.toFixed(6);
-    gpsLon  = pos.coords.longitude.toFixed(6);
+    gpsRealLat = pos.coords.latitude.toFixed(6);
+    gpsRealLon = pos.coords.longitude.toFixed(6);
     const prec = Math.round(pos.coords.accuracy);
-    gpsListo = true;
 
     setText('gps-txt', `✅ GPS listo · ±${prec}m`);
-    setText('gps-coords', `${gpsLat}, ${gpsLon}`);
+    setText('gps-coords', `${gpsRealLat}, ${gpsRealLon}`);
     setStyle('gps-box','background','#EAF4ED');
     setStyle('gps-box','borderColor','#86efac');
     $el('gps-icon')?.classList.remove('spin');
     const _gpsIcon = $el('gps-icon'); if (_gpsIcon) { _gpsIcon.style.color = '#2F855A';
     _gpsIcon.textContent = 'location_on'; }
-
     $el('btn-inicio').disabled = false;
+
+    // FIX: si el usuario está mirando un lote de un proyecto (GeoJSON/KML
+    // cargado), gpsLat/gpsLon apuntan a ESE lote (lo setea showCurrentLayer()).
+    // Antes, cada vez que el navegador reportaba una posición nueva —algo
+    // frecuente en notebooks sin GPS real, donde la ubicación se recalcula
+    // por WiFi/IP y puede saltar de país— esta función pisaba gpsLat/gpsLon
+    // con la posición real del dispositivo sin avisar, y la app "saltaba" de
+    // golpe del lote (ej. África) a la ubicación real del usuario (ej. EE.UU).
+    // Ahora, mientras haya un lote de proyecto activo, el GPS real solo se
+    // guarda en gpsRealLat/gpsRealLon (para el indicador y para "Delimitar
+    // desde mi ubicación") y NO reemplaza la ubicación que se está analizando.
+    const viendoLoteDeProyecto = typeof proyectoActual !== 'undefined' && proyectoActual
+      && proyectoActual.files.length > 0 && proyectoActual.currentIndex >= 0;
+    if (viendoLoteDeProyecto) return;
+
+    gpsLat  = gpsRealLat;
+    gpsLon  = gpsRealLon;
+    gpsListo = true;
     cargarDatos();
     iniciarModuloHidrico();
     // Redibujar líneas tácticas si el mapa ya está iniciado
@@ -5836,9 +6224,11 @@ const IIPDIInspector = (() => {
     // (reusa rhFetchHumedalPorCelda, ya integrado para el Riesgo Hidrológico).
     const cuerpos = await Promise.all(cuerposRaw.map(async c => {
       let humedalPct = null;
+      let humedalCapaNombre = null;
       try {
         if (typeof rhFetchHumedalPorCelda === 'function' && c.lat != null && c.lon != null) {
-          humedalPct = await rhFetchHumedalPorCelda(c.lat, c.lon);
+          const resHumedal = await rhFetchHumedalPorCelda(c.lat, c.lon);
+          if (resHumedal) { humedalPct = resHumedal.pct; humedalCapaNombre = resHumedal.nombre; }
         }
       } catch (e) { /* sin capa de humedal en esa zona: se sigue sin ese dato */ }
 
@@ -5854,7 +6244,7 @@ const IIPDIInspector = (() => {
         }
       } catch (e) { console.warn('[IPCA] Falló consulta de historial hidrológico (JRC GSW):', e.message || e); }
 
-      return { ...c, _humedalPct: humedalPct, _gsw: gsw };
+      return { ...c, _humedalPct: humedalPct, _humedalCapaNombre: humedalCapaNombre, _gsw: gsw };
     }));
 
     _ipcaContexto = { cuerpos, ...contextoBase };
@@ -7168,6 +7558,10 @@ const MedicionSuperficie = (() => {
 
   function limpiar() {
     if (mapaHidrologia) mapaHidrologia.off('click', onClickMapa);
+    // FIX: al terminar/limpiar la medición, se restaura el clic normal de
+    // los polígonos con popup (grid de riesgo hidrológico, campo delimitado,
+    // lotes, etc.) que se había desactivado en iniciar() para poder dibujar.
+    if (mapaHidrologia) _setPoligonosClicables(mapaHidrologia, true);
     limpiarCapasMapa();
     modo = null; vertices = []; cerrado = false;
     marcarBotonActivo(null);
@@ -7201,6 +7595,10 @@ const MedicionSuperficie = (() => {
       ? 'Hacé clic en el mapa para marcar cada vértice. Cuando tengas al menos 3, tocá "✅ Finalizar".'
       : 'Hacé clic en dos esquinas opuestas del rectángulo.');
     if (mapaHidrologia) mapaHidrologia.on('click', onClickMapa);
+    // FIX: mientras se dibuja (clic a clic) el grid de riesgo hidrológico y
+    // demás polígonos con popup dejan pasar el clic al mapa, en vez de
+    // abrir su popup y "comerse" el clic — igual que hace la regla de medición.
+    if (mapaHidrologia) _setPoligonosClicables(mapaHidrologia, false);
   }
 
   function agregarMarcador(lat, lon) {
@@ -7244,6 +7642,10 @@ const MedicionSuperficie = (() => {
   function cerrarForma() {
     cerrado = true;
     if (mapaHidrologia) mapaHidrologia.off('click', onClickMapa);
+    // FIX: la forma ya quedó cerrada — se restaura el clic normal del grid
+    // de riesgo hidrológico y demás polígonos con popup (dejaron de "pasar
+    // de largo" el clic, ya no hace falta mientras no se esté dibujando).
+    if (mapaHidrologia) _setPoligonosClicables(mapaHidrologia, true);
     limpiarCapasMapa();
     poligonoFinal = L.polygon(vertices.map(p => [p.lat, p.lon]), {
       color: '#7c3aed', weight: 2.5, fillColor: '#7c3aed', fillOpacity: 0.15,
@@ -9948,6 +10350,21 @@ function calcularAvanceFuego(vientoDirDeg) {
   };
 }
 
+// Formatea una distancia de propagación (en km) para mostrar. Con focos de
+// avance lento (típico en zonas húmedas/de baja carga de combustible, FFDI
+// bajo) redondear a 1 decimal en km hace que 15/30/60 min se vean todos
+// "0.0 km" y de golpe salte a "0.1 km" — como si no avanzara y después
+// saltara. Por debajo de 1 km se muestra en metros, donde sí se nota el
+// avance progresivo (12 m → 25 m → 50 m).
+function formatearDistanciaPropagacion(km) {
+  if (km === null || km === undefined || isNaN(km)) return '--';
+  if (km < 1) {
+    const metros = Math.round(km * 1000);
+    return metros < 1 ? '<1 m' : `${metros} m`;
+  }
+  return `${km.toFixed(1)} km`;
+}
+
 // ════════════════════════════════════════════════════════════════
 //  SISTEMA DE PREDICCIÓN DE PROPAGACIÓN DE INCENDIOS (cono + panel)
 // ════════════════════════════════════════════════════════════════
@@ -10074,8 +10491,23 @@ function _dibujarGeometriaConoFuego(inc, animar) {
   const factor = factorEscalaViento(inc.vientoVel);
   const medioAngulo = Math.max(20, 34 - factor * 6);
 
-  BANDAS_CONO_FUEGO.forEach((banda, idx) => {
-    const radio  = banda.radioBase * factor;
+  // FIX: antes las 3 bandas usaban un radio fijo (2/5/10 km) escalado solo
+  // por el viento, sin relación con la velocidad de propagación real
+  // (McArthur Mark 5). Eso hacía que el cono dibujado en el mapa pudiera
+  // medir varios km aunque la distancia estimada real fuera de apenas
+  // decenas de metros — se notaba al medir con la regla del mapa. Ahora
+  // cada banda usa como radio la MISMA distancia (d15/d30/d60) que se
+  // muestra en el panel, así el dibujo siempre coincide con el número.
+  const dist = inc.distancias || {};
+  const radioMinKm = 0.01; // 10 m — piso solo para que el polígono no colapse a un punto
+  const bandasCono = [
+    { radioKm: Math.max(dist.d60 || 0, radioMinKm), color: '#ffd54f', opacidad: 0.40 }, // 30–60 min
+    { radioKm: Math.max(dist.d30 || 0, radioMinKm), color: '#ff8c00', opacidad: 0.50 }, // 15–30 min
+    { radioKm: Math.max(dist.d15 || 0, radioMinKm), color: '#ff3b30', opacidad: 0.60 }, // 0–15 min
+  ];
+
+  bandasCono.forEach((banda, idx) => {
+    const radio  = banda.radioKm;
     const puntos = construirPetaloCono(inc.lat, inc.lon, avance.avanceDeg, radio, medioAngulo);
     const poly = L.polygon(puntos, {
       stroke: false, fillColor: banda.color,
@@ -10090,7 +10522,7 @@ function _dibujarGeometriaConoFuego(inc, animar) {
   });
 
   // Flecha central de dirección
-  const largoFlecha = BANDAS_CONO_FUEGO[0].radioBase * factor * 0.8;
+  const largoFlecha = bandasCono[2].radioKm * 0.8;
   const puntaFlecha  = destinoLatLon(inc.lat, inc.lon, avance.avanceDeg, largoFlecha);
 
   const sombra = L.polyline([[inc.lat, inc.lon], puntaFlecha], {
@@ -10238,9 +10670,9 @@ function renderPanelIncendioBody(inc) {
       <span class="pi-dato-valor">${inc.municipio || 'Ubicando...'}</span></div>
     <div class="pi-distancias">
       <p class="pi-subtitulo" style="margin-top:0">Distancia estimada de propagación</p>
-      <div class="pi-dist-fila"><span class="pi-dist-dot" style="background:#ff3b30"></span>15 min <b>${inc.distancias.d15} km</b></div>
-      <div class="pi-dist-fila"><span class="pi-dist-dot" style="background:#ff8c00"></span>30 min <b>${inc.distancias.d30} km</b></div>
-      <div class="pi-dist-fila"><span class="pi-dist-dot" style="background:#ffd54f"></span>60 min <b>${inc.distancias.d60} km</b></div>
+      <div class="pi-dist-fila"><span class="pi-dist-dot" style="background:#ff3b30"></span>15 min <b>${formatearDistanciaPropagacion(inc.distancias.d15)}</b></div>
+      <div class="pi-dist-fila"><span class="pi-dist-dot" style="background:#ff8c00"></span>30 min <b>${formatearDistanciaPropagacion(inc.distancias.d30)}</b></div>
+      <div class="pi-dist-fila"><span class="pi-dist-dot" style="background:#ffd54f"></span>60 min <b>${formatearDistanciaPropagacion(inc.distancias.d60)}</b></div>
     </div>
     <div id="pi-agua-cercana" class="pi-distancias">
       <p class="pi-subtitulo" style="margin-top:0">💧 Cuerpo de agua más cercano</p>
@@ -10248,9 +10680,9 @@ function renderPanelIncendioBody(inc) {
     </div>
     <div class="pi-leyenda">
       <p class="pi-subtitulo" style="margin-top:0">Alcance del cono</p>
-      <div class="pi-ley-fila">🔴 <span>0–2 km: propagación más probable a corto plazo</span></div>
-      <div class="pi-ley-fila">🟠 <span>2–5 km: riesgo medio</span></div>
-      <div class="pi-ley-fila">🟡 <span>5–10 km: posible propagación si las condiciones se mantienen</span></div>
+      <div class="pi-ley-fila">🔴 <span>0–${formatearDistanciaPropagacion(inc.distancias.d15)}: propagación más probable en los próximos 15 min</span></div>
+      <div class="pi-ley-fila">🟠 <span>${formatearDistanciaPropagacion(inc.distancias.d15)}–${formatearDistanciaPropagacion(inc.distancias.d30)}: riesgo medio (15–30 min)</span></div>
+      <div class="pi-ley-fila">🟡 <span>${formatearDistanciaPropagacion(inc.distancias.d30)}–${formatearDistanciaPropagacion(inc.distancias.d60)}: posible si las condiciones se mantienen (30–60 min)</span></div>
     </div>
     <div class="pi-botones">
       <button class="pi-btn pi-btn-primario" onclick="centrarIncendio('${inc.id}')">📍 Centrar incendio</button>
@@ -10543,9 +10975,9 @@ function procesarIncendiosActivos(hotspots) {
     inc.velProp    = velProp;
     inc.riesgoNivel = calcularRiesgoIncendio(velProp, inc.frp, ffdiVal);
     inc.distancias = {
-      d15: (velProp * 0.25).toFixed(1),
-      d30: (velProp * 0.5).toFixed(1),
-      d60: (velProp * 1).toFixed(1),
+      d15: velProp * 0.25,
+      d30: velProp * 0.5,
+      d60: velProp * 1,
     };
 
     if (!inc.municipio) {
@@ -10887,7 +11319,10 @@ async function rhFetchHumedalPorCelda(lat, lon) {
     if (val === undefined || val === null) continue; // esta capa no cubre el punto — probar la siguiente
 
     rhCapaHumedalPreferidaIdx = RH_HUMEDAL_CAPAS.indexOf(capa); // cachear para las próximas celdas
-    return Math.round(val * 1000) / 10; // % con un decimal (ej: 98.2)
+    // Devuelve el % de probabilidad junto con el nombre de la subregión INTA
+    // que respondió, para poder mostrárselo al usuario (así se ubica en el
+    // mapa cuando ve un cuadrado celeste de humedal).
+    return { pct: Math.round(val * 1000) / 10, nombre: capa.nombre }; // % con un decimal (ej: 98.2)
   }
   return null; // ninguna de las 18 capas cubre esta zona del país
 }
@@ -10902,13 +11337,16 @@ async function rhFetchGridHumedales(celdas, onProgreso) {
 
   const primerLote = celdas.slice(0, LOTE);
   const primerosResultados = await Promise.all(primerLote.map(c => rhFetchHumedalPorCelda(c.latC, c.lonC)));
-  primerosResultados.forEach((res, k) => { primerLote[k].humedalPct = res; });
+  primerosResultados.forEach((res, k) => {
+    primerLote[k].humedalPct = res ? res.pct : null;
+    primerLote[k].humedalCapaNombre = res ? res.nombre : null;
+  });
   hechas = primerLote.length;
   if (onProgreso) onProgreso(hechas, celdas.length);
 
   const hayCobertura = primerosResultados.some(v => v !== null);
   if (!hayCobertura) {
-    for (let i = LOTE; i < celdas.length; i++) celdas[i].humedalPct = null;
+    for (let i = LOTE; i < celdas.length; i++) { celdas[i].humedalPct = null; celdas[i].humedalCapaNombre = null; }
     if (onProgreso) onProgreso(celdas.length, celdas.length);
     return;
   }
@@ -10916,7 +11354,10 @@ async function rhFetchGridHumedales(celdas, onProgreso) {
   for (let i = LOTE; i < celdas.length; i += LOTE) {
     const lote = celdas.slice(i, i + LOTE);
     const resultados = await Promise.all(lote.map(c => rhFetchHumedalPorCelda(c.latC, c.lonC)));
-    resultados.forEach((res, k) => { lote[k].humedalPct = res; });
+    resultados.forEach((res, k) => {
+      lote[k].humedalPct = res ? res.pct : null;
+      lote[k].humedalCapaNombre = res ? res.nombre : null;
+    });
     hechas += lote.length;
     if (onProgreso) onProgreso(hechas, celdas.length);
     if (i + LOTE < celdas.length) await new Promise(res => setTimeout(res, 200));
@@ -10927,13 +11368,13 @@ async function rhFetchGridHumedales(celdas, onProgreso) {
  *  ≥90% → es un humedal natural (vive anegado) — no cuenta como riesgo de encharcamiento/anegamiento/inundación.
  *  60-90% → zona de transición: se mantiene la clasificación de riesgo, pero se avisa que puede ser humedal.
  *  <60%  → sin cambios, tierra firme según el criterio de INTA. */
-function rhAplicarHumedal(clas, humedalPct) {
+function rhAplicarHumedal(clas, humedalPct, humedalCapaNombre) {
   if (humedalPct === null || humedalPct === undefined) return clas;
   if (humedalPct >= 90) {
-    return { cat: 'humedal_natural', color: '#0ea5e9', label: '💧 Humedal natural (INTA)', humedalPct };
+    return { cat: 'humedal_natural', color: '#0ea5e9', label: '💧 Humedal natural (INTA)', humedalPct, humedalCapaNombre };
   }
   if (humedalPct >= 60) {
-    return { ...clas, label: `${clas.label} · posible humedal (${humedalPct}%)`, humedalPct };
+    return { ...clas, label: `${clas.label} · posible humedal (${humedalPct}%)`, humedalPct, humedalCapaNombre };
   }
   return clas;
 }
@@ -11212,7 +11653,7 @@ function rhRecalcularClasificacion() {
     const pendiente   = (tieneRelieve ? c.relieve.pendiente : null) ?? (suelo?.pendientePct || 2);
     const cn          = Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendiente, posRel) + rhAjusteSueloDetalle(c.sueloDetalle)));
     const Q           = rhEscorrentiaSCS(P, cn);
-    const clas         = rhAplicarHumedal(rhClasificar(Q), c.humedalPct);
+    const clas         = rhAplicarHumedal(rhClasificar(Q), c.humedalPct, c.humedalCapaNombre);
     c.clasificacion = clas; c.cn = cn; c.Q = Q; c.tieneRelieve = tieneRelieve;
     conteo[clas.cat]++;
   });
@@ -11243,9 +11684,23 @@ function rhSueloDetallePopupHTML(c) {
   }
   const fuente = sd ? `<p style="font-size:10px;color:#9ca3af;margin:8px 0 0;">Fuente: carta de detalle · ${sd._provincia || '—'}</p>`
                      : `<p style="font-size:11px;color:#727971;margin:6px 0 0;">Sin carta de detalle para este punto — se usó solo el mapa nacional de suelo 1:500.000.</p>`;
+  // Si la celda cayó en zona de humedal (natural o "posible"), se muestra a qué
+  // subregión del mapa nacional de humedales de INTA pertenece, para que el
+  // usuario se ubique geográficamente (no todos los cuadrados celestes son el
+  // mismo humedal — el país está dividido en 18 subregiones).
+  const humedalInfo = c.clasificacion?.humedalCapaNombre
+    ? `<div style="display:flex;align-items:flex-start;gap:6px;background:#e0f2fe;border-radius:8px;padding:6px 8px;margin-bottom:6px;">
+        <span style="flex-shrink:0;">💧</span>
+        <span style="font-size:10.5px;color:#0c4a6e;line-height:1.3;">
+          <b>${c.clasificacion.humedalCapaNombre}</b><br/>
+          ${c.clasificacion.humedalPct != null ? `Mapa nacional de humedales (INTA) · ${c.clasificacion.humedalPct}% de probabilidad` : 'Mapa nacional de humedales (INTA)'}
+        </span>
+      </div>`
+    : '';
   return `<div style="font-size:12px;min-width:200px;max-width:260px;">
     <div style="font-weight:800;margin-bottom:4px;">🌱 Suelo (INTA)</div>
     ${c.clasificacion ? `<div style="margin-bottom:6px;"><span style="background:${c.clasificacion.color};color:#fff;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;">${c.clasificacion.label || c.clasificacion.cat}</span></div>` : ''}
+    ${humedalInfo}
     ${filas || '<p style="font-size:11px;color:#727971;margin:2px 0;">Sin columnas de detalle disponibles.</p>'}
     ${fuente}
   </div>`;
@@ -11321,7 +11776,7 @@ function rhPintarConMm(P) {
     const posRel      = tieneRelieve ? (c.relieve.elevacion - minE) / rangoE : 0.5;
     const pendiente   = (tieneRelieve ? c.relieve.pendiente : null) ?? (suelo?.pendientePct || 2);
     const cn = Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendiente, posRel) + rhAjusteSueloDetalle(c.sueloDetalle)));
-    c.clasificacion = rhAplicarHumedal(rhClasificar(rhEscorrentiaSCS(P, cn)), c.humedalPct);
+    c.clasificacion = rhAplicarHumedal(rhClasificar(rhEscorrentiaSCS(P, cn)), c.humedalPct, c.humedalCapaNombre);
   });
   rhPintarGrid(celdas);
 }
