@@ -32,6 +32,7 @@ en el lugar que le corresponda según su escala, antes de los tiles
 nacionales. No hace falta tocar app.py ni el resto de este archivo.
 """
 import gc
+import math
 import threading
 import time
 from collections import OrderedDict
@@ -440,20 +441,6 @@ SUELO_CAPAS = [
         'bbox': (-59.6652, -30.0475, -58.7880, -29.0503),
         'simplificar_grados': 0.0005,
     },
-    {
-        # Antes vivía mal etiquetada como "Esquina/Goya/Lavalle (mixta 1:50k-1:100k)"
-        # en el escalón 1:100.000 -- con la metadata real del catálogo (título
-        # "suelos a escalas 1:100.000 (Esquina) y 1:50.000 (Goya y Lavalle)",
-        # pero alternate=geonode:Suelos_Lavalle, específico de ESTA capa) queda
-        # claro que esta capa remota es 100% Lavalle a 1:50.000 -- Esquina y
-        # Goya ya tienen sus propias capas correctas más arriba.
-        'nombre': 'Corrientes — Lavalle',
-        'url': 'https://geo-nodo09.inta.gob.ar/geoserver/wfs?service=WFS&version=2.0.0&request=GetFeature&typeName=geonode:Suelos_Lavalle&outputFormat=application/json',
-        'escala': '1:50.000',
-        'confiabilidad': 'alta',
-        'bbox': (-59.2386, -29.2576, -58.6001, -28.7688),
-        'simplificar_grados': 0.0007,
-    },
     # ── Santiago del Estero 1:50.000 (geo-nodo02 / geo-nodo05) ──
     {
         'nombre': 'Santiago del Estero — Norte Belgrano',
@@ -489,52 +476,61 @@ SUELO_CAPAS = [
         'simplificar_grados': 0.0005,
     },
     # ── Salta 1:50.000 (aprox.) -- subidas por el usuario directo a
-    # Hugging Face, no vinieron del catálogo INTA revisado en esta
-    # sesión. Bbox calculado con margen generoso a partir de fuentes
-    # geográficas públicas (no del archivo real, que no pude descargar
-    # -- el dataset de HF es privado/requiere auth). Escala asumida
-    # "detalle" por el nombre del archivo (mismo patrón que
-    # Suelos_detalle_NOA.geojson), sin confirmar contra la fuente
-    # original -- si algún punto da resultados raros en esta zona,
-    # revisar bbox y escala real.
+    # Los 3 archivos de Valle de Lerma cubren el mismo valle (zona
+    # Salta capital / Cerrillos / San Agustín hasta el sur), pero la
+    # división Norte/Centro/Sur original por franjas de latitud estaba
+    # mal -- el archivo "Centro" en realidad cae en la parte NORTE real
+    # del valle (confirmado bajando el contenido real). Bbox unificado
+    # y generoso para los 3 hasta poder confirmar la división real.
+    # Campos reales confirmados (bajando el archivo Centro): cap_uso
+    # (coincide con el alias que ya usa _normalizar), Ipc (índice de
+    # productividad numérico -- NO coincide con los alias actuales de
+    # indice_prod, hay que sumar 'Ipc' a la lista), Ind_Prod (texto
+    # descriptivo "Baja/Regular/Buena Productividad", no numérico).
     {
         'nombre': 'Salta — Valle de Lerma (Norte)',
         'url': _HF_BASE + 'Suelos_detalle_Valle_de_Lerma_Norte_Salta.geojson?download=true',
-        'escala': '1:50.000 (sin confirmar)',
+        'escala': 'detalle (sin escala numérica declarada)',
         'confiabilidad': 'alta',
-        'bbox': (-65.75, -25.40, -65.15, -24.50),
+        'bbox': (-65.60, -25.50, -65.10, -24.50),
         'simplificar_grados': 0.0005,
     },
     {
         'nombre': 'Salta — Valle de Lerma (Centro)',
         'url': _HF_BASE + 'Suelos_detalle_Valle_de_Lerma_Centro_Salta.geojson?download=true',
-        'escala': '1:50.000 (sin confirmar)',
+        'escala': 'detalle (sin escala numérica declarada)',
         'confiabilidad': 'alta',
-        'bbox': (-65.75, -25.90, -65.15, -25.40),
+        'bbox': (-65.60, -25.50, -65.10, -24.50),
         'simplificar_grados': 0.0005,
     },
     {
         'nombre': 'Salta — Valle de Lerma (Sur)',
         'url': _HF_BASE + 'Suelos_detalle_Valle_de_Lerma_Sur_Salta.geojson?download=true',
-        'escala': '1:50.000 (sin confirmar)',
+        'escala': 'detalle (sin escala numérica declarada)',
         'confiabilidad': 'alta',
-        'bbox': (-65.75, -26.40, -65.15, -25.90),
+        'bbox': (-65.60, -25.50, -65.10, -24.50),
         'simplificar_grados': 0.0005,
     },
     {
         'nombre': 'Salta — Valles Calchaquíes',
-        'url': _HF_BASE + 'Suelos_detalle_Valles_Calchaquíes_Salta.geojson?download=true',
-        'escala': '1:50.000 (sin confirmar)',
+        'url': _HF_BASE + 'Suelos_detalle_Valles_Calchaquies_Salta.geojson?download=true',
+        'escala': 'detalle (sin escala numérica declarada)',
         'confiabilidad': 'alta',
         'bbox': (-66.50, -26.50, -65.30, -24.60),
         'simplificar_grados': 0.0005,
     },
     {
+        # Bbox recalculado del contenido REAL del archivo (antes era una
+        # estimación por geografía general, que quedaba mal ubicada).
+        # Campos reales del geojson: Suelo, aso, Ap_Agricol (A/B/C/D,
+        # aptitud agrícola -- mapea a 'clase'), Ap_Riego, Suelo_1..5,
+        # CM_Suelo1..5, ajusteCN. No trae cap_uso ni ind_prod numérico
+        # -- _normalizar() necesita un alias nuevo para 'Ap_Agricol'.
         'nombre': 'Salta — Miraflores / El Galpón',
         'url': _HF_BASE + 'Suelos_detalle_Miraflores_El_Galpon_Salta.geojson?download=true',
-        'escala': '1:50.000 (sin confirmar)',
+        'escala': 'detalle (sin escala numérica declarada)',
         'confiabilidad': 'alta',
-        'bbox': (-65.10, -25.70, -64.40, -25.10),
+        'bbox': (-64.95, -25.50, -64.55, -25.25),
         'simplificar_grados': 0.0005,
     },
     # ── Formosa 1:50.000 (geo-nodo05) ──
@@ -544,24 +540,21 @@ SUELO_CAPAS = [
         'escala': '1:50.000',
         'confiabilidad': 'alta',
         'bbox': (-59.6517, -26.3887, -58.9259, -25.4734),
-        # FIX (OOM en Render, plan de 512MB): esta carta venía con
-        # 'simplificar_grados': 0.0005 igual que el resto de las 1:50.000,
-        # pero es semidetallada sobre ~5.100 km² con muchos vértices por
-        # polígono. La lectura del GeoJSON crudo (r.json()) igual pasa por
-        # un pico de memoria transitorio antes de poder simplificar nada
-        # -- eso no lo cambia esta tolerancia -- pero lo que SÍ queda
-        # viviendo en el caché LRU (hasta _MAX_CAPAS_EN_CACHE=3 capas a la
-        # vez, más Earth Engine y el resto del proceso) es la geometría YA
-        # simplificada. Con 0.0005 esa geometría en memoria seguía siendo
-        # pesada; sumada a otras 2 capas + EE, cruzaba los 512MB del plan
-        # ("Ran out of memory" en los logs de Render) y el proceso se
-        # reiniciaba a mitad de un pedido -- por eso la capa nunca llegaba
-        # al frontend. Se sube la tolerancia a 0.0015 (~3x más gruesa) para
-        # que la geometría que queda cacheada pese bastante menos.
-        # Sacrifica algo de precisión visual en el contorno de cada
-        # polígono, pero a la escala en que se ve esta capa en el mapa
-        # (departamento/provincia) no debería notarse.
-        'simplificar_grados': 0.0015,
+        'simplificar_grados': 0.0005,
+    },
+    {
+        'nombre': 'NOA (regional)',
+        'url': _HF_BASE + 'Suelos_detalle_NOA.geojson?download=true',
+        'escala': 'regional (zonas grandes)',
+        'confiabilidad': 'media',
+        # Noroeste argentino (Jujuy/Salta/Tucumán/Catamarca/Santiago del
+        # Estero) -- OJO: esto NO cubre Corrientes (que es NEA, noreste),
+        # aunque el nombre "regional" pueda sugerir que sí.
+        'bbox': (-70.0, -29.6, -61.5, -20.8),
+        # Solo 9 polígonos en total -- liviano de por sí, no hace falta
+        # tilearlo. Esquema propio (grupo_tier A-E + descri), ver
+        # _normalizar_noa().
+        'simplificar_grados': 0.005,
     },
     # ── Corrientes 1:100.000 (geo-nodo09) ──
     {
@@ -571,6 +564,17 @@ SUELO_CAPAS = [
         'confiabilidad': 'alta',
         'bbox': (-59.7117, -30.4340, -58.7179, -29.4683),
         'simplificar_grados': 0.001,
+    },
+    {
+        # Mezcla Esquina 1:100k + Goya/Lavalle 1:50k en una sola capa
+        # remota (no se puede separar desde la metadata) -- se ubica en
+        # el escalón 1:100.000 por precaución (el peor de los dos).
+        'nombre': 'Corrientes — Esquina/Goya/Lavalle',
+        'url': 'https://geo-nodo09.inta.gob.ar/geoserver/wfs?service=WFS&version=2.0.0&request=GetFeature&typeName=geonode:Suelos_Lavalle&outputFormat=application/json',
+        'escala': '1:50.000-1:100.000 (mixta)',
+        'confiabilidad': 'alta',
+        'bbox': (-59.2386, -29.2576, -58.6001, -28.7688),
+        'simplificar_grados': 0.0007,
     },
     {
         'nombre': 'Corrientes — Llanura Arenosa',
@@ -699,26 +703,6 @@ SUELO_CAPAS = [
         'confiabilidad': 'media',
         'bbox': (-65.3, -30.0, -61.5, -25.0),  # aproximado, provincia completa
         'simplificar_grados': 0.01,
-    },
-    # ── Regional, SIN escala numérica clara ──────────────────────────────
-    # Va acá a propósito, DESPUÉS de toda carta con escala definida (por
-    # peor que sea, 1:500.000) y ANTES del bloque Nacional 1:1.000.000:
-    # es más detallada que el mapa país entero, pero "regional/zonas
-    # grandes" no es una escala comparable a las demás -- por eso queda en
-    # su propio escalón, justo arriba del último recurso.
-    {
-        'nombre': 'NOA (regional)',
-        'url': _HF_BASE + 'Suelos_detalle_NOA.geojson?download=true',
-        'escala': 'regional (zonas grandes)',
-        'confiabilidad': 'media',
-        # Noroeste argentino (Jujuy/Salta/Tucumán/Catamarca/Santiago del
-        # Estero) -- OJO: esto NO cubre Corrientes (que es NEA, noreste),
-        # aunque el nombre "regional" pueda sugerir que sí.
-        'bbox': (-70.0, -29.6, -61.5, -20.8),
-        # Solo 9 polígonos en total -- liviano de por sí, no hace falta
-        # tilearlo. Esquema propio (grupo_tier A-E + descri), ver
-        # _normalizar_noa().
-        'simplificar_grados': 0.005,
     },
 ]
 
@@ -1014,19 +998,63 @@ _cache = OrderedDict()  # nombre_capa -> {'tree', 'geoms', 'props'} | None (fall
 _cache_lock = threading.Lock()
 
 
-def _cargar_capa(capa):
+# ──────────────────────────────────────────────────────────────────────────
+# FILTRADO POR BBOX EN EL PROPIO PEDIDO WFS (evita OOM en Render)
+# ──────────────────────────────────────────────────────────────────────────
+# Las capas nuevas de GeoINTA (Corrientes, Formosa, San Luis, etc.) son
+# remotas -- antes _cargar_capa() bajaba y parseaba la carta COMPLETA del
+# departamento entero cada vez, aunque la vista actual del mapa solo
+# necesitara un rincón chiquito. Eso hacía que Render se quedara sin
+# memoria (plan free, 512MB) con cartas grandes como Pirané (5.104 km²).
+# Fix: cuando la capa es un WFS en vivo, se le agrega un filtro BBOX al
+# pedido GetFeature para que el propio servidor de INTA mande solo el
+# recorte que hace falta -- mismo principio que ya se usa para no cargar
+# capas fuera de rango (_capa_puede_cubrir_bbox), pero a nivel de la
+# descarga en sí, no solo de "cuál capa probar".
+_WFS_BBOX_TILE_DEG = 0.25   # tamaño de "tile" para cuantizar el bbox pedido
+_WFS_BBOX_MARGEN_DEG = 0.05  # margen extra alrededor de lo pedido
+
+
+def _es_capa_wfs_en_vivo(capa):
+    """True si 'url' apunta a un WFS GetFeature en vivo (geo-nodoXX.inta.gob.ar),
+    no a un archivo ya pre-alojado y liviano (ej. Hugging Face)."""
+    return 'geoserver/wfs' in capa['url'] and 'GetFeature' in capa['url']
+
+
+def _bbox_tile_para_wfs(bbox_consulta):
+    """Cuantiza bbox_consulta=(west,south,east,north) a una grilla de
+    _WFS_BBOX_TILE_DEG grados con margen, para (a) pedirle al WFS de INTA
+    solo el pedazo que hace falta y (b) poder cachear ese pedazo en vez de
+    la capa entera. Vistas cercanas caen en el mismo tile y reusan caché."""
+    west, south, east, north = bbox_consulta
+
+    def _piso(v):
+        return math.floor((v - _WFS_BBOX_MARGEN_DEG) / _WFS_BBOX_TILE_DEG) * _WFS_BBOX_TILE_DEG
+
+    def _techo(v):
+        return math.ceil((v + _WFS_BBOX_MARGEN_DEG) / _WFS_BBOX_TILE_DEG) * _WFS_BBOX_TILE_DEG
+
+    return (round(_piso(west), 2), round(_piso(south), 2), round(_techo(east), 2), round(_techo(north), 2))
+
+
+def _cargar_capa(capa, bbox_consulta=None):
     nombre = capa['nombre']
+    usar_bbox_wfs = bbox_consulta is not None and _es_capa_wfs_en_vivo(capa)
+    tile = _bbox_tile_para_wfs(bbox_consulta) if usar_bbox_wfs else None
+    clave_cache = f"{nombre}::{tile}" if tile else nombre
+
     with _cache_lock:
-        if nombre in _cache:
-            _cache.move_to_end(nombre)  # se acaba de usar -> pasa a "más reciente"
-            return _cache[nombre]
-    datos = None
-    _t0 = time.monotonic()
-    try:
-        r = requests.get(capa['url'], timeout=120)
+        if clave_cache in _cache:
+            _cache.move_to_end(clave_cache)  # se acaba de usar -> pasa a "más reciente"
+            return _cache[clave_cache]
+
+    def _descargar(url_pedido, con_filtro):
+        _t0 = time.monotonic()
+        r = requests.get(url_pedido, timeout=120)
         r.raise_for_status()
         geojson = r.json()
-        print(f'⏱️ [suelos_inta_regional] "{nombre}" descargada+parseada en {time.monotonic() - _t0:.1f}s')
+        etiqueta = f'{nombre} [tile {tile}]' if con_filtro else nombre
+        print(f'⏱️ [suelos_inta_regional] "{etiqueta}" descargada+parseada en {time.monotonic() - _t0:.1f}s')
         geoms, props = [], []
         for feat in geojson.get('features', []):
             geom = feat.get('geometry')
@@ -1046,25 +1074,13 @@ def _cargar_capa(capa):
                     g_simple = g.simplify(tolerancia, preserve_topology=True)
                     if not g_simple.is_empty:
                         g = g_simple
-                # FIX: g.buffer(0) sobre un polígono con auto-intersecciones
-                # feas a veces no devuelve un Polygon/MultiPolygon limpio,
-                # sino un GeometryCollection (mezcla de polígono + líneas o
-                # puntos sueltos, artefactos de la reparación). Leaflet no
-                # sabe pintar ese tipo mixto y, como el frontend construye
-                # TODA la capa con un solo L.geoJSON(), una sola geometría
-                # así rompía la capa entera sin ningún error visible (el
-                # backend seguía devolviendo 200 con el resto de los
-                # polígonos bien). Se descarta acá antes de cachear, para
-                # que nunca llegue al frontend.
-                if g.is_empty or g.geom_type not in ('Polygon', 'MultiPolygon'):
-                    continue
             except Exception:
                 continue  # geometría puntualmente corrupta: se ignora
             geoms.append(g)
             props.append(feat.get('properties') or {})
         tree = STRtree(geoms) if geoms else None
-        datos = {'tree': tree, 'geoms': geoms, 'props': props}
-        print(f'✅ [suelos_inta_regional] Carta "{nombre}" cargada: {len(geoms)} polígonos.')
+        resultado = {'tree': tree, 'geoms': geoms, 'props': props}
+        print(f'✅ [suelos_inta_regional] Carta "{etiqueta}" cargada: {len(geoms)} polígonos.')
         # El dict crudo del GeoJSON (r.json()) puede pesar bastante más que
         # el resultado final ya convertido a Shapely -- liberarlo explícito
         # en vez de esperar a que salga de scope ayuda a que el proceso le
@@ -1072,6 +1088,30 @@ def _cargar_capa(capa):
         # patrón que ya usa cuenca_engine.py con sus arrays intermedios).
         del geojson, r
         gc.collect()
+        return resultado
+
+    datos = None
+    try:
+        if tile:
+            w, s, e, n = tile
+            # BBOX en orden lon/lat explícito (CRS84) -- evita el lío de
+            # orden de ejes que trae EPSG:4326 en WFS 2.0.0 según el
+            # servidor. Reduce lo que INTA manda a solo este recorte, en
+            # vez de la carta del departamento entero -- clave para no
+            # quedarse sin memoria en Render con cartas grandes.
+            url_filtrada = f"{capa['url']}&bbox={w},{s},{e},{n},urn:ogc:def:crs:OGC::CRS84"
+            try:
+                datos = _descargar(url_filtrada, con_filtro=True)
+            except Exception as exc_filtro:
+                # Si el servidor no soporta este filtro (o cualquier otro
+                # fallo puntual), reintentar sin filtro -- capa completa,
+                # como antes -- en vez de dejar la zona sin datos. Es más
+                # lento/pesado, pero sigue funcionando.
+                print(f'⚠️ [suelos_inta_regional] BBOX filtrado falló en "{nombre}" '
+                      f'({exc_filtro}); reintentando sin filtro (carta completa).')
+                datos = _descargar(capa['url'], con_filtro=False)
+        else:
+            datos = _descargar(capa['url'], con_filtro=False)
     except Exception as exc:  # noqa: BLE001
         print(f'⚠️ [suelos_inta_regional] No se pudo cargar la carta "{nombre}": {exc}')
         # OJO: si falló (datos sigue en None acá), NO se guarda en _cache --
@@ -1082,8 +1122,8 @@ def _cargar_capa(capa):
         # vuelve a intentar desde cero.
         return None
     with _cache_lock:
-        _cache[nombre] = datos
-        _cache.move_to_end(nombre)
+        _cache[clave_cache] = datos
+        _cache.move_to_end(clave_cache)
         while len(_cache) > _MAX_CAPAS_EN_CACHE:
             nombre_descartado, _ = _cache.popitem(last=False)  # la menos usada recientemente
             print(f'🗑️ [suelos_inta_regional] Descartando capa "{nombre_descartado}" del caché '
@@ -1237,21 +1277,13 @@ def _normalizar(props):
     # alias explícitos porque _g() solo prueba variantes de MAYÚSCULA/
     # minúscula/Capitalizada de la MISMA palabra -- 'cap_uso' con guion
     # bajo nunca matchea 'Cap Uso' con espacio, son strings distintos.
-    # 'cu' (Norte Belgrano, Santiago del Estero) y 'c_uso_uc' (Santiago del
-    # Estero provincial, campo a nivel de unidad cartográfica) son el mismo
-    # dato con otro nombre de columna. 'c_d_u_' (Santiago del Estero —
-    # Suroeste) es "CAP_D_USO" truncado a 10 caracteres, típico de
-    # shapefiles viejos (DBF clásico).
-    cap_uso = _g(props, 'cap_uso', 'capacidad_uso', 'Cap Uso', 'cu', 'c_uso_uc', 'c_d_u_')
+    cap_uso = _g(props, 'cap_uso', 'capacidad_uso', 'Cap Uso')
     drenaje_crudo = _g(props, 'drenaje_estimado', 'drenaje', 'drenaje_s1')
-    # 'ipc' (Entre Ríos, a nivel de unidad -- no confundir con las columnas
-    # numeradas 'porc_1'..'porc_7' que son por componente/serie, esas no se
-    # usan acá), 'iprod_uc' (Santiago del Estero provincial, ídem 'ipc' pero
-    # otro nombre) e 'ipc_iic'/'ipc_iva' (Norte Belgrano -- dos índices
-    # distintos en la misma carta; se prioriza IIC, con IVA de respaldo).
-    # 'i_p_' (Santiago del Estero — Suroeste) es "IND_PROD" truncado, mismo
-    # motivo que 'c_d_u_' arriba.
-    indice_prod = _g(props, 'ind_prod', 'indice_prod', 'IP', 'ipc', 'iprod_uc', 'ipc_iic', 'ipc_iva', 'i_p_')
+    # 'Ipc' (Valle de Lerma / Valles Calchaquíes, Salta) es un índice de
+    # productividad numérico igual que 'IP' de Córdoba, solo con otro
+    # nombre de columna -- se agrega como alias explícito por el mismo
+    # motivo que 'Cap Uso' arriba: _g() no matchea nombres distintos.
+    indice_prod = _g(props, 'ind_prod', 'indice_prod', 'IP', 'Ipc')
 
     # Esquema GAT/IAT (ej. Santa Fe 1:50.000) -- ver _parse_gat() arriba.
     # Solo se usa como respaldo si el esquema estándar no trajo nada, así
@@ -1280,6 +1312,18 @@ def _normalizar(props):
         clase_noa = _parse_grupo_tier_noa(_g(props, 'grupo_tier'))
         if clase_noa:
             clase = clase_noa
+
+    # Esquema "Ap_Agricol" (ej. capas de Salta: Miraflores/El Galpón, Valle
+    # de Lerma, Valles Calchaquíes -- subidas directo a Hugging Face, no
+    # forman parte del catálogo INTA revisado hoy). Viene como letra A-D
+    # (a veces combinada tipo "C/D") en vez de número romano de clase.
+    # Se traduce a la clase romana equivalente (A=I la mejor, D=IV la peor)
+    # solo como respaldo -- igual criterio que los esquemas de arriba.
+    if clase is None:
+        ap_agricol = _g(props, 'Ap_Agricol', 'ap_agricol')
+        if ap_agricol:
+            letra = str(ap_agricol).split('/')[0].strip().upper()
+            clase = {'A': 'I', 'B': 'II', 'C': 'III', 'D': 'IV'}.get(letra)
 
     if indice_prod in (None, ''):
         indice_prod = _g(props, 'iat')  # Índice de Aptitud de Tierras, ya en escala 0-100
@@ -1325,98 +1369,46 @@ def _advertencia_escala(capa):
     )
 
 
-# Tolerancia para el "hueco de datos": si el punto clickeado no cae EXACTO
-# adentro de ningún polígono de una carta (caminos, ríos, bordes de la hoja,
-# pequeños huecos de digitalización son normales en cartografía real), se
-# busca el polígono más cercano de esa misma carta dentro de este radio
-# antes de resignarse a probar la siguiente capa de la prioridad. ~0.001°
-# ≈ 100m en estas latitudes (mismo orden de magnitud que 'simplificar_grados'
-# ya usado en SUELO_CAPAS, así que es coherente con el resto del archivo).
-_TOLERANCIA_GRADOS = 0.001
-
-
-def _armar_resultado(capa, props, exacto, distancia_m=None):
-    norm = _normalizar(props)
-    advertencia = _advertencia_escala(capa)
-    if not exacto:
-        msg_cercania = (
-            f'El punto exacto no cae dentro de ningún polígono de "{capa["nombre"]}" '
-            f'(hueco real de la carta: camino, río, borde de hoja, etc.) — se usó el '
-            f'polígono más cercano de esta misma carta, a ~{distancia_m:.0f} m.'
-        )
-        advertencia = f'{advertencia} {msg_cercania}' if advertencia else msg_cercania
-    return {
-        'encontrado': True,
-        'fuente': capa['nombre'],
-        'clase': norm['clase'],
-        'subclase': norm['subclase'],
-        'capacidad_uso': norm['capacidad_uso'],
-        'indice_prod': norm['indice_prod'],
-        'limitante': norm['limitante'],
-        'drenaje': norm['drenaje'],
-        'anegabilidad': norm['anegabilidad'],
-        'advertencia_escala': advertencia,
-        'confiabilidad': capa['confiabilidad'],
-        'propiedades_crudas': props,
-        'exacto': exacto,
-    }
-
-
 # ──────────────────────────────────────────────────────────────────────────
 # API PÚBLICA — llamada desde app.py
 # ──────────────────────────────────────────────────────────────────────────
 def consultar_mejor_capa(lat, lon):
     """Consulta puntual: prueba cada capa en orden de prioridad (mejor
     escala primero) y devuelve el primer polígono que contiene (lat, lon).
-
-    Dos pasadas, SIEMPRE respetando el orden de prioridad de SUELO_CAPAS
-    (mejor escala primero):
-      1) Cobertura EXACTA — como antes. Si alguna capa cubre el punto de
-         verdad, gana de inmediato (ninguna capa de peor escala llega
-         siquiera a mirarse).
-      2) Si NINGUNA capa tuvo cobertura exacta: se recorre la lista de
-         nuevo, en el mismo orden, buscando el polígono más cercano dentro
-         de _TOLERANCIA_GRADOS. La primera capa (=mejor escala) que tenga
-         algo cerca gana — un "casi" en una carta 1:50.000 sigue siendo
-         mejor dato que un "exacto" en el respaldo Nacional 1:1.000.000.
-
     Formato de salida = el que ya espera _aptitudFetchINTA() en el frontend."""
     punto = Point(lon, lat)
+    # Bbox chico alrededor del punto -- para que las capas WFS en vivo
+    # bajen solo ese recorte en vez de la carta entera (ver _cargar_capa).
+    margen_punto = 0.02
+    bbox_punto = (lon - margen_punto, lat - margen_punto, lon + margen_punto, lat + margen_punto)
 
-    # Un solo recorrido de SUELO_CAPAS, en su orden de prioridad (mejor
-    # escala primero). Para CADA capa: si algo la cubre exacto, se usa ya
-    # (así de simple). Si nada la cubre exacto pero hay un polígono cerca
-    # (dentro de _TOLERANCIA_GRADOS -- típicamente un hueco real de la
-    # carta: camino, río, borde de hoja), se usa ese "casi" de ESTA capa
-    # y se corta ahí -- sin seguir probando capas peores. Es clave no
-    # seguir a la capa siguiente en ese caso: la Nacional (último recurso)
-    # no tiene huecos y daría cobertura exacta casi siempre, así que si
-    # se la dejara competir le ganaría por "exacto" a cualquier casi-match
-    # de una capa de mejor escala -- exactamente lo que NO se quiere.
     for capa in SUELO_CAPAS:
         if not _capa_puede_cubrir_punto(capa, lon, lat):
             continue  # fuera del bbox de esta capa: ni se descarga ni se carga en memoria
-        datos = _cargar_capa(capa)
+        datos = _cargar_capa(capa, bbox_consulta=bbox_punto)
         if not datos or not datos['tree']:
             continue
-
-        mejor_dist = None
-        mejor_props = None
-        for i in datos['tree'].query(punto.buffer(_TOLERANCIA_GRADOS)):
+        for i in datos['tree'].query(punto):
             geom = datos['geoms'][i]
             if geom.covers(punto):
-                return _armar_resultado(capa, datos['props'][i], exacto=True)
-            d = geom.distance(punto)
-            if d <= _TOLERANCIA_GRADOS and (mejor_dist is None or d < mejor_dist):
-                mejor_dist = d
-                mejor_props = datos['props'][i]
+                props = datos['props'][i]
+                norm = _normalizar(props)
+                return {
+                    'encontrado': True,
+                    'fuente': capa['nombre'],
+                    'clase': norm['clase'],
+                    'subclase': norm['subclase'],
+                    'capacidad_uso': norm['capacidad_uso'],
+                    'indice_prod': norm['indice_prod'],
+                    'limitante': norm['limitante'],
+                    'drenaje': norm['drenaje'],
+                    'anegabilidad': norm['anegabilidad'],
+                    'advertencia_escala': _advertencia_escala(capa),
+                    'confiabilidad': capa['confiabilidad'],
+                    'propiedades_crudas': props,
+                }
 
-        if mejor_props is not None:
-            distancia_m = mejor_dist * 111_000  # aprox. -- alcanza para un mensaje informativo
-            return _armar_resultado(capa, mejor_props, exacto=False, distancia_m=distancia_m)
-        # Ni exacto ni cerca en esta capa: recién ahí se prueba la siguiente (peor escala).
-
-    # Ninguna capa (ni siquiera la Nacional, que cubre todo el país sin huecos) dio nada
+    # Ninguna capa (ni siquiera la Nacional) cubre este punto
     return {'encontrado': False, 'fuente': None}
 
 
@@ -1439,6 +1431,13 @@ _PROVINCIA_A_NACIONAL = {
     'Córdoba': 'Nacional — Cordoba',
     'Santa Fe': 'Nacional — Santa Fe',
     'Buenos Aires': 'Nacional — Buenos Aires',
+    'Corrientes': 'Nacional — Corrientes',
+    'Santiago del Estero': 'Nacional — Santiago Del Estero',
+    'Misiones': 'Nacional — Misiones',
+    'Formosa': 'Nacional — Formosa',
+    'San Luis': 'Nacional — San Luis',
+    'Salta': 'Nacional — Salta',
+    'Entre Ríos': 'Nacional — Entre Rios',
 }
 
 # Si la carta de detalle ya cubre esta fracción (o más) del área visible
@@ -1450,11 +1449,15 @@ _COBERTURA_MINIMA_SIN_RELLENO = 0.55
 
 def _provincia_de_capa_detalle(capa):
     """'Córdoba (-65_-34)' -> 'Córdoba'; 'Santa Fe (c0f0)' -> 'Santa Fe';
-    'Buenos Aires' -> 'Buenos Aires'. None si no es una carta de detalle
-    provincial mapeada (ej. NOA, o ya es una carta Nacional)."""
+    'Buenos Aires' -> 'Buenos Aires'; 'San Luis — Villa Mercedes' ->
+    'San Luis' (patrón con raya usado por las capas remotas de GeoINTA
+    agregadas después de Córdoba/Santa Fe/Buenos Aires). None si no es
+    una carta de detalle provincial mapeada (ej. NOA, o ya es Nacional)."""
     nombre = capa['nombre']
     for provincia in _PROVINCIA_A_NACIONAL:
-        if nombre == provincia or nombre.startswith(provincia + ' ('):
+        if (nombre == provincia
+                or nombre.startswith(provincia + ' (')
+                or nombre.startswith(provincia + ' — ')):
             return provincia
     return None
 
@@ -1474,7 +1477,7 @@ def _features_de_capa_en_bbox(capa, caja):
     `capa` que intersectan `caja`, con propiedades ya normalizadas.
     Reutilizado tanto por la carta de detalle como por el relleno
     Nacional en capa_visual_bbox()."""
-    datos = _cargar_capa(capa)
+    datos = _cargar_capa(capa, bbox_consulta=caja.bounds)
     if not datos or not datos['tree']:
         return [], []
     indices = datos['tree'].query(caja)
@@ -1518,7 +1521,7 @@ def capa_visual_bbox(bbox):
     for capa in SUELO_CAPAS:
         if not _capa_puede_cubrir_bbox(capa, bbox):
             continue  # fuera del bbox de esta capa: ni se descarga ni se carga en memoria
-        datos = _cargar_capa(capa)
+        datos = _cargar_capa(capa, bbox_consulta=bbox)
         if not datos or not datos['tree']:
             intentos.append(f"{capa['nombre']}: FALLÓ AL CARGAR")
             continue
