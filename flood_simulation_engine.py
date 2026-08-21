@@ -484,11 +484,23 @@ def _haversine_km(lat1, lon1, lat2, lon2):
 
 
 def rank_localidades_por_inundacion(costo_acumulado, region_lat, region_lon, radius_km,
-                                     max_costo, frames, localidades=None, escala=90):
+                                     max_costo, frames, localidades=None, escala=90,
+                                     buffer_localidad_m=1200):
     """
     Muestrea 'costo_acumulado' (el mismo campo que arma los fotogramas de
-    /inundacion_animacion) en la coordenada de cada localidad conocida, y
-    devuelve la lista ordenada por cuál se moja primero.
+    /inundacion_animacion) alrededor de cada localidad conocida, y devuelve
+    la lista ordenada por cuál se moja primero.
+
+    OJO -- se muestrea el MÍNIMO dentro de un buffer (buffer_localidad_m)
+    alrededor del punto de cada localidad, NO el punto exacto. Motivo: el
+    punto que tenemos es el centro/plaza del pueblo, y los pueblos casi
+    siempre están construidos en la parte más ALTA de su zona (para no
+    inundarse) -- el centro exacto casi nunca cae dentro de la máscara de
+    celdas candidatas, así que muestrear el punto solo devolvía "sin dato"
+    para prácticamente cualquier localidad real, incluso estando el pueblo
+    a metros del agua. El mínimo en un radio chico alrededor sí captura
+    "qué tan cerca le llega el agua al borde del pueblo", que es lo que
+    realmente importa para priorizar.
 
     Args:
         costo_acumulado: ee.Image, la misma que ya usa generate_animation_frames.
@@ -503,15 +515,20 @@ def rank_localidades_por_inundacion(costo_acumulado, region_lat, region_lon, rad
             LOCALIDADES_CORRIENTES.
         escala: resolución de muestreo en metros (default 90, igual que
             _conectividad_hidraulica).
+        buffer_localidad_m: radio (metros) del círculo alrededor de cada
+            localidad donde se busca el costo mínimo (default 1200m --
+            cubre el borde/periferia de un pueblo chico/mediano sin
+            "robarle" el resultado a una localidad vecina).
 
     Returns:
         Lista de dicts ordenada ascendente por costo (primero = se moja
         antes), cada uno:
             {'nombre', 'lat', 'lon', 'costo_acumulado', 'orden_fotograma',
              'porcentaje_alcance'}
-        Localidades fuera del radio consultado, o con costo_acumulado sin
-        dato (fuera de la zona candidata/conectada -- no se van a mojar
-        con este umbral) quedan afuera de la lista, no aparecen como "nunca".
+        Localidades fuera del radio consultado, o sin ninguna celda
+        candidata/conectada dentro de su buffer (no se van a mojar con
+        este umbral, ni en el borde) quedan afuera de la lista, no
+        aparecen como "nunca".
     """
     if localidades is None:
         localidades = LOCALIDADES_CORRIENTES
@@ -528,22 +545,23 @@ def rank_localidades_por_inundacion(costo_acumulado, region_lat, region_lon, rad
         return []
 
     fc = ee.FeatureCollection([
-        ee.Feature(ee.Geometry.Point([loc['lon'], loc['lat']]), {'nombre': loc['nombre']})
+        ee.Feature(ee.Geometry.Point([loc['lon'], loc['lat']]).buffer(buffer_localidad_m),
+                   {'nombre': loc['nombre']})
         for loc in cercanas
     ])
 
     muestreado = costo_acumulado.rename('costo').reduceRegions(
         collection=fc,
-        reducer=ee.Reducer.first(),
+        reducer=ee.Reducer.min(),
         scale=escala,
     ).getInfo()
 
     resultado = []
     for feat in muestreado.get('features', []):
         props = feat.get('properties', {})
-        costo = props.get('costo')
+        costo = props.get('costo_min', props.get('costo'))
         if costo is None:
-            continue  # fuera de la zona candidata/conectada: no se moja con este umbral
+            continue  # ni el borde del pueblo tiene celda candidata/conectada con este umbral
         nombre = props.get('nombre')
         loc_original = next((l for l in cercanas if l['nombre'] == nombre), None)
         resultado.append({
