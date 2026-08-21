@@ -2962,6 +2962,23 @@ def inundacion_animacion():
         with ThreadPoolExecutor(max_workers=min(frames, 6)) as executor:
             fotogramas = list(executor.map(_generar_fotograma, range(1, frames + 1)))
 
+        # Localidades priorizadas: qué pueblos/parajes de la zona se
+        # inundan primero, en el mismo orden que muestra la animación --
+        # se muestrea el mismo 'costo_acumulado' que arma los fotogramas,
+        # así que es consistente por construcción, no una aproximación
+        # aparte. Defensivo: si el módulo no está deployado o falla el
+        # muestreo (ej. Earth Engine caído), la animación sigue
+        # devolviéndose igual, solo sin este agregado.
+        localidades_priorizadas = []
+        if _MOTOR_DISPONIBLE:
+            try:
+                localidades_priorizadas = _motor_inundacion.rank_localidades_por_inundacion(
+                    costo_acumulado, region_lat=lat, region_lon=lon, radius_km=radius_km,
+                    max_costo=max_costo_m, frames=frames,
+                )
+            except Exception as exc_loc:  # noqa: BLE001
+                print(f'⚠️ [inundacion_animacion] Falló el ranking de localidades: {exc_loc}')
+
         respuesta = {
             'umbral_m'        : umbral_m,
             'umbral_metodo'   : umbral_metodo,
@@ -2969,6 +2986,7 @@ def inundacion_animacion():
             'frames'          : frames,
             'distancia_max_m' : round(max_costo_m, 1),
             'fotogramas'      : fotogramas,
+            'localidades_priorizadas': localidades_priorizadas,
             'nota'            : (
                 'La distancia es un proxy de orden de llegada (celdas más '
                 'cerca del río primero), NO tiempo real. Convertir a horas '

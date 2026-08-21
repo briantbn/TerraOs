@@ -416,3 +416,144 @@ def generate_animation_frames(costo_acumulado, candidatas, region, frames,
             'imagen': frame_img,
         })
     return fotogramas, max_costo
+
+
+# ══════════════════════════════════════════════════════════════════════
+# PRIORIZACIÓN DE LOCALIDADES EN LA ANIMACIÓN DE INUNDACIÓN
+# ══════════════════════════════════════════════════════════════════════
+# Dado que cada fotograma de la animación es una banda de 'costo_acumulado'
+# (ver _conectividad_hidraulica en app.py), para saber "qué localidad se
+# moja primero" alcanza con MUESTREAR ese mismo costo_acumulado en la
+# coordenada de cada localidad -- es el mismo campo, ni más ni menos, así
+# que el orden que sale acá es exactamente consistente con lo que se ve en
+# la animación (no es una aproximación aparte por distancia recta).
+#
+# Coordenadas: pueblo/localidad (no el centroide del departamento), fuente
+# Wikipedia/IGN/geodatos.net para las cabeceras departamentales y las
+# localidades menores más conocidas. Lista no exhaustiva -- si falta algún
+# lugar puntual que al usuario le importe, se agrega a mano.
+LOCALIDADES_CORRIENTES = [
+    {'nombre': 'Corrientes (Capital)',        'lat': -27.4692, 'lon': -58.8306},
+    {'nombre': 'Bella Vista',                 'lat': -28.5069, 'lon': -59.0453},
+    {'nombre': 'Berón de Astrada',            'lat': -27.6000, 'lon': -57.7167},
+    {'nombre': 'Concepción',                  'lat': -28.5167, 'lon': -57.9667},
+    {'nombre': 'Curuzú Cuatiá',               'lat': -29.7897, 'lon': -58.0522},
+    {'nombre': 'Empedrado',                   'lat': -27.9600, 'lon': -58.7994},
+    {'nombre': 'Esquina',                     'lat': -30.0042, 'lon': -59.5231},
+    {'nombre': 'General Alvear',              'lat': -29.7833, 'lon': -56.7833},
+    {'nombre': 'Caá Catí',                    'lat': -27.9526, 'lon': -57.4353},
+    {'nombre': 'Goya',                        'lat': -29.1394, 'lon': -59.2669},
+    {'nombre': 'Itatí',                       'lat': -27.2667, 'lon': -58.2500},
+    {'nombre': 'Ituzaingó',                   'lat': -27.5911, 'lon': -56.6947},
+    {'nombre': 'Santa Lucía (Lavalle)',       'lat': -28.9833, 'lon': -59.0833},
+    {'nombre': 'Mburucuyá',                   'lat': -28.0333, 'lon': -58.2167},
+    {'nombre': 'Mercedes',                    'lat': -29.1836, 'lon': -58.0781},
+    {'nombre': 'Monte Caseros',               'lat': -30.2661, 'lon': -57.6386},
+    {'nombre': 'Paso de los Libres',          'lat': -29.7000, 'lon': -57.0900},
+    {'nombre': 'Saladas',                     'lat': -28.2500, 'lon': -58.6333},
+    {'nombre': 'San Cosme',                   'lat': -27.3333, 'lon': -58.5167},
+    {'nombre': 'San Luis del Palmar',         'lat': -27.5075, 'lon': -58.5561},
+    {'nombre': 'La Cruz',                     'lat': -29.1833, 'lon': -56.6333},
+    {'nombre': 'San Miguel',                  'lat': -28.0167, 'lon': -57.6167},
+    {'nombre': 'San Roque',                   'lat': -28.6667, 'lon': -58.4667},
+    {'nombre': 'Santo Tomé',                  'lat': -28.5514, 'lon': -56.0500},
+    {'nombre': 'Sauce',                       'lat': -30.0667, 'lon': -58.7667},
+    {'nombre': 'Lomas de Vallejos',           'lat': -27.7375, 'lon': -57.9198},
+    {'nombre': 'San Lorenzo',                 'lat': -27.7000, 'lon': -58.7500},  # aproximado
+    {'nombre': 'Riachuelo',                   'lat': -27.3500, 'lon': -58.7500},  # aproximado
+    {'nombre': 'Ita Ibaté',                   'lat': -27.4400, 'lon': -57.3400},
+    {'nombre': 'Paso de la Patria',           'lat': -27.3667, 'lon': -58.6500},
+    {'nombre': 'Santa Ana',                   'lat': -27.3800, 'lon': -58.5300},
+    {'nombre': 'Colonia Carlos Pellegrini',   'lat': -28.5406, 'lon': -57.1900},
+    {'nombre': 'Yapeyú',                      'lat': -29.4900, 'lon': -56.8300},
+    {'nombre': 'Perugorría',                  'lat': -29.3300, 'lon': -58.6300},
+    {'nombre': 'Chavarría',                   'lat': -29.0800, 'lon': -58.9700},
+    {'nombre': 'Loreto',                      'lat': -28.3200, 'lon': -57.5200},
+    {'nombre': 'El Sombrero',                 'lat': -27.6981, 'lon': -58.7712},
+    {'nombre': 'Bonpland',                    'lat': -27.5000, 'lon': -55.5300},  # límite Misiones, aprox.
+]
+
+
+def _haversine_km(lat1, lon1, lat2, lon2):
+    R = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * R * math.asin(math.sqrt(a))
+
+
+def rank_localidades_por_inundacion(costo_acumulado, region_lat, region_lon, radius_km,
+                                     max_costo, frames, localidades=None, escala=90):
+    """
+    Muestrea 'costo_acumulado' (el mismo campo que arma los fotogramas de
+    /inundacion_animacion) en la coordenada de cada localidad conocida, y
+    devuelve la lista ordenada por cuál se moja primero.
+
+    Args:
+        costo_acumulado: ee.Image, la misma que ya usa generate_animation_frames.
+        region_lat, region_lon, radius_km: centro y radio de la consulta
+            (los mismos que ya recibe /inundacion_animacion) -- se usan
+            para descartar localidades lejos ANTES de tocar Earth Engine.
+        max_costo: el mismo valor (percentil 95) ya calculado para repartir
+            los fotogramas -- se reusa para no duplicar ese cómputo.
+        frames: cantidad de fotogramas de la animación (para calcular en
+            qué 'orden' de fotograma cae cada localidad).
+        localidades: lista de dicts {'nombre','lat','lon'} -- default
+            LOCALIDADES_CORRIENTES.
+        escala: resolución de muestreo en metros (default 90, igual que
+            _conectividad_hidraulica).
+
+    Returns:
+        Lista de dicts ordenada ascendente por costo (primero = se moja
+        antes), cada uno:
+            {'nombre', 'lat', 'lon', 'costo_acumulado', 'orden_fotograma',
+             'porcentaje_alcance'}
+        Localidades fuera del radio consultado, o con costo_acumulado sin
+        dato (fuera de la zona candidata/conectada -- no se van a mojar
+        con este umbral) quedan afuera de la lista, no aparecen como "nunca".
+    """
+    if localidades is None:
+        localidades = LOCALIDADES_CORRIENTES
+    if not max_costo or max_costo <= 0:
+        return []
+
+    # Filtro barato en Python ANTES de tocar Earth Engine: ni siquiera
+    # arma el FeatureCollection para localidades fuera del radio pedido.
+    cercanas = [
+        loc for loc in localidades
+        if _haversine_km(region_lat, region_lon, loc['lat'], loc['lon']) <= radius_km
+    ]
+    if not cercanas:
+        return []
+
+    fc = ee.FeatureCollection([
+        ee.Feature(ee.Geometry.Point([loc['lon'], loc['lat']]), {'nombre': loc['nombre']})
+        for loc in cercanas
+    ])
+
+    muestreado = costo_acumulado.rename('costo').reduceRegions(
+        collection=fc,
+        reducer=ee.Reducer.first(),
+        scale=escala,
+    ).getInfo()
+
+    resultado = []
+    for feat in muestreado.get('features', []):
+        props = feat.get('properties', {})
+        costo = props.get('costo')
+        if costo is None:
+            continue  # fuera de la zona candidata/conectada: no se moja con este umbral
+        nombre = props.get('nombre')
+        loc_original = next((l for l in cercanas if l['nombre'] == nombre), None)
+        resultado.append({
+            'nombre': nombre,
+            'lat': loc_original['lat'] if loc_original else None,
+            'lon': loc_original['lon'] if loc_original else None,
+            'costo_acumulado': round(costo, 1),
+            'orden_fotograma': min(frames, max(1, math.ceil((costo / max_costo) * frames))),
+            'porcentaje_alcance': round(min(100.0, 100 * costo / max_costo), 1),
+        })
+
+    resultado.sort(key=lambda r: r['costo_acumulado'])
+    return resultado
