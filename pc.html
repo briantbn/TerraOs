@@ -3552,6 +3552,9 @@
               Combina textura y drenaje reales del suelo (INTA), relieve del campo (SRTM/Copernicus), lluvia acumulada (Open-Meteo) y el mapa nacional de humedales de INTA (18 subregiones, todo el país) para estimar cómo reaccionará tu campo delimitado ante la lluvia: encharcamiento, anegamiento, inundación o humedal natural (zonas que ya están anegadas por naturaleza y no se cuentan como riesgo).
               Necesita un campo delimitado.
             </p>
+            <p style="font-size:9.5px;color:#0e7490;margin:0 0 10px;opacity:0.65;line-height:1.4;font-style:italic">
+              Metodología: escorrentía por el método SCS Curve Number (NRCS), con CN publicado (TR-55, 1986) según el Grupo Hidrológico de Suelo que resulta de la textura/drenaje INTA, y ajuste por pendiente con la fórmula publicada de Huang et al. (2006). El ajuste por posición dentro del campo y los umbrales finales (encharcamiento/anegamiento/inundación) son heurísticas propias calibradas — no una norma publicada — pensadas para mostrar dónde dentro del lote es relativamente más o menos riesgoso, no como un valor legal/normativo.
+            </p>
             <button onclick="rhAbrirPanel()" style="width:100%;padding:9px;border-radius:9px;background:#0e7490;color:#fff;font-weight:700;font-size:12px;border:none;cursor:pointer">Abrir panel de riesgo hidrológico</button>
           </div>
 
@@ -3789,30 +3792,27 @@
 
       <div style="display:flex;gap:6px;margin-bottom:10px;">
         <button id="medsup-btn-finalizar" onclick="MedicionSuperficie.finalizarPoligono()" style="display:none;flex:1;padding:7px;border-radius:8px;background:#2F855A;color:#fff;font-weight:700;font-size:10.5px;border:none;cursor:pointer;">✅ Finalizar</button>
-        <button onclick="MedicionSuperficie.limpiar()" style="flex:1;padding:7px;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;font-weight:700;font-size:10.5px;border:1px solid rgba(255,255,255,.2);cursor:pointer;">🗑 Limpiar</button>
+        <button onclick="MedicionSuperficie.limpiarTodo()" style="flex:1;padding:7px;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;font-weight:700;font-size:10.5px;border:1px solid rgba(255,255,255,.2);cursor:pointer;">🗑 Limpiar todo</button>
       </div>
 
       <div id="medsup-resultados" style="display:none;border-top:1px solid rgba(255,255,255,.12);padding-top:10px;margin-bottom:10px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
-          <div style="background:rgba(255,255,255,.06);border-radius:8px;padding:7px;text-align:center;">
-            <p style="font-size:9px;color:rgba(255,255,255,.55);margin:0;text-transform:uppercase;">Hectáreas</p>
-            <p id="medsup-ha" style="font-size:14px;font-weight:800;color:#fff;margin:2px 0 0;">--</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
+          <div style="background:rgba(124,58,237,.18);border-radius:8px;padding:7px;text-align:center;">
+            <p style="font-size:9px;color:rgba(255,255,255,.6);margin:0;text-transform:uppercase;">Formas</p>
+            <p id="medsup-total-cant" style="font-size:14px;font-weight:800;color:#fff;margin:2px 0 0;">0</p>
           </div>
-          <div style="background:rgba(255,255,255,.06);border-radius:8px;padding:7px;text-align:center;">
-            <p style="font-size:9px;color:rgba(255,255,255,.55);margin:0;text-transform:uppercase;">km²</p>
-            <p id="medsup-km2" style="font-size:14px;font-weight:800;color:#fff;margin:2px 0 0;">--</p>
+          <div style="background:rgba(124,58,237,.18);border-radius:8px;padding:7px;text-align:center;">
+            <p style="font-size:9px;color:rgba(255,255,255,.6);margin:0;text-transform:uppercase;">Total ha</p>
+            <p id="medsup-total-ha" style="font-size:14px;font-weight:800;color:#fff;margin:2px 0 0;">0</p>
           </div>
-          <div style="background:rgba(255,255,255,.06);border-radius:8px;padding:7px;text-align:center;">
-            <p style="font-size:9px;color:rgba(255,255,255,.55);margin:0;text-transform:uppercase;">m²</p>
-            <p id="medsup-m2" style="font-size:12px;font-weight:800;color:#fff;margin:2px 0 0;">--</p>
-          </div>
-          <div style="background:rgba(255,255,255,.06);border-radius:8px;padding:7px;text-align:center;">
-            <p style="font-size:9px;color:rgba(255,255,255,.55);margin:0;text-transform:uppercase;">Perímetro</p>
-            <p id="medsup-perim" style="font-size:12px;font-weight:800;color:#fff;margin:2px 0 0;">--</p>
+          <div style="background:rgba(124,58,237,.18);border-radius:8px;padding:7px;text-align:center;">
+            <p style="font-size:9px;color:rgba(255,255,255,.6);margin:0;text-transform:uppercase;">Total km²</p>
+            <p id="medsup-total-km2" style="font-size:14px;font-weight:800;color:#fff;margin:2px 0 0;">0</p>
           </div>
         </div>
+        <div id="medsup-lista-formas" style="max-height:180px;overflow-y:auto;margin-bottom:10px;"></div>
         <div style="margin-bottom:8px;">
-          <label for="medsup-nombre" style="font-size:9px;color:rgba(255,255,255,.55);margin:0 0 4px;text-transform:uppercase;display:block;">Nombre del archivo</label>
+          <label for="medsup-nombre" style="font-size:9px;color:rgba(255,255,255,.55);margin:0 0 4px;text-transform:uppercase;display:block;">Nombre del archivo a exportar</label>
           <input id="medsup-nombre" type="text" maxlength="80" placeholder="Ej: Lote Norte, Campo 3..."
             style="width:100%;box-sizing:border-box;padding:7px 8px;border-radius:8px;background:rgba(255,255,255,.08);color:#fff;font-weight:600;font-size:11px;border:1px solid rgba(255,255,255,.2);outline:none;"/>
         </div>
@@ -7491,12 +7491,20 @@ const IIPDIInspector = (() => {
 // ════════════════════════════════════════════════════════════════
 const MedicionSuperficie = (() => {
   let modo = null;          // 'poligono' | 'rectangulo'
-  let vertices = [];        // [{lat, lon}]
-  let marcadores = [];      // L.circleMarker[] (mientras se dibuja)
-  let lineaEnCurso = null;  // L.polyline (mientras se dibuja)
-  let poligonoFinal = null; // L.polygon (forma cerrada)
-  let asas = [];            // L.marker[] arrastrables (forma ya cerrada, para editar vértices)
+  let vertices = [];        // [{lat, lon}] — SOLO la forma que se está dibujando ahora (sin cerrar)
+  let marcadores = [];      // L.circleMarker[] (mientras se dibuja la forma en curso)
+  let lineaEnCurso = null;  // L.polyline (mientras se dibuja la forma en curso)
   let cerrado = false;
+
+  // FIX (a pedido): antes solo se podía tener UNA forma medida a la vez —
+  // dibujar/importar una nueva borraba la anterior. Ahora `formas` guarda
+  // TODAS las formas cerradas (dibujadas a mano o importadas) y todas
+  // quedan visibles juntas en el mapa, cada una con su propio color, sus
+  // propias asas editables y su propia hectárea — más una fila de totales.
+  // { id, vertices, layer: L.polygon, asas: L.marker[], nombre, has, km2, m2, perimKm }
+  let formas = [];
+  let contadorFormas = 0;
+  const COLORES_FORMAS = ['#7c3aed', '#0ea5e9', '#f59e0b', '#ec4899', '#22c55e', '#ef4444', '#14b8a6', '#a855f7'];
 
   const iconoAsa = L.divIcon({
     className: 'medsup-asa-vertice',
@@ -7515,50 +7523,88 @@ const MedicionSuperficie = (() => {
     });
   }
 
+  // Limpia SOLO lo que pertenece a la forma en curso (marcadores + línea
+  // punteada mientras se dibuja) — las formas ya cerradas (`formas`) no se
+  // tocan acá, así conviven varias en el mapa al mismo tiempo.
   function limpiarCapasMapa() {
     if (!mapaHidrologia) return;
     marcadores.forEach(m => mapaHidrologia.removeLayer(m));
     marcadores = [];
-    asas.forEach(a => mapaHidrologia.removeLayer(a));
-    asas = [];
     if (lineaEnCurso) { mapaHidrologia.removeLayer(lineaEnCurso); lineaEnCurso = null; }
-    if (poligonoFinal) { mapaHidrologia.removeLayer(poligonoFinal); poligonoFinal = null; }
   }
 
-  // Recalcula hectáreas/km²/m²/perímetro y actualiza el polígono en el mapa
-  // a partir del array `vertices` actual. Se usa tanto al cerrar la forma
-  // como cada vez que se arrastra un asa.
-  function actualizarResultados() {
-    if (poligonoFinal) poligonoFinal.setLatLngs(vertices.map(p => [p.lat, p.lon]));
-    const has = calcularHectareas(vertices);
-    const km2 = has / 100;
-    const m2  = has * 10000;
-    const perimKm = calcularPerimetroKm(vertices);
-    setText('medsup-ha', has.toLocaleString('es-AR', { maximumFractionDigits: 1 }));
-    setText('medsup-km2', km2.toLocaleString('es-AR', { maximumFractionDigits: 2 }));
-    setText('medsup-m2', Math.round(m2).toLocaleString('es-AR'));
-    setText('medsup-perim', perimKm < 1 ? `${Math.round(perimKm * 1000)} m` : `${perimKm.toFixed(2)} km`);
+  // Recalcula hectáreas/km²/m²/perímetro de UNA forma y redibuja su
+  // polígono en el mapa. Se usa tanto al cerrarla como cada vez que se
+  // arrastra una de sus asas.
+  function actualizarForma(forma) {
+    forma.layer.setLatLngs(forma.vertices.map(p => [p.lat, p.lon]));
+    forma.has = calcularHectareas(forma.vertices);
+    forma.km2 = forma.has / 100;
+    forma.m2  = forma.has * 10000;
+    forma.perimKm = calcularPerimetroKm(forma.vertices);
+    renderListaFormas();
   }
 
-  // Crea, para cada vértice de la forma ya cerrada, un asa (L.marker
-  // arrastrable) que permite reubicarlo a mano. Al soltar, se recalculan
-  // hectáreas/km²/perímetro y se redibuja el polígono con la forma nueva.
-  function crearAsasEditables() {
-    asas.forEach(a => mapaHidrologia.removeLayer(a));
-    asas = vertices.map((v, i) => {
+  // Crea, para cada vértice de una forma ya cerrada, un asa (L.marker
+  // arrastrable) que permite reubicarlo a mano. Al soltar, se recalcula
+  // esa forma puntual (las demás no se tocan).
+  function crearAsasEditables(forma) {
+    forma.asas.forEach(a => mapaHidrologia.removeLayer(a));
+    forma.asas = forma.vertices.map((v, i) => {
       const asa = L.marker([v.lat, v.lon], { icon: iconoAsa, draggable: true }).addTo(mapaHidrologia);
       asa.on('drag', (e) => {
         const { lat, lng: lon } = e.target.getLatLng();
-        vertices[i] = { lat, lon };
-        actualizarResultados();
+        forma.vertices[i] = { lat, lon };
+        actualizarForma(forma);
       });
       return asa;
     });
   }
 
+  // Dibuja/actualiza la lista de formas en el panel, con nombre editable,
+  // hectáreas y botón para borrar esa forma puntual — y la fila de totales.
+  function renderListaFormas() {
+    const cont = $el('medsup-lista-formas');
+    if (cont) {
+      cont.innerHTML = formas.map(f => `
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.08)">
+          <span style="width:10px;height:10px;border-radius:3px;background:${f.layer.options.color};flex-shrink:0"></span>
+          <input value="${(f.nombre || '').replace(/"/g, '&quot;')}" maxlength="60" oninput="MedicionSuperficie.renombrarForma(${f.id}, this.value)"
+                 style="flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:3px 6px;color:#fff;font-size:10.5px"/>
+          <span style="font-size:10.5px;color:#fff;white-space:nowrap">${(f.has || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} ha</span>
+          <button onclick="MedicionSuperficie.eliminarForma(${f.id})" title="Eliminar esta forma"
+                  style="background:none;border:none;color:#f87171;cursor:pointer;font-size:13px;padding:2px 4px;line-height:1">✕</button>
+        </div>`).join('');
+    }
+    const totalHa = formas.reduce((s, f) => s + (f.has || 0), 0);
+    setText('medsup-total-cant', formas.length);
+    setText('medsup-total-ha', totalHa.toLocaleString('es-AR', { maximumFractionDigits: 1 }));
+    setText('medsup-total-km2', (totalHa / 100).toLocaleString('es-AR', { maximumFractionDigits: 2 }));
+    const res = $el('medsup-resultados');
+    if (res) res.style.display = formas.length ? 'block' : 'none';
+  }
+
+  function renombrarForma(id, nombre) {
+    const f = formas.find(x => x.id === id);
+    if (f) f.nombre = nombre;
+  }
+
+  function eliminarForma(id) {
+    const idx = formas.findIndex(f => f.id === id);
+    if (idx === -1) return;
+    const f = formas[idx];
+    if (f.layer) mapaHidrologia.removeLayer(f.layer);
+    f.asas.forEach(a => mapaHidrologia.removeLayer(a));
+    formas.splice(idx, 1);
+    renderListaFormas();
+  }
+
+  // Cancela SOLO el trazo en curso (si se estaba dibujando algo a medio
+  // terminar) — las formas ya cerradas quedan en el mapa. Es lo que se usa
+  // internamente antes de empezar una forma nueva.
   function limpiar() {
     if (mapaHidrologia) mapaHidrologia.off('click', onClickMapa);
-    // FIX: al terminar/limpiar la medición, se restaura el clic normal de
+    // FIX: al terminar/cancelar el trazo, se restaura el clic normal de
     // los polígonos con popup (grid de riesgo hidrológico, campo delimitado,
     // lotes, etc.) que se había desactivado en iniciar() para poder dibujar.
     if (mapaHidrologia) _setPoligonosClicables(mapaHidrologia, true);
@@ -7568,13 +7614,24 @@ const MedicionSuperficie = (() => {
     setInstruccion('');
     setProgreso('');
     $el('medsup-btn-finalizar').style.display = 'none';
-    $el('medsup-resultados').style.display = 'none';
+  }
+
+  // Esto es lo que dispara el botón "🗑 Limpiar todo": borra el trazo en
+  // curso Y TODAS las formas ya cerradas — vuelve el panel a cero.
+  function limpiarTodo() {
+    limpiar();
+    formas.forEach(f => {
+      if (f.layer) mapaHidrologia.removeLayer(f.layer);
+      f.asas.forEach(a => mapaHidrologia.removeLayer(a));
+    });
+    formas = [];
+    renderListaFormas();
     const nombreInput = $el('medsup-nombre');
     if (nombreInput) nombreInput.value = '';
   }
 
   function iniciar(nuevoModo) {
-    limpiar();
+    limpiar(); // solo cancela el trazo en curso — las formas ya cerradas quedan en el mapa
     // Exclusión mutua: si el Inspector de Riesgo Hidrológico (u otra
     // herramienta de click) estaba activo, se apaga acá — así un click
     // sobre el mapa solo lo procesa la Regla, no las dos a la vez.
@@ -7639,6 +7696,8 @@ const MedicionSuperficie = (() => {
     if (modo === 'poligono' && vertices.length >= 3) cerrarForma();
   }
 
+  // Cierra la forma en curso y la AGREGA a `formas` (no reemplaza a las
+  // anteriores). Devuelve la forma recién creada.
   function cerrarForma() {
     cerrado = true;
     if (mapaHidrologia) mapaHidrologia.off('click', onClickMapa);
@@ -7646,31 +7705,44 @@ const MedicionSuperficie = (() => {
     // de riesgo hidrológico y demás polígonos con popup (dejaron de "pasar
     // de largo" el clic, ya no hace falta mientras no se esté dibujando).
     if (mapaHidrologia) _setPoligonosClicables(mapaHidrologia, true);
-    limpiarCapasMapa();
-    poligonoFinal = L.polygon(vertices.map(p => [p.lat, p.lon]), {
-      color: '#7c3aed', weight: 2.5, fillColor: '#7c3aed', fillOpacity: 0.15,
-    }).addTo(mapaHidrologia);
-    mapaHidrologia.fitBounds(poligonoFinal.getBounds(), { padding: [40, 40] });
-    crearAsasEditables();
-    actualizarResultados();
+    limpiarCapasMapa(); // solo saca los marcadores/línea punteada del trazo en curso
 
+    const idx = ++contadorFormas;
+    const color = COLORES_FORMAS[(idx - 1) % COLORES_FORMAS.length];
+    const layer = L.polygon(vertices.map(p => [p.lat, p.lon]), {
+      color, weight: 2.5, fillColor: color, fillOpacity: 0.18,
+    }).addTo(mapaHidrologia);
+
+    const forma = { id: idx, vertices: vertices.slice(), layer, asas: [], nombre: `Forma ${idx}` };
+    formas.push(forma);
+    crearAsasEditables(forma);
+    actualizarForma(forma);
+
+    // Encuadra TODAS las formas juntas (no solo la recién cerrada), así se
+    // ven las 2/3/20 formas a la vez, tal como se pidió.
+    if (formas.length > 1) {
+      const grupo = L.featureGroup(formas.map(f => f.layer));
+      mapaHidrologia.fitBounds(grupo.getBounds(), { padding: [40, 40] });
+    } else {
+      mapaHidrologia.fitBounds(layer.getBounds(), { padding: [40, 40] });
+    }
+
+    vertices = []; modo = null; cerrado = false;
+    marcarBotonActivo(null);
     $el('medsup-btn-finalizar').style.display = 'none';
-    $el('medsup-resultados').style.display = 'block';
-    setInstruccion('Forma cerrada. Arrastrá los puntos violeta para ajustarla, o limpiá para dibujar otra.');
+    setInstruccion(`Forma #${idx} agregada (van ${formas.length}). Tocá "Polígono" o "Rectángulo" de nuevo para agregar otra, arrastrá los puntos violeta para ajustar cualquiera, o "🗑 Limpiar todo" para borrar todas.`);
+    renderListaFormas();
+    return forma;
   }
 
-  // Exporta la forma cerrada actual (dibujada o importada) a GeoJSON/KML.
-  // Reutiliza _descargarTexto/tokml, ya definidos más abajo en el archivo
-  // (son 'function' declarations -> hoisted, no importa el orden real).
+  // Exporta TODAS las formas cerradas (dibujadas y/o importadas) juntas,
+  // como una FeatureCollection con una Feature por forma — cada una con su
+  // nombre y hectáreas en las propiedades.
   function exportar(formato) {
-    if (!poligonoFinal) {
-      alert('Todavía no hay una forma cerrada para exportar. Dibujá un polígono/rectángulo, o importá un KML/GeoJSON primero.');
+    if (formas.length === 0) {
+      alert('Todavía no hay ninguna forma cerrada para exportar. Dibujá un polígono/rectángulo, o importá un KML/GeoJSON primero.');
       return;
     }
-    // Nombre ingresado por el usuario (opcional). Se usa tanto para el
-    // nombre del archivo descargado como para la propiedad `name` dentro
-    // del GeoJSON/KML, así el lote queda identificado si luego se lo
-    // vuelve a importar o se lo abre en otro programa (QGIS, Earth, etc).
     const nombreInput = $el('medsup-nombre');
     const nombreCrudo = nombreInput ? nombreInput.value.trim() : '';
     const nombreArchivo = nombreCrudo
@@ -7679,67 +7751,73 @@ const MedicionSuperficie = (() => {
           .trim().replace(/\s+/g, '_') || 'medicion_superficie'
       : 'medicion_superficie';
 
-    const geojson = poligonoFinal.toGeoJSON();
-    if (nombreCrudo) {
-      geojson.properties = geojson.properties || {};
-      geojson.properties.name = nombreCrudo;
-    }
+    const featureCollection = {
+      type: 'FeatureCollection',
+      features: formas.map(f => {
+        const feat = f.layer.toGeoJSON();
+        feat.properties = feat.properties || {};
+        feat.properties.name = f.nombre || `Forma ${f.id}`;
+        feat.properties.hectareas = Math.round((f.has || 0) * 10) / 10;
+        return feat;
+      }),
+    };
 
     if (formato === 'geojson') {
-      _descargarTexto(`${nombreArchivo}.geojson`, JSON.stringify(geojson, null, 2), 'application/geo+json');
+      _descargarTexto(`${nombreArchivo}.geojson`, JSON.stringify(featureCollection, null, 2), 'application/geo+json');
     } else {
       if (typeof tokml === 'undefined') { alert('No se pudo cargar el conversor a KML (revisá tu conexión a internet).'); return; }
-      _descargarTexto(`${nombreArchivo}.kml`, tokml(geojson), 'application/vnd.google-earth.kml+xml');
+      _descargarTexto(`${nombreArchivo}.kml`, tokml(featureCollection), 'application/vnd.google-earth.kml+xml');
     }
   }
 
-  // Toma el primer polígono que encuentre dentro de un GeoJSON (Feature,
-  // FeatureCollection o Geometry suelta) y lo devuelve como [{lat,lon}, ...]
-  // -- incluye Polygon y MultiPolygon (en ese caso, el primer polígono del
-  // grupo). Si el archivo trae varias formas, solo se usa la primera: esta
-  // herramienta mide UNA superficie por vez, igual que dibujándola a mano.
-  function _primerPoligonoComoVertices(geojson) {
-    function anilloDeGeometria(geom) {
-      if (!geom) return null;
-      if (geom.type === 'Polygon') return geom.coordinates[0];
-      if (geom.type === 'MultiPolygon') return geom.coordinates[0][0];
-      return null;
+  // Extrae TODOS los polígonos que encuentre dentro de un GeoJSON (Feature,
+  // FeatureCollection, Geometry suelta, GeometryCollection) como una lista
+  // de [{lat,lon}, ...] -- incluye Polygon y cada parte de un MultiPolygon.
+  // FIX: antes solo se tomaba el PRIMER polígono del archivo; ahora, si el
+  // KML/GeoJSON trae varias formas (ej. 20 lotes), se agregan todas.
+  function _todosLosPoligonosComoVertices(geojson) {
+    const anillos = [];
+    function extraerDeGeometria(geom) {
+      if (!geom) return;
+      if (geom.type === 'Polygon') anillos.push(geom.coordinates[0]);
+      else if (geom.type === 'MultiPolygon') geom.coordinates.forEach(poly => anillos.push(poly[0]));
+      else if (geom.type === 'GeometryCollection') (geom.geometries || []).forEach(extraerDeGeometria);
     }
     let feats;
     if (geojson.type === 'FeatureCollection') feats = geojson.features || [];
     else if (geojson.type === 'Feature') feats = [geojson];
     else feats = [{ geometry: geojson }];
-    for (const f of feats) {
-      const anillo = anilloDeGeometria(f.geometry);
-      if (anillo && anillo.length >= 3) {
-        return anillo.map(([lon, lat]) => ({ lat, lon }));
-      }
-    }
-    return null;
+    feats.forEach(f => extraerDeGeometria(f.geometry));
+    return anillos.filter(a => a && a.length >= 3).map(anillo => anillo.map(([lon, lat]) => ({ lat, lon })));
   }
 
-  // Importa un .kml/.kmz/.geojson/.json y lo muestra como si se hubiera
-  // dibujado a mano: calcula hectáreas/km²/m²/perímetro igual que
-  // cerrarForma(). Reutiliza _extraerGeoJSONDeArchivo (mismo parser que
-  // usa el panel "Cargar o exportar capas" del mapa satelital).
+  // Importa un .kml/.kmz/.geojson/.json: cada polígono que traiga el
+  // archivo se agrega como una forma más (no reemplaza a las que ya había
+  // en el mapa). Reutiliza _extraerGeoJSONDeArchivo (mismo parser que usa
+  // el panel "Cargar o exportar capas" del mapa satelital).
   async function importarArchivo(event) {
     const archivo = event.target.files && event.target.files[0];
     event.target.value = ''; // permite volver a elegir el mismo archivo después
     if (!archivo) return;
     try {
       const geojson = await _extraerGeoJSONDeArchivo(archivo);
-      const nuevosVertices = _primerPoligonoComoVertices(geojson);
-      if (!nuevosVertices) {
+      const listasVertices = _todosLosPoligonosComoVertices(geojson);
+      if (!listasVertices.length) {
         alert('El archivo no contiene ningún polígono. Usá un .kml/.kmz/.geojson con al menos una forma cerrada.');
         return;
       }
-      limpiar();
-      vertices = nuevosVertices;
-      cerrarForma();
+      const nombreBase = archivo.name.replace(/\.(kml|kmz|geojson|json)$/i, '');
+      listasVertices.forEach((verts, i) => {
+        vertices = verts;
+        const forma = cerrarForma();
+        forma.nombre = listasVertices.length > 1 ? `${nombreBase} ${i + 1}` : nombreBase;
+      });
+      renderListaFormas();
       // Precarga el nombre con el del archivo importado (sin extensión),
       // como punto de partida — el usuario lo puede editar antes de exportar.
       const nombreInput = $el('medsup-nombre');
-      if (nombreInput) nombreInput.value = archivo.name.replace(/\.(kml|kmz|geojson|json)$/i, '');
+      if (nombreInput) nombreInput.value = nombreBase;
+      setProgreso(listasVertices.length > 1 ? `✅ Se importaron ${listasVertices.length} formas.` : '');
     } catch (err) {
       alert('No se pudo importar el archivo: ' + err.message);
     }
@@ -7756,25 +7834,30 @@ const MedicionSuperficie = (() => {
     if (planifPanel && planifPanel.style.display === 'block') planifPanel.style.display = 'none';
     const p = $el('medsup-panel');
     if (p) p.style.display = 'block';
+    renderListaFormas();
   }
   function cerrarPanel() {
-    // Antes esto llamaba a limpiar() y borraba del mapa la forma recién
-    // dibujada/importada apenas se cerraba el panel (con la ✕ o al abrir
-    // otra herramienta). Ahora la forma queda fija en el mapa: solo se
-    // oculta el panel. Para borrarla de verdad está el botón "🗑 Limpiar".
+    // La(s) forma(s) quedan fijas en el mapa: solo se oculta el panel. Para
+    // borrarlas de verdad está el botón "🗑 Limpiar todo".
     const p = $el('medsup-panel');
     if (p) p.style.display = 'none';
   }
 
-  // Devuelve los vértices de la forma YA CERRADA (dibujada a mano o
-  // importada de un KML/GeoJSON), o null si todavía no hay ninguna forma
-  // cerrada. Lo usa calcularRiesgoHidrologico() como fuente alternativa
-  // de área cuando no hay un campo delimitado con "Mi Campo".
+  // Devuelve los vértices de la forma cerrada MÁS RECIENTE (la última
+  // dibujada, importada o editada), o null si todavía no hay ninguna. Lo
+  // usa calcularRiesgoHidrologico() como fuente alternativa de área cuando
+  // no hay un campo delimitado con "Mi Campo". Si se midieron varias formas
+  // a la vez, el riesgo hidrológico sigue evaluando UN campo por vez — se
+  // toma la última agregada, que es la que normalmente se está mirando.
   function getVertices() {
-    return cerrado && vertices.length >= 3 ? vertices : null;
+    if (formas.length === 0) return null;
+    return formas[formas.length - 1].vertices;
   }
 
-  return { iniciar, finalizarPoligono, limpiar, abrirPanel, cerrarPanel, exportar, importarArchivo, getVertices };
+  return {
+    iniciar, finalizarPoligono, limpiar, limpiarTodo, abrirPanel, cerrarPanel,
+    exportar, importarArchivo, getVertices, renombrarForma, eliminarForma,
+  };
 })();
 
 // ════════════════════════════════════════════════════════════════
@@ -11060,15 +11143,30 @@ let rhEscenarioActual     = 'real'; // 'real' | '40'|'60'|'80'|'100'|'120'|'150'
 let rhVentanaSeleccionada = 48;     // 24 | 48 | 72 (para el escenario "Real")
 let rhAnimando            = false;
 
-// ── Clasificación de texto INTA → categorías de textura/drenaje ──
-function rhTexturaCategoria(txt) {
+// ── Clasificación de texto INTA → clase textural USDA / categoría de drenaje ──
+// Las 12 clases del triángulo textural USDA (el mismo sistema que usa el
+// NRCS; la nomenclatura en español de INTA es la traducción directa de la
+// inglesa), evaluadas de más específica a menos específica para no confundir
+// p.ej. "franco arcillo arenoso" con "franco arenoso".
+function rhTexturaUSDA(txt) {
   const t = (txt || '').toLowerCase();
   if (!t) return 'franco';
-  if (/muy arcill|arcillos[oa] pesad/.test(t)) return 'muy_arcilloso';
-  if (/arcill/.test(t)) return 'arcilloso';
-  if (/(^|\s)arena|arenos/.test(t) && !/franco/.test(t)) return 'arenoso';
-  return 'franco'; // franco, franco arenoso, franco limoso, limoso, etc.
+  if (/franco arcillo arenoso/.test(t)) return 'franco_arcillo_arenoso'; // sandy clay loam
+  if (/franco arcillo limoso/.test(t))  return 'franco_arcillo_limoso';  // silty clay loam
+  if (/franco arcilloso/.test(t))       return 'franco_arcilloso';       // clay loam
+  if (/franco arenoso/.test(t))         return 'franco_arenoso';         // sandy loam
+  if (/franco limoso/.test(t))          return 'franco_limoso';          // silt loam
+  if (/arcillo arenoso/.test(t))        return 'arcillo_arenoso';        // sandy clay
+  if (/arcillo limoso/.test(t))         return 'arcillo_limoso';         // silty clay
+  if (/muy arcill|arcillos[oa] pesad|arcill/.test(t)) return 'arcilloso'; // clay
+  if (/^franco\b/.test(t) || t === 'franco')           return 'franco';   // loam
+  if (/limos/.test(t))                  return 'limoso';                 // silt
+  if (/(^|\s)aren|arenos/.test(t))      return 'arenoso';                // sand / loamy sand
+  return 'franco';
 }
+// Se conserva el nombre viejo como alias, por si queda alguna referencia externa.
+function rhTexturaCategoria(txt) { return rhTexturaUSDA(txt); }
+
 function rhDrenajeCategoria(txt) {
   const t = (txt || '').toLowerCase();
   if (/exces/.test(t)) return 'excesivo';
@@ -11077,26 +11175,105 @@ function rhDrenajeCategoria(txt) {
   if (/pobre|deficient|mal drenad/.test(t)) return 'pobre';
   return 'moderado';
 }
-// Curve Number base por [textura][drenaje] — valores de referencia SCS/NRCS
-const RH_CN_TABLA = {
-  arenoso:       { excesivo: 35, bueno: 45, moderado: 55, imperfecto: 65, pobre: 75 },
-  franco:        { excesivo: 50, bueno: 60, moderado: 70, imperfecto: 78, pobre: 85 },
-  arcilloso:     { excesivo: 60, bueno: 70, moderado: 78, imperfecto: 85, pobre: 90 },
-  muy_arcilloso: { excesivo: 65, bueno: 75, moderado: 83, imperfecto: 90, pobre: 94 },
+// ── Curve Number (CN) — método SCS/NRCS ───────────────────────────────
+// Antes la textura+drenaje mapeaban directo a un CN inventado. Ahora se usa
+// el proceso real de dos pasos del método SCS-CN:
+//
+//  1) Clase textural USDA → Grupo Hidrológico de Suelo (HSG A/B/C/D), con
+//     una tabla REALMENTE PUBLICADA y ampliamente citada (NRCS Web Soil
+//     Survey / Purdue University LTHIA model documentation; reproducida de
+//     forma consistente en Minnesota Stormwater Manual, Friends of the
+//     Rouge, Earthworks Environmental, entre otras fuentes que citan a
+//     NRCS):
+//       A: arena, arena franca, franco arenoso           (sand/loamy sand/sandy loam)
+//       B: franco limoso, franco, limoso                 (silt loam/loam/silt)
+//       C: franco arcillo arenoso                        (sandy clay loam)
+//       D: franco arcilloso, franco arcillo limoso,
+//          arcillo arenoso, arcillo limoso, arcilloso     (clay loam/silty clay
+//                                                          loam/sandy clay/silty clay/clay)
+//     El drenaje observado ajusta ese HSG "textural" según el criterio
+//     oficial del NRCS (National Engineering Handbook, Part 630, Cap. 7):
+//     un drenaje muy pobre o nivel freático alto empuja a D casi sin
+//     importar la textura ("soils with a permanent high water table... "
+//     son D por definición); un drenaje imperfecto sube al menos a C.
+//  2) HSG → CN publicado, tabla TR-55 (USDA-NRCS, 1986) Tabla 2-2a
+//     "Cultivated Agricultural Lands", cobertura "Row crops, straight
+//     row", promedio entre condición hidrológica "mala" (72/81/88/91) y
+//     "buena" (67/78/85/89) — la app no tiene dato del cultivo/cobertura
+//     puntual, así que se usa el punto medio como valor representativo.
+const RH_TEXTURA_USDA_A_HSG = {
+  arenoso:                'A',
+  franco_arenoso:          'A',
+  franco_limoso:           'B',
+  franco:                  'B',
+  limoso:                  'B',
+  franco_arcillo_arenoso:  'C',
+  franco_arcilloso:        'D',
+  franco_arcillo_limoso:   'D',
+  arcillo_arenoso:         'D',
+  arcillo_limoso:          'D',
+  arcilloso:               'D',
 };
+const RH_CN_POR_HSG = { A: 70, B: 80, C: 87, D: 90 }; // TR-55 Tabla 2-2a, promedio mala/buena condición
+const RH_ORDEN_HSG = ['A', 'B', 'C', 'D'];
 
-/** Ajuste del CN según pendiente local y posición relativa dentro del campo (0=más bajo, 1=más alto). */
-function rhAjusteRelieve(pendientePct, posicionRelativa) {
-  let ajuste = 0;
-  if (pendientePct < 1)      ajuste += 6;
-  else if (pendientePct < 3) ajuste += 2;
-  else if (pendientePct > 8) ajuste -= 10;
-  else if (pendientePct > 4) ajuste -= 4;
+/** Grupo Hidrológico de Suelo final: HSG textural (tabla publicada) ajustado por el drenaje observado, según el criterio NRCS Cap. 7. */
+function rhHSGFinal(texturaUSDA, drenajeCat) {
+  const hsgTextural = RH_TEXTURA_USDA_A_HSG[texturaUSDA] || 'B';
+  if (drenajeCat === 'pobre') return 'D'; // napa alta / drenaje muy pobre → D casi sin importar la textura (criterio NRCS)
+  if (drenajeCat === 'imperfecto') {
+    const idx = Math.max(RH_ORDEN_HSG.indexOf(hsgTextural), RH_ORDEN_HSG.indexOf('C'));
+    return RH_ORDEN_HSG[idx]; // nunca mejor que C con drenaje imperfecto
+  }
+  return hsgTextural; // excesivo/bueno/moderado: el HSG textural ya representa la infiltración esperada
+}
 
-  if (posicionRelativa < 0.2)      ajuste += 8;  // parte más baja del campo
-  else if (posicionRelativa < 0.4) ajuste += 3;
-  else if (posicionRelativa > 0.8) ajuste -= 8;   // parte más alta
-  return ajuste;
+/** CN base real: resuelve primero el HSG (textura publicada + drenaje) y busca su CN publicado (TR-55). */
+function rhCNBase(texturaCat, drenajeCat) {
+  const hsg = rhHSGFinal(texturaCat, drenajeCat);
+  return RH_CN_POR_HSG[hsg];
+}
+
+/**
+ * Ajuste de CN por pendiente — fórmula PUBLICADA de Huang et al. (2006),
+ * "A modification to the Soil Conservation Service curve number method for
+ * steep slopes in the Loess Plateau of China" (Journal of Hydrology 326),
+ * que refina a Sharpley & Williams (1990). El CN de tabla (CN2) está
+ * definido para una condición de referencia (~5% de pendiente); para otras
+ * pendientes se interpola hacia CN3 (condición húmeda, AMC III), que crece
+ * con la pendiente:
+ *   CN3  = CN2 · exp(0.00673 · (100 − CN2))
+ *   CN2α = CN2 + (CN3 − CN2)/3 · (1 − 2·exp(−13.86·α))      [α = pendiente, fracción]
+ * Se devuelve el delta (CN2α − CN2) para sumarlo junto al resto de ajustes.
+ */
+function rhAjustePendienteCN(cn2, pendientePct) {
+  const alfa = Math.max(0, pendientePct) / 100;
+  const cn3 = cn2 * Math.exp(0.00673 * (100 - cn2));
+  const cn2ajustado = cn2 + (cn3 - cn2) / 3 * (1 - 2 * Math.exp(-13.86 * alfa));
+  return cn2ajustado - cn2;
+}
+
+/**
+ * Convierte el TWI (ya calculado con el método real Beven-Kirkby, ver
+ * rhCalcularTWI) normalizado 0–1 dentro del campo (0 = celda con menor TWI
+ * del lote = más "seca" relativamente, 1 = mayor TWI = más "húmeda") en un
+ * ajuste aditivo de CN. La FORMA de esta conversión (los números 6/2/-6) es
+ * una decisión de diseño de la app, calibrada para que el degradado dentro
+ * de un mismo campo sea razonable — no existe una fórmula publicada única
+ * que combine TWI con el Curve Number del SCS. Lo que sí es 100% el método
+ * publicado es el TWI en sí (ver rhCalcularTWI).
+ */
+function rhAjusteTWI(twiNormalizado) {
+  if (twiNormalizado === null || twiNormalizado === undefined) return 0; // sin dato de relieve → sin ajuste
+  if (twiNormalizado > 0.8)        return 6;  // mayor TWI del campo: recibe y retiene más escorrentía de vecinas
+  if (twiNormalizado > 0.6)        return 2;
+  if (twiNormalizado < 0.2)        return -6; // menor TWI del campo: drena, no acumula
+  return 0;
+}
+
+/** Ajuste total de CN según pendiente local (fórmula publicada de Huang et al.) y TWI normalizado dentro del campo (método publicado, conversión a CN calibrada — ver comentarios arriba). */
+function rhAjusteRelieve(pendientePct, twiNormalizado, cnBase) {
+  return rhAjustePendienteCN(cnBase, pendientePct) + rhAjusteTWI(twiNormalizado);
 }
 
 /** Escorrentía superficial estimada (mm) — método SCS Curve Number. */
@@ -11108,6 +11285,13 @@ function rhEscorrentiaSCS(P_mm, CN) {
   return Math.pow(P_mm - Ia, 2) / (P_mm + 0.8 * S);
 }
 
+// Umbrales de clasificación por escorrentía (Q, mm) — ADVERTENCIA: son
+// umbrales OPERATIVOS calibrados por prueba y error contra casos de campo
+// conocidos, NO provienen de una norma o tabla publicada (no existe un
+// estándar universal de "mm de escorrentía = anegamiento" válido para
+// cualquier lote, ya que depende de infraestructura de drenaje local,
+// duración del evento, capacidad de absorción posterior, etc.). Se dejan
+// documentados así para no dar la impresión de que son un valor normativo.
 function rhClasificar(Q) {
   if (Q < 15) return { cat: 'sin_riesgo',     color: '#22c55e', label: '🟢 Sin riesgo' };
   if (Q < 35) return { cat: 'encharcamiento', color: '#ffd54f', label: '🟡 Riesgo de encharcamiento' };
@@ -11199,10 +11383,79 @@ function rhGenerarGrid(puntos, n) {
       const lat0 = minLat + i * stepLat, lat1 = lat0 + stepLat;
       const lon0 = minLon + j * stepLon, lon1 = lon0 + stepLon;
       const latC = (lat0 + lat1) / 2, lonC = (lon0 + lon1) / 2;
-      if (rhPuntoEnPoligono(latC, lonC, puntos)) celdas.push({ lat0, lat1, lon0, lon1, latC, lonC });
+      if (rhPuntoEnPoligono(latC, lonC, puntos)) celdas.push({ i, j, lat0, lat1, lon0, lon1, latC, lonC });
     }
   }
   return celdas;
+}
+
+// ── Índice Topográfico de Humedad (TWI) — Beven & Kirkby (1979) ──────
+// "A physically based, variable contributing area model of basin
+// hydrology", Hydrological Sciences Bulletin 24(1). Fórmula publicada:
+//   TWI = ln( a / tan(β) )
+// donde a = área de contribución específica (área que drena hacia la celda,
+// por unidad de ancho de contorno) y β = pendiente local. Reemplaza al
+// "posicionRelativa" anterior (que solo miraba si una celda era la más baja
+// del campo, sin importar cuánta agua de otras celdas recibe realmente).
+//
+// El cálculo de "a" usa acumulación de flujo D8 (O'Callaghan & Mark, 1984):
+// cada celda entrega toda su agua a su único vecino más empinado hacia
+// abajo (de los 8 vecinos), procesando las celdas de mayor a menor
+// elevación para que el área acumulada de cada celda ya esté resuelta
+// cuando le toca "entregar" su agua aguas abajo.
+//
+// AVISO DE HONESTIDAD METODOLÓGICA: el cálculo del TWI en sí (D8 + fórmula
+// de Beven-Kirkby) es 100% el método estándar publicado. Lo que NO es de
+// una fórmula publicada es la magnitud del ajuste de CN que se le asigna a
+// cada nivel de TWI (ver rhAjusteTWI) — no existe una fórmula universal
+// única que combine TWI con el Curve Number del SCS; esa conversión sigue
+// siendo una decisión de diseño de la app, igual que antes, pero ahora
+// basada en un índice hidrológico real en vez de un simple ranking de
+// elevación cruda dentro del campo.
+function rhCalcularTWI(celdas) {
+  const porClave = new Map();
+  celdas.forEach(c => porClave.set(`${c.i}_${c.j}`, c));
+
+  const conElevacion = celdas.filter(c => c.relieve && c.relieve.elevacion !== null && c.relieve.elevacion !== undefined);
+  if (conElevacion.length < 2) { celdas.forEach(c => { c.twi = null; }); return { minTWI: 0, maxTWI: 1 }; }
+
+  // Tamaño real de celda en metros (a partir de la primera celda disponible)
+  const c0 = conElevacion[0];
+  const altoM  = Math.max((c0.lat1 - c0.lat0) * 111320, 1);
+  const anchoM = Math.max((c0.lon1 - c0.lon0) * 111320 * Math.cos(c0.latC * Math.PI / 180), 1);
+  const areaCeldaM2   = altoM * anchoM;
+  const anchoContornoM = (altoM + anchoM) / 2; // aproximación del ancho de contorno por celda
+
+  conElevacion.forEach(c => { c.acumCeldas = 1; }); // cada celda arranca acumulando solo su propia área
+
+  const vecinos8 = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+  // Procesar de mayor a menor elevación: al llegar a una celda, toda el agua
+  // que le entra de vecinas más altas ya fue sumada a su acumCeldas.
+  const orden = [...conElevacion].sort((a, b) => b.relieve.elevacion - a.relieve.elevacion);
+  orden.forEach(c => {
+    let mejorVecino = null, mejorCaida = 0;
+    vecinos8.forEach(([di, dj]) => {
+      const v = porClave.get(`${c.i + di}_${c.j + dj}`);
+      if (!v || !v.relieve || v.relieve.elevacion === null || v.relieve.elevacion === undefined) return;
+      const caida = c.relieve.elevacion - v.relieve.elevacion;
+      if (caida > mejorCaida) { mejorCaida = caida; mejorVecino = v; } // vecino más empinado hacia abajo (D8)
+    });
+    if (mejorVecino) mejorVecino.acumCeldas = (mejorVecino.acumCeldas || 1) + c.acumCeldas;
+    // si no hay vecino más bajo (mínimo local / borde del campo), el agua "se queda" ahí — no se propaga más
+  });
+
+  let minTWI = Infinity, maxTWI = -Infinity;
+  conElevacion.forEach(c => {
+    const a = (c.acumCeldas * areaCeldaM2) / anchoContornoM; // área de contribución específica
+    const pendienteFrac = Math.max((c.relieve.pendiente || 0) / 100, 0.005); // piso ~0.3° para evitar tan(0)
+    const twi = Math.log(a / Math.tan(Math.atan(pendienteFrac)));
+    c.twi = twi;
+    if (twi < minTWI) minTWI = twi;
+    if (twi > maxTWI) maxTWI = twi;
+  });
+  celdas.forEach(c => { if (c.twi === undefined) c.twi = null; }); // celdas sin elevación: sin TWI
+
+  return { minTWI, maxTWI: Math.max(maxTWI, minTWI + 0.5) };
 }
 
 /** Antes de lanzar 196 consultas en paralelo, "despierta" el backend (Render free tier duerme tras inactividad
@@ -11581,7 +11834,9 @@ async function calcularRiesgoHidrologico() {
     const maxE   = elevs.length ? Math.max(...elevs) : 1;
     const rangoE = Math.max(maxE - minE, 0.5); // evita división por cero en terreno perfectamente plano
 
-    rhDatosCampo       = { suelo, lluvia, celdas, minE, maxE, rangoE, centro };
+    const { minTWI, maxTWI } = rhCalcularTWI(celdas); // TWI real (Beven-Kirkby) por celda, con acumulación de flujo D8
+
+    rhDatosCampo       = { suelo, lluvia, celdas, minE, maxE, rangoE, minTWI, maxTWI, centro };
     rhUltimaFirmaCampo = rhFirmaPuntos(puntos);
     rhCacheLotes.set(rhUltimaFirmaCampo, rhDatosCampo); // queda guardado: si se vuelve a este polígono, no se recalcula
 
@@ -11639,19 +11894,20 @@ async function calcularRiesgoHidrologico() {
 /** Reclasifica y repinta con los datos ya cacheados (rápido: no vuelve a pedir nada a los backends). */
 function rhRecalcularClasificacion() {
   if (!rhDatosCampo) return;
-  const { suelo, celdas, minE, rangoE } = rhDatosCampo;
+  const { suelo, celdas, minTWI, maxTWI } = rhDatosCampo;
+  const rangoTWI = Math.max((maxTWI ?? 1) - (minTWI ?? 0), 0.001);
   const P = rhMmActivos();
 
   const texturaCat = rhTexturaCategoria(suelo?.texturaProf || suelo?.texturaSup);
   const drenajeCat = rhDrenajeCategoria(suelo?.drenaje);
-  const cnBase = (RH_CN_TABLA[texturaCat] || RH_CN_TABLA.franco)[drenajeCat] ?? 70;
+  const cnBase = rhCNBase(texturaCat, drenajeCat);
 
   const conteo = { sin_riesgo: 0, encharcamiento: 0, anegamiento: 0, inundacion: 0, humedal_natural: 0 };
   celdas.forEach(c => {
     const tieneRelieve = c.relieve && c.relieve.elevacion !== null && c.relieve.elevacion !== undefined;
-    const posRel      = tieneRelieve ? (c.relieve.elevacion - minE) / rangoE : 0.5; // sin dato → posición neutra
+    const twiNorm      = (tieneRelieve && c.twi !== null && c.twi !== undefined) ? (c.twi - minTWI) / rangoTWI : null; // sin dato → sin ajuste
     const pendiente   = (tieneRelieve ? c.relieve.pendiente : null) ?? (suelo?.pendientePct || 2);
-    const cn          = Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendiente, posRel) + rhAjusteSueloDetalle(c.sueloDetalle)));
+    const cn          = Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendiente, twiNorm, cnBase) + rhAjusteSueloDetalle(c.sueloDetalle)));
     const Q           = rhEscorrentiaSCS(P, cn);
     const clas         = rhAplicarHumedal(rhClasificar(Q), c.humedalPct, c.humedalCapaNombre);
     c.clasificacion = clas; c.cn = cn; c.Q = Q; c.tieneRelieve = tieneRelieve;
@@ -11767,15 +12023,16 @@ function rhSeleccionarVentana(v) {
 // ── Animación: rampa de lluvia de 0 al valor del escenario, en ~4s ──
 function rhPintarConMm(P) {
   if (!rhDatosCampo) return;
-  const { suelo, celdas, minE, rangoE } = rhDatosCampo;
+  const { suelo, celdas, minTWI, maxTWI } = rhDatosCampo;
+  const rangoTWI = Math.max((maxTWI ?? 1) - (minTWI ?? 0), 0.001);
   const texturaCat = rhTexturaCategoria(suelo?.texturaProf || suelo?.texturaSup);
   const drenajeCat = rhDrenajeCategoria(suelo?.drenaje);
-  const cnBase = (RH_CN_TABLA[texturaCat] || RH_CN_TABLA.franco)[drenajeCat] ?? 70;
+  const cnBase = rhCNBase(texturaCat, drenajeCat);
   celdas.forEach(c => {
     const tieneRelieve = c.relieve && c.relieve.elevacion !== null && c.relieve.elevacion !== undefined;
-    const posRel      = tieneRelieve ? (c.relieve.elevacion - minE) / rangoE : 0.5;
+    const twiNorm      = (tieneRelieve && c.twi !== null && c.twi !== undefined) ? (c.twi - minTWI) / rangoTWI : null;
     const pendiente   = (tieneRelieve ? c.relieve.pendiente : null) ?? (suelo?.pendientePct || 2);
-    const cn = Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendiente, posRel) + rhAjusteSueloDetalle(c.sueloDetalle)));
+    const cn = Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendiente, twiNorm, cnBase) + rhAjusteSueloDetalle(c.sueloDetalle)));
     c.clasificacion = rhAplicarHumedal(rhClasificar(rhEscorrentiaSCS(P, cn)), c.humedalPct, c.humedalCapaNombre);
   });
   rhPintarGrid(celdas);
@@ -12011,6 +12268,13 @@ async function rhAnalizarLoteActual(reiniciarSiHayLote = true) {
     btn.disabled = true;
     btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px">hourglass_empty</span> Analizando…';
   }
+  // FIX: si este lote ya se había analizado antes (ej. se lo vuelve a analizar
+  // con lluvia/parámetros nuevos), se le saca la palomita mientras se está
+  // recalculando — así no queda una palomita "vieja" confundiendo al usuario
+  // sobre si el resultado que está viendo ya terminó o no.
+  const loteEnCurso = proyectoActual.loteActual;
+  if (loteEnCurso) { loteEnCurso.analizado = false; }
+  rhRenderListaProyectos();
   try {
     await calcularRiesgoHidrologico();
   } finally {
@@ -12057,7 +12321,7 @@ function rhRenderListaProyectos() {
         style="display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;
         padding:6px 8px;border-radius:8px;border:1px solid ${activo ? '#2563eb' : 'rgba(255,255,255,.15)'};
         background:${activo ? 'rgba(37,99,235,.25)' : 'rgba(255,255,255,.05)'};color:#fff;font-size:11px;cursor:pointer;">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${lote.analizado ? '✓ ' : ''}${_nombreCortoArchivo(lote.nombre)}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${lote.analizado ? '<span style="color:#4ade80;font-weight:800;">✓</span> ' : ''}${_nombreCortoArchivo(lote.nombre)}</span>
         <span style="flex-shrink:0;color:rgba(255,255,255,.6);">${area}</span>
       </button>`;
   }).join('');
@@ -12088,13 +12352,13 @@ function rhMostrarEnInspectorSuelos(lat, lon, data) {
 
   const texturaCat  = rhTexturaCategoria(g('text_bs1') || g('text_sups1'));
   const drenajeCat  = rhDrenajeCategoria(g('drenaje_s1'));
-  const cnBase      = (RH_CN_TABLA[texturaCat] || RH_CN_TABLA.franco)[drenajeCat] ?? 70;
+  const cnBase      = rhCNBase(texturaCat, drenajeCat);
   const pendienteSuelo = parseFloat(g('porc_pens1')) || 2;
   const ventana = rhVentanaSeleccionada || 48;
 
   const render = (lluvia) => {
     const P = lluvia['l' + ventana] ?? lluvia.l48 ?? 0;
-    const cn = Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendienteSuelo, 0.5))); // posición relativa neutra: es una consulta puntual, no de grilla
+    const cn = Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendienteSuelo, 0.5, cnBase))); // TWI neutro: es una consulta puntual sin vecinos, no se puede calcular acumulación de flujo real
     const Q  = rhEscorrentiaSCS(P, cn);
     const clas = rhClasificar(Q);
 
