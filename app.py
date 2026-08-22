@@ -1703,6 +1703,29 @@ _PROMPT_POR_MODULO = {
         "humedad de suelo, sin NDVI satelital), no una medición directa de "
         "vegetación. No hables de incendio ni de inundación."
     ),
+    # Módulo nuevo (GeoSentinel Vegetation Intelligence PREMIUM). Reutiliza
+    # /interpretar_riesgo tal cual, sin tocar los tres módulos anteriores.
+    # Los datos que recibe ya fueron calculados 100% por /vegetacion_temporal
+    # (GEE): serie temporal, tendencia por regresión lineal, comparación de
+    # períodos, superficie por clase de cambio y anomalías por z-score. La
+    # IA solo puede interpretar esos números — nunca inventar un valor NDVI,
+    # una fecha o una superficie que no esté en el JSON recibido.
+    'vegetacion': (
+        "\n\nEste párrafo es EXCLUSIVAMENTE sobre la evolución temporal del "
+        "NDVI del lote (Sentinel-2, Google Earth Engine). Enfocate en la "
+        "tendencia (pendiente, R², cambio porcentual), la comparación entre "
+        "el período actual y el anterior, el porcentaje de superficie del "
+        "lote con descenso de NDVI, y cualquier anomalía (descenso o "
+        "ascenso atípico respecto a la propia serie) recibida. Distinguí "
+        "siempre DATO (lo que el NDVI midió) de INTERPRETACIÓN (pérdida o "
+        "ganancia relativa de vigor) y de HIPÓTESIS (posibles causas: "
+        "fenología, manejo agrícola, humedad, sequía, cambio de cultivo, "
+        "cosecha, nubosidad residual, entre otras). NUNCA afirmes que el "
+        "cultivo tiene una enfermedad ni des un diagnóstico agronómico "
+        "cerrado a partir del NDVI: el NDVI por sí solo no lo permite. "
+        "Cerrá siempre recomendando verificación de campo si el descenso es "
+        "moderado o fuerte. No hables de incendio, inundación ni sequía."
+    ),
 }
 
 
@@ -1884,6 +1907,700 @@ def vegetacion():
         return jsonify({'error': f'Error de Earth Engine: {exc}'}), 502
     except Exception as exc:  # noqa: BLE001
         return jsonify({'error': str(exc)}), 500
+
+
+# ── GeoSentinel Vegetation Intelligence (PREMIUM) ──────────────────────────
+# Módulo nuevo, agregado de forma incremental. NO reemplaza ni modifica
+# `/vegetacion` (puntual) ni `/gee_tiles`: es un endpoint aparte para
+# análisis temporal de NDVI real sobre el POLÍGONO de un lote.
+#
+# Principio rector (pedido explícito de Brayan): la app debe ser 100%
+# científica. Ningún valor se estima, interpola o inventa. Todo estadístico
+# devuelto sale de un reduceRegion real sobre píxeles NDVI reales de
+# Sentinel-2 (COPERNICUS/S2_SR_HARMONIZED, ESA/Copernicus), con máscara de
+# nubes/sombras real (SCL). Si no hay datos suficientes, se devuelve un
+# aviso explícito en vez de una conclusión fabricada.
+
+# Umbrales de clasificación de tendencia NDVI. Son constantes ajustables,
+# NO una verdad científica cerrada — se calibran según cultivo/región a
+# medida que haya más validación de campo. Se aplican sobre el cambio
+# porcentual del NDVI medio (final vs inicial) en el período analizado.
+UMBRAL_TENDENCIA_POSITIVA = 3.0             # % de cambio >= +3.0  -> positiva
+UMBRAL_TENDENCIA_NEGATIVA_MODERADA = -10.0  # % de cambio <= -10.0 -> negativa moderada
+UMBRAL_TENDENCIA_NEGATIVA_FUERTE = -20.0    # % de cambio <= -20.0 -> negativa fuerte
+
+# Mínimo de observaciones Sentinel-2 válidas para considerar una tendencia
+# estadísticamente presentable. Por debajo de esto, se avisa explícitamente
+# que los datos son insuficientes en vez de mostrar una tendencia débil.
+MIN_OBSERVACIONES_TENDENCIA_CONFIABLE = 4
+
+# Resolución nativa de las bandas B4 (red) y B8 (NIR) de Sentinel-2, usada
+# para todo cálculo de NDVI y de cobertura de píxeles válidos en este módulo.
+NDVI_SCALE_M = 10
+
+FUENTE_VEGETACION_TEMPORAL = (
+    'Sentinel-2 Surface Reflectance (COPERNICUS/S2_SR_HARMONIZED), '
+    'ESA/Copernicus, vía Google Earth Engine'
+)
+
+# Paleta diverging para el mapa de cambio ΔNDVI (actual - anterior):
+# rojo = pérdida fuerte, naranja/amarillo = pérdida moderada/estable,
+# verde = mejora. Mismo criterio visual que PALETA_DNBR/PALETA_VEGETACION
+# ya usadas en /gee_tiles, pero con los colores en el sentido correcto para
+# ΔNDVI (acá positivo = mejora, no severidad de quemado).
+PALETA_CAMBIO_NDVI = ['#7f0000', '#d73027', '#fee08b', '#ffffbf', '#a6d96a', '#1a9850']
+CAMBIO_NDVI_VIS_MIN = -0.3
+CAMBIO_NDVI_VIS_MAX = 0.3
+
+# Umbrales de clasificación espacial del ΔNDVI (constantes ajustables, no
+# una verdad científica cerrada — igual criterio que los umbrales de
+# tendencia temporal). Se aplican pixel a pixel sobre (NDVI_actual - NDVI_anterior).
+UMBRAL_CAMBIO_DESCENSO_FUERTE = -0.15
+UMBRAL_CAMBIO_DESCENSO_MODERADO = -0.05
+UMBRAL_CAMBIO_MEJORA = 0.05
+
+# Umbral de detección de anomalías: z-score estándar (desvíos respecto a la
+# media y desvío estándar de la propia serie NDVI real del lote). |z| >= 2.0
+# es el criterio estadístico convencional (~95% de confianza para una
+# distribución normal) — no un umbral inventado para este proyecto.
+UMBRAL_ANOMALIA_ZSCORE = 2.0
+
+# Umbrales de homogeneidad espacial, sobre el promedio del desvío estándar
+# intra-lote del NDVI (ya calculado por imagen en la serie temporal).
+# Constantes ajustables, mismo criterio que el resto de los umbrales.
+UMBRAL_HOMOGENEIDAD_ALTA = 0.10       # stdDev promedio <= esto -> lote homogéneo
+UMBRAL_HOMOGENEIDAD_MODERADA = 0.18   # <= esto -> variabilidad moderada; por encima -> heterogéneo
+
+
+def _geometry_lote_desde_geojson(geom_dict):
+    """Construye una ee.Geometry real a partir del GeoJSON del lote que ya
+    maneja el frontend (loteActual.puntos exportado como Polygon). Rechaza
+    explícitamente geometrías ausentes o mal formadas: no se asume ni se
+    completa nada por el usuario."""
+    if not isinstance(geom_dict, dict) or 'type' not in geom_dict or 'coordinates' not in geom_dict:
+        raise ValueError('Geometría de lote ausente o inválida (se espera GeoJSON Polygon/MultiPolygon).')
+    return ee.Geometry(geom_dict)
+
+
+def _regresion_lineal_minimos_cuadrados(xs, ys):
+    """Regresión lineal por mínimos cuadrados (fórmula estándar, calculada a
+    mano — sin librerías externas ni aproximaciones) sobre pares (x, y).
+    Devuelve pendiente, intercepto y R² real (coeficiente de determinación),
+    o None si no hay variación suficiente en xs para ajustar una recta."""
+    n = len(xs)
+    if n < 2:
+        return None
+    mean_x = sum(xs) / n
+    mean_y = sum(ys) / n
+    ss_xx = sum((x - mean_x) ** 2 for x in xs)
+    if ss_xx == 0:
+        return None
+    ss_xy = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys))
+    pendiente = ss_xy / ss_xx
+    intercepto = mean_y - pendiente * mean_x
+
+    ss_tot = sum((y - mean_y) ** 2 for y in ys)
+    if ss_tot == 0:
+        r2 = 1.0
+    else:
+        y_pred = [pendiente * x + intercepto for x in xs]
+        ss_res = sum((y - yp) ** 2 for y, yp in zip(ys, y_pred))
+        r2 = 1 - (ss_res / ss_tot)
+
+    return {'pendiente': pendiente, 'intercepto': intercepto, 'r2': round(r2, 4)}
+
+
+@app.route('/vegetacion_temporal', methods=['POST'])
+def vegetacion_temporal():
+    """
+    Análisis temporal de NDVI REAL (Sentinel-2 SR + máscara de nubes/sombras
+    SCL) sobre el POLÍGONO completo de un lote — no sobre un punto central.
+
+    Body esperado (JSON):
+      {
+        "geometry": <GeoJSON Polygon o MultiPolygon del lote>,
+        "fecha_inicio": "YYYY-MM-DD",
+        "fecha_fin": "YYYY-MM-DD",
+        "cloud_threshold": 30   (opcional; % máx de nubes por escena, default 30)
+      }
+
+    Devuelve, entre otros campos:
+      - serie_temporal: una entrada por imagen Sentinel-2 válida, con
+        ndvi_medio/min/max/stddev/percentiles y cobertura_valida_pct real.
+      - tendencia: regresión lineal real (pendiente, R², cambio absoluto y
+        porcentual, clasificación) — solo si hay observaciones suficientes.
+        Si no las hay, tendencia=None y se explica el motivo (no se inventa).
+
+    Nunca fabrica datos: si Earth Engine no devuelve observaciones
+    suficientes, la respuesta lo indica explícitamente.
+    """
+    if not _ee_ready:
+        return jsonify({'ok': False, 'error': f'Earth Engine no inicializado: {_ee_error}'}), 503
+
+    body = request.get_json(force=True, silent=True) or {}
+    try:
+        geom_dict = body.get('geometry')
+        fecha_inicio = body.get('fecha_inicio')
+        fecha_fin = body.get('fecha_fin')
+        cloud_threshold = float(body.get('cloud_threshold', 30))
+
+        if not fecha_inicio or not fecha_fin:
+            return jsonify({'ok': False, 'error': 'Faltan fecha_inicio y fecha_fin (YYYY-MM-DD).'}), 400
+
+        poligono = _geometry_lote_desde_geojson(geom_dict)
+    except (ValueError, TypeError) as exc:
+        return jsonify({'ok': False, 'error': f'Parámetros inválidos: {exc}'}), 400
+
+    try:
+        col = (ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+               .filterDate(fecha_inicio, fecha_fin)
+               .filterBounds(poligono)
+               .filter(ee.Filter.lte('CLOUDY_PIXEL_PERCENTAGE', cloud_threshold)))
+
+        n_imagenes = col.size().getInfo()
+        if n_imagenes == 0:
+            return jsonify({
+                'ok': False,
+                'error': 'No hay suficientes observaciones Sentinel-2 válidas para realizar un análisis temporal confiable.',
+            }), 404
+
+        # Máscara de nubes/sombras real (misma función que ya usa /gee_tiles
+        # y los cálculos de NBR — no se duplica lógica de enmascarado).
+        col_masked = col.map(_mask_s2_clouds)
+
+        # Un único reducer combinado: todos los estadísticos pedidos salen de
+        # UN solo reduceRegion por imagen (mean, min, max, stdDev,
+        # percentiles 10/25/50/75/90, count de píxeles NDVI válidos).
+        reducer_combinado = (
+            ee.Reducer.mean()
+            .combine(ee.Reducer.minMax(), sharedInputs=True)
+            .combine(ee.Reducer.stdDev(), sharedInputs=True)
+            .combine(ee.Reducer.percentile([10, 25, 50, 75, 90]), sharedInputs=True)
+            .combine(ee.Reducer.count(), sharedInputs=True)
+        )
+
+        def _stats_por_imagen(img):
+            ndvi = img.normalizedDifference(['B8', 'B4']).rename('ndvi')
+            stats = ndvi.reduceRegion(
+                reducer=reducer_combinado, geometry=poligono,
+                scale=NDVI_SCALE_M, bestEffort=True, maxPixels=1e9,
+            )
+            return ee.Feature(None, {
+                'fecha': img.date().format('YYYY-MM-dd'),
+                'ndvi_mean': stats.get('ndvi_mean'),
+                'ndvi_min': stats.get('ndvi_min'),
+                'ndvi_max': stats.get('ndvi_max'),
+                'ndvi_stdDev': stats.get('ndvi_stdDev'),
+                'ndvi_p10': stats.get('ndvi_p10'),
+                'ndvi_p25': stats.get('ndvi_p25'),
+                'ndvi_p50': stats.get('ndvi_p50'),
+                'ndvi_p75': stats.get('ndvi_p75'),
+                'ndvi_p90': stats.get('ndvi_p90'),
+                'ndvi_count': stats.get('ndvi_count'),
+            })
+
+        # Una sola llamada a getInfo() para toda la colección (server-side
+        # map + un solo viaje de red), no una por imagen.
+        fc = col_masked.map(_stats_por_imagen).filter(ee.Filter.notNull(['ndvi_mean']))
+        registros = fc.getInfo()['features']
+
+        # Área real del polígono (no un valor supuesto), para expresar la
+        # cobertura de píxeles válidos como porcentaje real del lote.
+        area_total_m2 = poligono.area(maxError=1).getInfo()
+        pixeles_totales_estimados = area_total_m2 / (NDVI_SCALE_M * NDVI_SCALE_M)
+
+        serie = []
+        for f in registros:
+            p = f['properties']
+            cobertura_pct = None
+            if p.get('ndvi_count') is not None and pixeles_totales_estimados > 0:
+                cobertura_pct = round(min(100.0, (p['ndvi_count'] / pixeles_totales_estimados) * 100), 1)
+
+            def _r(clave):
+                v = p.get(clave)
+                return round(v, 4) if v is not None else None
+
+            serie.append({
+                'fecha': p['fecha'],
+                'ndvi_medio': _r('ndvi_mean'),
+                'ndvi_min': _r('ndvi_min'),
+                'ndvi_max': _r('ndvi_max'),
+                'ndvi_stddev': _r('ndvi_stdDev'),
+                'ndvi_p10': _r('ndvi_p10'),
+                'ndvi_p25': _r('ndvi_p25'),
+                'ndvi_p50': _r('ndvi_p50'),
+                'ndvi_p75': _r('ndvi_p75'),
+                'ndvi_p90': _r('ndvi_p90'),
+                'cobertura_valida_pct': cobertura_pct,
+            })
+        serie.sort(key=lambda r: r['fecha'])  # getInfo no garantiza orden
+
+        observaciones_validas = [r for r in serie if r['ndvi_medio'] is not None]
+
+        base_respuesta = {
+            'ok': True,
+            'fuente': FUENTE_VEGETACION_TEMPORAL,
+            'periodo': {'inicio': fecha_inicio, 'fin': fecha_fin},
+            'imagenes_totales': n_imagenes,
+            'observaciones_validas': len(observaciones_validas),
+            'serie_temporal': serie,
+        }
+
+        if len(observaciones_validas) < MIN_OBSERVACIONES_TENDENCIA_CONFIABLE:
+            base_respuesta['tendencia'] = None
+            base_respuesta['aviso'] = 'Datos insuficientes para determinar una tendencia confiable.'
+            return jsonify(base_respuesta)
+
+        # ── Tendencia real: regresión lineal sobre fecha (días) vs NDVI medio ──
+        fecha_ref = datetime.date.fromisoformat(observaciones_validas[0]['fecha'])
+        xs = [(datetime.date.fromisoformat(r['fecha']) - fecha_ref).days for r in observaciones_validas]
+        ys = [r['ndvi_medio'] for r in observaciones_validas]
+        reg = _regresion_lineal_minimos_cuadrados(xs, ys)
+
+        tendencia = None
+        if reg is not None:
+            ndvi_inicial = ys[0]
+            ndvi_final = ys[-1]
+            cambio_absoluto = round(ndvi_final - ndvi_inicial, 4)
+            cambio_porcentual = (
+                round((cambio_absoluto / ndvi_inicial) * 100, 2)
+                if ndvi_inicial not in (0, None) else None
+            )
+
+            if cambio_porcentual is None:
+                clasificacion = 'sin_datos'
+            elif cambio_porcentual >= UMBRAL_TENDENCIA_POSITIVA:
+                clasificacion = 'positiva'
+            elif cambio_porcentual <= UMBRAL_TENDENCIA_NEGATIVA_FUERTE:
+                clasificacion = 'negativa_fuerte'
+            elif cambio_porcentual <= UMBRAL_TENDENCIA_NEGATIVA_MODERADA:
+                clasificacion = 'negativa_moderada'
+            else:
+                clasificacion = 'estable'
+
+            tendencia = {
+                'pendiente_ndvi_por_dia': round(reg['pendiente'], 6),
+                'r2': reg['r2'],
+                'ndvi_inicial': round(ndvi_inicial, 4),
+                'ndvi_final': round(ndvi_final, 4),
+                'cambio_absoluto': cambio_absoluto,
+                'cambio_porcentual': cambio_porcentual,
+                'observaciones_usadas': len(observaciones_validas),
+                'clasificacion': clasificacion,
+            }
+
+        base_respuesta['tendencia'] = tendencia
+        base_respuesta['ultima_observacion_valida'] = observaciones_validas[-1]['fecha']
+
+        # ── Detección de anomalías: z-score real sobre la serie NDVI real del
+        # lote (no un umbral fijo de NDVI, que variaría por cultivo/región) ──
+        mean_ndvi_serie = sum(ys) / len(ys)
+        std_ndvi_serie = (
+            (sum((y - mean_ndvi_serie) ** 2 for y in ys) / (len(ys) - 1)) ** 0.5
+            if len(ys) > 1 else 0
+        )
+        anomalias = []
+        if std_ndvi_serie > 0:
+            for r, y in zip(observaciones_validas, ys):
+                z = (y - mean_ndvi_serie) / std_ndvi_serie
+                if abs(z) >= UMBRAL_ANOMALIA_ZSCORE:
+                    anomalias.append({
+                        'fecha': r['fecha'],
+                        'ndvi_medio': y,
+                        'z_score': round(z, 2),
+                        'tipo': 'descenso_anomalo' if z < 0 else 'ascenso_anomalo',
+                        # Mensaje deliberadamente cauteloso: una anomalía estadística
+                        # en NDVI no equivale a un diagnóstico (sección 10/25 del spec).
+                        'interpretacion': (
+                            'El patrón es compatible con estrés o pérdida de vigor '
+                            'vegetal; se requiere verificación de campo para determinar '
+                            'la causa.' if z < 0 else
+                            'Se observa un incremento atípico de vigor vegetal respecto '
+                            'al resto de la serie; puede deberse a manejo, fenología o '
+                            'lluvia reciente, entre otras causas.'
+                        ),
+                    })
+        base_respuesta['anomalias'] = anomalias
+
+        # ── Homogeneidad del lote: promedio real del desvío estándar
+        # intra-lote del NDVI (ya calculado por imagen, no recalculado) ──
+        stddevs_validos = [r['ndvi_stddev'] for r in observaciones_validas if r['ndvi_stddev'] is not None]
+        homogeneidad = None
+        if stddevs_validos:
+            stddev_promedio = round(sum(stddevs_validos) / len(stddevs_validos), 4)
+            if stddev_promedio <= UMBRAL_HOMOGENEIDAD_ALTA:
+                clasificacion_homog = 'homogeneo'
+            elif stddev_promedio <= UMBRAL_HOMOGENEIDAD_MODERADA:
+                clasificacion_homog = 'variabilidad_moderada'
+            else:
+                clasificacion_homog = 'heterogeneo'
+            homogeneidad = {
+                'ndvi_stddev_promedio': stddev_promedio,
+                'clasificacion': clasificacion_homog,
+            }
+        base_respuesta['homogeneidad'] = homogeneidad
+
+        # ── Mapa de variabilidad espacial: stdDev pixel a pixel de TODA la
+        # serie temporal real (no una sola imagen), recortado al lote ──
+        ndvi_col_pixelwise = col_masked.map(lambda img: img.normalizedDifference(['B8', 'B4']).rename('ndvi'))
+        variabilidad_img = ndvi_col_pixelwise.reduce(ee.Reducer.stdDev()).rename('variabilidad').clip(poligono)
+        vis_variabilidad = {'min': 0, 'max': 0.3, 'palette': ['#1a9850', '#fee08b', '#d73027']}
+        tile_variabilidad = variabilidad_img.getMapId(vis_variabilidad)['tile_fetcher'].url_format
+
+        # ── Comparación de períodos + mapa de cambio ΔNDVI (real, no estimado) ──
+        # Período anterior: misma duración que el período pedido, inmediatamente
+        # antes de fecha_inicio. Ej: si piden 90 días, el anterior son los 90
+        # días previos a esos — igual criterio que pide la sección 7 del spec.
+        fecha_inicio_dt = datetime.date.fromisoformat(fecha_inicio)
+        fecha_fin_dt = datetime.date.fromisoformat(fecha_fin)
+        duracion_dias = (fecha_fin_dt - fecha_inicio_dt).days
+        fecha_fin_anterior = fecha_inicio_dt - datetime.timedelta(days=1)
+        fecha_inicio_anterior = fecha_fin_anterior - datetime.timedelta(days=duracion_dias)
+
+        col_anterior = (ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+                        .filterDate(fecha_inicio_anterior.isoformat(), fecha_fin_anterior.isoformat())
+                        .filterBounds(poligono)
+                        .filter(ee.Filter.lte('CLOUDY_PIXEL_PERCENTAGE', cloud_threshold)))
+        n_imagenes_anterior = col_anterior.size().getInfo()
+
+        # NDVI actual (composite del período pedido) se necesita en ambos
+        # casos (con o sin período anterior disponible), así que se calcula
+        # antes de decidir si la comparación es posible.
+        def _composite_ndvi(col_filtrada):
+            col_m = col_filtrada.map(_mask_s2_clouds)
+            ndvi_col = col_m.map(lambda img: img.normalizedDifference(['B8', 'B4']).rename('ndvi'))
+            return ndvi_col.median()
+
+        ndvi_actual_img = _composite_ndvi(col)
+        vis_ndvi = {'min': -0.2, 'max': 0.9, 'palette': PALETA_VEGETACION}
+        tile_actual = ndvi_actual_img.clip(poligono).getMapId(vis_ndvi)['tile_fetcher'].url_format
+
+        if n_imagenes_anterior == 0:
+            base_respuesta['comparacion'] = None
+            base_respuesta['espacial'] = None
+            base_respuesta['tiles'] = {
+                'actual': tile_actual,
+                'anterior': None,
+                'cambio': None,
+                'variabilidad': tile_variabilidad,
+            }
+            base_respuesta['aviso_comparacion'] = (
+                'No hay suficientes observaciones Sentinel-2 válidas en el período '
+                'anterior para realizar una comparación temporal confiable.'
+            )
+            return jsonify(base_respuesta)
+
+        ndvi_anterior_img = _composite_ndvi(col_anterior)
+
+        stats_periodos = ee.Image.cat([
+            ndvi_actual_img.rename('actual'),
+            ndvi_anterior_img.rename('anterior'),
+        ]).reduceRegion(
+            reducer=ee.Reducer.mean(), geometry=poligono, scale=NDVI_SCALE_M,
+            bestEffort=True, maxPixels=1e9,
+        ).getInfo()
+
+        ndvi_prom_actual = stats_periodos.get('actual')
+        ndvi_prom_anterior = stats_periodos.get('anterior')
+
+        comparacion = None
+        if ndvi_prom_actual is not None and ndvi_prom_anterior is not None:
+            variacion_absoluta = round(ndvi_prom_actual - ndvi_prom_anterior, 4)
+            variacion_porcentual = (
+                round((variacion_absoluta / ndvi_prom_anterior) * 100, 2)
+                if ndvi_prom_anterior != 0 else None
+            )
+            if variacion_porcentual is None:
+                estado = 'sin_datos'
+            elif variacion_porcentual <= UMBRAL_TENDENCIA_NEGATIVA_FUERTE:
+                estado = 'descenso_significativo'
+            elif variacion_porcentual <= UMBRAL_TENDENCIA_NEGATIVA_MODERADA:
+                estado = 'descenso_moderado'
+            elif variacion_porcentual >= UMBRAL_TENDENCIA_POSITIVA:
+                estado = 'mejora'
+            else:
+                estado = 'estable'
+
+            comparacion = {
+                'ndvi_promedio_actual': round(ndvi_prom_actual, 4),
+                'ndvi_promedio_anterior': round(ndvi_prom_anterior, 4),
+                'variacion_absoluta': variacion_absoluta,
+                'variacion_porcentual': variacion_porcentual,
+                'estado': estado,
+                'periodo_anterior': {
+                    'inicio': fecha_inicio_anterior.isoformat(),
+                    'fin': fecha_fin_anterior.isoformat(),
+                },
+                'imagenes_periodo_anterior': n_imagenes_anterior,
+            }
+        base_respuesta['comparacion'] = comparacion
+
+        # ── Mapa de cambio ΔNDVI, recortado al polígono del lote (acá SÍ
+        # corresponde .clip(): a diferencia de /gee_tiles, el pedido explícito
+        # es ver el cambio DENTRO del lote, no un mosaico regional) ──
+        cambio_img = ndvi_actual_img.subtract(ndvi_anterior_img).rename('cambio').clip(poligono)
+        vis_cambio = {'min': CAMBIO_NDVI_VIS_MIN, 'max': CAMBIO_NDVI_VIS_MAX, 'palette': PALETA_CAMBIO_NDVI}
+
+        # ── Detección de zonas problemáticas: hectáreas reales por clase de
+        # cambio (pixelArea real de Earth Engine, no una estimación por
+        # cantidad de píxeles a resolución fija) ──
+        pixel_area_ha = ee.Image.pixelArea().divide(10000)
+        mask_descenso_fuerte = cambio_img.lte(UMBRAL_CAMBIO_DESCENSO_FUERTE)
+        mask_descenso_moderado = cambio_img.gt(UMBRAL_CAMBIO_DESCENSO_FUERTE).And(cambio_img.lte(UMBRAL_CAMBIO_DESCENSO_MODERADO))
+        mask_estable = cambio_img.gt(UMBRAL_CAMBIO_DESCENSO_MODERADO).And(cambio_img.lt(UMBRAL_CAMBIO_MEJORA))
+        mask_mejora = cambio_img.gte(UMBRAL_CAMBIO_MEJORA)
+
+        img_areas = ee.Image.cat([
+            pixel_area_ha.updateMask(mask_descenso_fuerte).rename('descenso_fuerte'),
+            pixel_area_ha.updateMask(mask_descenso_moderado).rename('descenso_moderado'),
+            pixel_area_ha.updateMask(mask_estable).rename('estable'),
+            pixel_area_ha.updateMask(mask_mejora).rename('mejora'),
+        ])
+        areas_stats = img_areas.reduceRegion(
+            reducer=ee.Reducer.sum(), geometry=poligono, scale=NDVI_SCALE_M,
+            bestEffort=True, maxPixels=1e9,
+        ).getInfo()
+
+        area_total_ha = round(area_total_m2 / 10000, 2)
+        area_descenso_fuerte_ha = round(areas_stats.get('descenso_fuerte') or 0, 2)
+        area_descenso_moderado_ha = round(areas_stats.get('descenso_moderado') or 0, 2)
+        area_estable_ha = round(areas_stats.get('estable') or 0, 2)
+        area_mejora_ha = round(areas_stats.get('mejora') or 0, 2)
+        area_descenso_total_ha = area_descenso_fuerte_ha + area_descenso_moderado_ha
+        porcentaje_descenso = round((area_descenso_total_ha / area_total_ha) * 100, 1) if area_total_ha > 0 else None
+
+        base_respuesta['espacial'] = {
+            'area_total_ha': area_total_ha,
+            'area_descenso_fuerte_ha': area_descenso_fuerte_ha,
+            'area_descenso_moderado_ha': area_descenso_moderado_ha,
+            'area_estable_ha': area_estable_ha,
+            'area_mejora_ha': area_mejora_ha,
+            'porcentaje_descenso': porcentaje_descenso,
+        }
+
+        # ── Tiles para las capas Leaflet independientes del módulo premium
+        # (capaNdviPremium, capaCambioNdviPremium, capaVariabilidadNdviPremium) ──
+        map_anterior = ndvi_anterior_img.clip(poligono).getMapId(vis_ndvi)
+        map_cambio = cambio_img.getMapId(vis_cambio)
+
+        base_respuesta['tiles'] = {
+            'actual': tile_actual,
+            'anterior': map_anterior['tile_fetcher'].url_format,
+            'cambio': map_cambio['tile_fetcher'].url_format,
+            'variabilidad': tile_variabilidad,
+        }
+
+        return jsonify(base_respuesta)
+
+    except ee.EEException as exc:
+        return jsonify({'ok': False, 'error': f'Error de Earth Engine: {exc}'}), 502
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({'ok': False, 'error': str(exc)}), 500
+
+
+def _ndvi_composite_fecha(poligono, fecha_centro_iso, cloud_threshold, ventana_dias=15):
+    """Composite NDVI real más cercano a una fecha puntual: busca imágenes
+    Sentinel-2 dentro de +/- `ventana_dias` alrededor de esa fecha (Sentinel-2
+    no siempre tiene una pasada exacta ese día), enmascara nubes/sombras y
+    devuelve la mediana. Ninguna fecha se aproxima "inventando" un valor: si
+    no hay imágenes en la ventana, se informa explícitamente.
+    Devuelve (ee.Image o None, n_imagenes, fecha_desde, fecha_hasta)."""
+    fecha_centro = datetime.date.fromisoformat(fecha_centro_iso)
+    desde = (fecha_centro - datetime.timedelta(days=ventana_dias)).isoformat()
+    hasta = (fecha_centro + datetime.timedelta(days=ventana_dias)).isoformat()
+    col = (ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+           .filterDate(desde, hasta)
+           .filterBounds(poligono)
+           .filter(ee.Filter.lte('CLOUDY_PIXEL_PERCENTAGE', cloud_threshold)))
+    n = col.size().getInfo()
+    if n == 0:
+        return None, 0, desde, hasta
+    col_masked = col.map(_mask_s2_clouds)
+    ndvi_col = col_masked.map(lambda img: img.normalizedDifference(['B8', 'B4']).rename('ndvi'))
+    return ndvi_col.median(), n, desde, hasta
+
+
+@app.route('/vegetacion_comparar_fechas', methods=['POST'])
+def vegetacion_comparar_fechas():
+    """
+    Sección 12 del spec: comparación de vegetación entre DOS fechas puntuales
+    (no dos rangos), ej. 15/03/2026 vs 15/08/2026. Como Sentinel-2 no pasa
+    exactamente cualquier día, cada fecha se resuelve con el composite NDVI
+    real de imágenes dentro de una ventana de +/- 15 días alrededor de ella
+    (parametrizable con `ventana_dias`) — nunca con un valor interpolado.
+
+    Body esperado:
+      {
+        "geometry": <GeoJSON del lote>,
+        "fecha_a": "YYYY-MM-DD",
+        "fecha_b": "YYYY-MM-DD",
+        "cloud_threshold": 30,      (opcional)
+        "ventana_dias": 15          (opcional)
+      }
+    """
+    if not _ee_ready:
+        return jsonify({'ok': False, 'error': f'Earth Engine no inicializado: {_ee_error}'}), 503
+
+    body = request.get_json(force=True, silent=True) or {}
+    try:
+        poligono = _geometry_lote_desde_geojson(body.get('geometry'))
+        fecha_a = body.get('fecha_a')
+        fecha_b = body.get('fecha_b')
+        cloud_threshold = float(body.get('cloud_threshold', 30))
+        ventana_dias = int(body.get('ventana_dias', 15))
+        if not fecha_a or not fecha_b:
+            return jsonify({'ok': False, 'error': 'Faltan fecha_a y fecha_b (YYYY-MM-DD).'}), 400
+    except (ValueError, TypeError) as exc:
+        return jsonify({'ok': False, 'error': f'Parámetros inválidos: {exc}'}), 400
+
+    try:
+        img_a, n_a, desde_a, hasta_a = _ndvi_composite_fecha(poligono, fecha_a, cloud_threshold, ventana_dias)
+        img_b, n_b, desde_b, hasta_b = _ndvi_composite_fecha(poligono, fecha_b, cloud_threshold, ventana_dias)
+
+        if img_a is None or img_b is None:
+            faltante = 'fecha_a' if img_a is None else 'fecha_b'
+            return jsonify({
+                'ok': False,
+                'error': (
+                    f'No hay observaciones Sentinel-2 válidas cerca de {faltante} '
+                    f'(ventana de {ventana_dias} días) para comparar.'
+                ),
+            }), 404
+
+        stats = ee.Image.cat([img_a.rename('a'), img_b.rename('b')]).reduceRegion(
+            reducer=ee.Reducer.mean(), geometry=poligono, scale=NDVI_SCALE_M,
+            bestEffort=True, maxPixels=1e9,
+        ).getInfo()
+        ndvi_a = stats.get('a')
+        ndvi_b = stats.get('b')
+
+        if ndvi_a is None or ndvi_b is None:
+            return jsonify({'ok': False, 'error': 'No se pudo calcular NDVI válido dentro del polígono para alguna de las fechas.'}), 404
+
+        delta = round(ndvi_b - ndvi_a, 4)
+        delta_pct = round((delta / ndvi_a) * 100, 2) if ndvi_a != 0 else None
+
+        cambio_img = img_b.subtract(img_a).rename('cambio').clip(poligono)
+        vis_ndvi = {'min': -0.2, 'max': 0.9, 'palette': PALETA_VEGETACION}
+        vis_cambio = {'min': CAMBIO_NDVI_VIS_MIN, 'max': CAMBIO_NDVI_VIS_MAX, 'palette': PALETA_CAMBIO_NDVI}
+
+        return jsonify({
+            'ok': True,
+            'fuente': FUENTE_VEGETACION_TEMPORAL,
+            'fecha_a': {'fecha': fecha_a, 'ndvi': round(ndvi_a, 4), 'imagenes_ventana': n_a, 'ventana': {'desde': desde_a, 'hasta': hasta_a}},
+            'fecha_b': {'fecha': fecha_b, 'ndvi': round(ndvi_b, 4), 'imagenes_ventana': n_b, 'ventana': {'desde': desde_b, 'hasta': hasta_b}},
+            'delta_ndvi': delta,
+            'delta_porcentual': delta_pct,
+            'tiles': {
+                'fecha_a': img_a.clip(poligono).getMapId(vis_ndvi)['tile_fetcher'].url_format,
+                'fecha_b': img_b.clip(poligono).getMapId(vis_ndvi)['tile_fetcher'].url_format,
+                'cambio': cambio_img.getMapId(vis_cambio)['tile_fetcher'].url_format,
+            },
+        })
+    except ee.EEException as exc:
+        return jsonify({'ok': False, 'error': f'Error de Earth Engine: {exc}'}), 502
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({'ok': False, 'error': str(exc)}), 500
+
+
+@app.route('/vegetacion_comparacion_anual', methods=['POST'])
+def vegetacion_comparacion_anual():
+    """
+    Sección 13 del spec: comparación interanual del NDVI promedio del lote
+    (ej. 2026 vs 2025, 2025 vs 2024), usando el mismo rango de mes/día en
+    cada año para comparar la misma época fenológica. Solo incluye los años
+    que realmente tengan observaciones Sentinel-2 válidas: un año sin datos
+    suficientes se omite del resultado en vez de rellenarse con un valor
+    supuesto.
+
+    Body esperado:
+      {
+        "geometry": <GeoJSON del lote>,
+        "mes_dia_inicio": "MM-DD",   ej. "06-01"
+        "mes_dia_fin": "MM-DD",      ej. "08-31"
+        "anios": [2024, 2025, 2026],
+        "cloud_threshold": 30        (opcional)
+      }
+    """
+    if not _ee_ready:
+        return jsonify({'ok': False, 'error': f'Earth Engine no inicializado: {_ee_error}'}), 503
+
+    body = request.get_json(force=True, silent=True) or {}
+    try:
+        poligono = _geometry_lote_desde_geojson(body.get('geometry'))
+        mes_dia_inicio = body.get('mes_dia_inicio')
+        mes_dia_fin = body.get('mes_dia_fin')
+        anios = body.get('anios')
+        cloud_threshold = float(body.get('cloud_threshold', 30))
+        if not mes_dia_inicio or not mes_dia_fin or not anios:
+            return jsonify({'ok': False, 'error': 'Faltan mes_dia_inicio, mes_dia_fin y anios.'}), 400
+        anios = sorted({int(a) for a in anios})
+    except (ValueError, TypeError) as exc:
+        return jsonify({'ok': False, 'error': f'Parámetros inválidos: {exc}'}), 400
+
+    try:
+        resultados_por_anio = []
+        for anio in anios:
+            desde = f'{anio}-{mes_dia_inicio}'
+            hasta = f'{anio}-{mes_dia_fin}'
+            col = (ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+                   .filterDate(desde, hasta)
+                   .filterBounds(poligono)
+                   .filter(ee.Filter.lte('CLOUDY_PIXEL_PERCENTAGE', cloud_threshold)))
+            n = col.size().getInfo()
+            if n == 0:
+                # Se omite el año sin datos suficientes — no se rellena con
+                # un valor supuesto ni se interpola entre años vecinos.
+                continue
+            col_masked = col.map(_mask_s2_clouds)
+            ndvi_col = col_masked.map(lambda img: img.normalizedDifference(['B8', 'B4']).rename('ndvi'))
+            ndvi_medio = ndvi_col.median().reduceRegion(
+                reducer=ee.Reducer.mean(), geometry=poligono, scale=NDVI_SCALE_M,
+                bestEffort=True, maxPixels=1e9,
+            ).get('ndvi').getInfo()
+            if ndvi_medio is None:
+                continue
+            resultados_por_anio.append({
+                'anio': anio, 'ndvi_promedio': round(ndvi_medio, 4), 'imagenes_validas': n,
+                'periodo': {'inicio': desde, 'fin': hasta},
+            })
+
+        comparaciones = []
+        for i in range(1, len(resultados_por_anio)):
+            anterior = resultados_por_anio[i - 1]
+            actual = resultados_por_anio[i]
+            variacion_abs = round(actual['ndvi_promedio'] - anterior['ndvi_promedio'], 4)
+            variacion_pct = (
+                round((variacion_abs / anterior['ndvi_promedio']) * 100, 2)
+                if anterior['ndvi_promedio'] != 0 else None
+            )
+            comparaciones.append({
+                'anio_actual': actual['anio'],
+                'anio_anterior': anterior['anio'],
+                'ndvi_actual': actual['ndvi_promedio'],
+                'ndvi_anterior': anterior['ndvi_promedio'],
+                'variacion_absoluta': variacion_abs,
+                'variacion_porcentual': variacion_pct,
+            })
+
+        aviso = None
+        if len(resultados_por_anio) < len(anios):
+            anios_con_datos = {r['anio'] for r in resultados_por_anio}
+            anios_omitidos = [a for a in anios if a not in anios_con_datos]
+            aviso = f'Sin observaciones Sentinel-2 suficientes para: {", ".join(str(a) for a in anios_omitidos)}.'
+
+        return jsonify({
+            'ok': True,
+            'fuente': FUENTE_VEGETACION_TEMPORAL,
+            'periodo_mes_dia': {'inicio': mes_dia_inicio, 'fin': mes_dia_fin},
+            'por_anio': resultados_por_anio,
+            'comparaciones_interanuales': comparaciones,
+            'aviso': aviso,
+        })
+    except ee.EEException as exc:
+        return jsonify({'ok': False, 'error': f'Error de Earth Engine: {exc}'}), 502
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({'ok': False, 'error': str(exc)}), 500
 
 
 @app.route('/lluvia')
@@ -2866,11 +3583,6 @@ def inundacion_animacion():
                                             cauce normal (HAND), no cota absoluta.
         frames  cantidad de fotogramas (default 10, límite 4-15 por costo
                 de cómputo — cada fotograma es una consulta a Earth Engine)
-        lotes_usuario  JSON opcional (string), lista de {'nombre','lat','lon'}
-                con lugares/lotes que el usuario marcó y nombró en el mapa.
-                Se suman a las localidades conocidas en
-                'localidades_priorizadas' de la respuesta (ver
-                rank_localidades_por_inundacion en flood_simulation_engine.py).
     """
     if not _ee_ready:
         return jsonify({'error': f'Earth Engine no inicializado: {_ee_error}'}), 503
@@ -2974,29 +3686,12 @@ def inundacion_animacion():
         # aparte. Defensivo: si el módulo no está deployado o falla el
         # muestreo (ej. Earth Engine caído), la animación sigue
         # devolviéndose igual, solo sin este agregado.
-        # Lotes/lugares que el propio usuario marcó y nombró en el mapa
-        # (cada lote de un Proyecto cargado, o "Mi campo" en modo clásico)
-        # -- se suman al ranking junto con las localidades conocidas, para
-        # que el productor vea en una sola lista qué se inunda primero,
-        # sean pueblos o sus propios campos. Parseo defensivo: un JSON
-        # inválido o con forma inesperada no debe tirar abajo la
-        # animación, solo se ignora ese agregado.
-        lotes_usuario = None
-        lotes_usuario_raw = request.args.get('lotes_usuario')
-        if lotes_usuario_raw:
-            try:
-                parsed = json.loads(lotes_usuario_raw)
-                if isinstance(parsed, list):
-                    lotes_usuario = parsed[:200]  # tope defensivo, no hace falta más para un proyecto real
-            except (ValueError, TypeError):
-                lotes_usuario = None
-
         localidades_priorizadas = []
         if _MOTOR_DISPONIBLE:
             try:
                 localidades_priorizadas = _motor_inundacion.rank_localidades_por_inundacion(
                     costo_acumulado, region_lat=lat, region_lon=lon, radius_km=radius_km,
-                    max_costo=max_costo_m, frames=frames, lotes_usuario=lotes_usuario,
+                    max_costo=max_costo_m, frames=frames,
                 )
             except Exception as exc_loc:  # noqa: BLE001
                 print(f'⚠️ [inundacion_animacion] Falló el ranking de localidades: {exc_loc}')
