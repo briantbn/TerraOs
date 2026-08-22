@@ -484,48 +484,62 @@ def _haversine_km(lat1, lon1, lat2, lon2):
 
 
 def rank_localidades_por_inundacion(costo_acumulado, region_lat, region_lon, radius_km,
-                                     max_costo, frames, localidades=None, escala=90,
-                                     buffer_localidad_m=1200):
+                                     max_costo, frames, localidades=None, lotes_usuario=None,
+                                     escala=90, buffer_localidad_m=1200, buffer_lote_m=400):
     """
     Muestrea 'costo_acumulado' (el mismo campo que arma los fotogramas de
-    /inundacion_animacion) alrededor de cada localidad conocida, y devuelve
-    la lista ordenada por cuál se moja primero.
+    /inundacion_animacion) alrededor de cada localidad conocida y de cada
+    lote/lugar que el propio usuario marcó y nombró en el mapa, y devuelve
+    UNA lista combinada ordenada por cuál se moja primero.
 
-    OJO -- se muestrea el MÍNIMO dentro de un buffer (buffer_localidad_m)
-    alrededor del punto de cada localidad, NO el punto exacto. Motivo: el
-    punto que tenemos es el centro/plaza del pueblo, y los pueblos casi
-    siempre están construidos en la parte más ALTA de su zona (para no
-    inundarse) -- el centro exacto casi nunca cae dentro de la máscara de
-    celdas candidatas, así que muestrear el punto solo devolvía "sin dato"
-    para prácticamente cualquier localidad real, incluso estando el pueblo
-    a metros del agua. El mínimo en un radio chico alrededor sí captura
-    "qué tan cerca le llega el agua al borde del pueblo", que es lo que
-    realmente importa para priorizar.
+    OJO -- se muestrea el MÍNIMO dentro de un buffer (buffer_localidad_m o
+    buffer_lote_m según el caso) alrededor del punto de cada entrada, NO el
+    punto exacto. Motivo: el punto que tenemos es el centro/plaza del
+    pueblo (o el centroide del lote), y los pueblos casi siempre están
+    construidos en la parte más ALTA de su zona (para no inundarse) -- el
+    centro exacto casi nunca cae dentro de la máscara de celdas candidatas,
+    así que muestrear el punto solo devolvía "sin dato" para prácticamente
+    cualquier localidad real, incluso estando el pueblo a metros del agua.
+    El mínimo en un radio chico alrededor sí captura "qué tan cerca le
+    llega el agua al borde del pueblo/lote", que es lo que realmente
+    importa para priorizar. Los lotes usan un buffer más chico por
+    default (400m vs 1200m de las localidades) porque un campo/lote
+    puntual es normalmente mucho más chico que un pueblo.
 
     Args:
         costo_acumulado: ee.Image, la misma que ya usa generate_animation_frames.
         region_lat, region_lon, radius_km: centro y radio de la consulta
             (los mismos que ya recibe /inundacion_animacion) -- se usan
-            para descartar localidades lejos ANTES de tocar Earth Engine.
+            para descartar entradas lejos ANTES de tocar Earth Engine.
         max_costo: el mismo valor (percentil 95) ya calculado para repartir
             los fotogramas -- se reusa para no duplicar ese cómputo.
         frames: cantidad de fotogramas de la animación (para calcular en
-            qué 'orden' de fotograma cae cada localidad).
+            qué 'orden' de fotograma cae cada entrada).
         localidades: lista de dicts {'nombre','lat','lon'} -- default
             LOCALIDADES_CORRIENTES.
+        lotes_usuario: lista opcional de dicts {'nombre','lat','lon'} con
+            los lugares/lotes que el usuario marcó y nombró en el mapa
+            (por ejemplo, cada lote de un Proyecto cargado, o "Mi campo"
+            en modo clásico). Se validan acá (no se confía en el frontend):
+            entradas sin nombre o sin lat/lon numéricos válidos se
+            descartan en silencio. Puede venir None o vacía.
         escala: resolución de muestreo en metros (default 90, igual que
             _conectividad_hidraulica).
         buffer_localidad_m: radio (metros) del círculo alrededor de cada
             localidad donde se busca el costo mínimo (default 1200m --
             cubre el borde/periferia de un pueblo chico/mediano sin
             "robarle" el resultado a una localidad vecina).
+        buffer_lote_m: mismo concepto que buffer_localidad_m, pero para
+            los lotes del usuario (default 400m).
 
     Returns:
         Lista de dicts ordenada ascendente por costo (primero = se moja
         antes), cada uno:
-            {'nombre', 'lat', 'lon', 'costo_acumulado', 'orden_fotograma',
-             'porcentaje_alcance'}
-        Localidades fuera del radio consultado, o sin ninguna celda
+            {'nombre', 'tipo', 'lat', 'lon', 'costo_acumulado',
+             'orden_fotograma', 'porcentaje_alcance'}
+        'tipo' es 'localidad' o 'lote', para que el frontend pueda
+        distinguir el ícono/estilo de cada fila sin adivinar por nombre.
+        Entradas fuera del radio consultado, o sin ninguna celda
         candidata/conectada dentro de su buffer (no se van a mojar con
         este umbral, ni en el borde) quedan afuera de la lista, no
         aparecen como "nunca".
@@ -536,18 +550,43 @@ def rank_localidades_por_inundacion(costo_acumulado, region_lat, region_lon, rad
         return []
 
     # Filtro barato en Python ANTES de tocar Earth Engine: ni siquiera
-    # arma el FeatureCollection para localidades fuera del radio pedido.
+    # arma el FeatureCollection para entradas fuera del radio pedido.
     cercanas = [
-        loc for loc in localidades
+        {'nombre': loc['nombre'], 'lat': loc['lat'], 'lon': loc['lon'],
+         'tipo': 'localidad', 'buffer_m': buffer_localidad_m}
+        for loc in localidades
         if _haversine_km(region_lat, region_lon, loc['lat'], loc['lon']) <= radius_km
     ]
+
+    # Lotes del usuario: se validan acá porque llegan del frontend (no son
+    # datos internos como LOCALIDADES_CORRIENTES) -- nombre vacío o
+    # lat/lon no numéricos se descartan sin romper el resto del pedido.
+    for lote in (lotes_usuario or []):
+        try:
+            nombre = str((lote or {}).get('nombre') or '').strip()
+            lat = float(lote['lat'])
+            lon = float(lote['lon'])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not nombre:
+            continue
+        if _haversine_km(region_lat, region_lon, lat, lon) > radius_km:
+            continue
+        cercanas.append({'nombre': nombre, 'lat': lat, 'lon': lon,
+                          'tipo': 'lote', 'buffer_m': buffer_lote_m})
+
     if not cercanas:
         return []
 
+    # 'lat'/'lon'/'tipo' viajan como propiedades del Feature (no solo
+    # 'nombre'): así el resultado de reduceRegions se lee directo, sin
+    # tener que volver a buscar cada nombre en las listas originales
+    # (que ahora mezclan localidades y lotes, y en teoría podrían
+    # repetirse nombres entre ambas).
     fc = ee.FeatureCollection([
-        ee.Feature(ee.Geometry.Point([loc['lon'], loc['lat']]).buffer(buffer_localidad_m),
-                   {'nombre': loc['nombre']})
-        for loc in cercanas
+        ee.Feature(ee.Geometry.Point([p['lon'], p['lat']]).buffer(p['buffer_m']),
+                   {'nombre': p['nombre'], 'tipo': p['tipo'], 'lat': p['lat'], 'lon': p['lon']})
+        for p in cercanas
     ])
 
     muestreado = costo_acumulado.rename('costo').reduceRegions(
@@ -561,13 +600,12 @@ def rank_localidades_por_inundacion(costo_acumulado, region_lat, region_lon, rad
         props = feat.get('properties', {})
         costo = props.get('costo_min', props.get('costo'))
         if costo is None:
-            continue  # ni el borde del pueblo tiene celda candidata/conectada con este umbral
-        nombre = props.get('nombre')
-        loc_original = next((l for l in cercanas if l['nombre'] == nombre), None)
+            continue  # ni el borde tiene celda candidata/conectada con este umbral
         resultado.append({
-            'nombre': nombre,
-            'lat': loc_original['lat'] if loc_original else None,
-            'lon': loc_original['lon'] if loc_original else None,
+            'nombre': props.get('nombre'),
+            'tipo': props.get('tipo', 'localidad'),
+            'lat': props.get('lat'),
+            'lon': props.get('lon'),
             'costo_acumulado': round(costo, 1),
             'orden_fotograma': min(frames, max(1, math.ceil((costo / max_costo) * frames))),
             'porcentaje_alcance': round(min(100.0, 100 * costo / max_costo), 1),

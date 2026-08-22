@@ -2866,6 +2866,11 @@ def inundacion_animacion():
                                             cauce normal (HAND), no cota absoluta.
         frames  cantidad de fotogramas (default 10, límite 4-15 por costo
                 de cómputo — cada fotograma es una consulta a Earth Engine)
+        lotes_usuario  JSON opcional (string), lista de {'nombre','lat','lon'}
+                con lugares/lotes que el usuario marcó y nombró en el mapa.
+                Se suman a las localidades conocidas en
+                'localidades_priorizadas' de la respuesta (ver
+                rank_localidades_por_inundacion en flood_simulation_engine.py).
     """
     if not _ee_ready:
         return jsonify({'error': f'Earth Engine no inicializado: {_ee_error}'}), 503
@@ -2969,12 +2974,29 @@ def inundacion_animacion():
         # aparte. Defensivo: si el módulo no está deployado o falla el
         # muestreo (ej. Earth Engine caído), la animación sigue
         # devolviéndose igual, solo sin este agregado.
+        # Lotes/lugares que el propio usuario marcó y nombró en el mapa
+        # (cada lote de un Proyecto cargado, o "Mi campo" en modo clásico)
+        # -- se suman al ranking junto con las localidades conocidas, para
+        # que el productor vea en una sola lista qué se inunda primero,
+        # sean pueblos o sus propios campos. Parseo defensivo: un JSON
+        # inválido o con forma inesperada no debe tirar abajo la
+        # animación, solo se ignora ese agregado.
+        lotes_usuario = None
+        lotes_usuario_raw = request.args.get('lotes_usuario')
+        if lotes_usuario_raw:
+            try:
+                parsed = json.loads(lotes_usuario_raw)
+                if isinstance(parsed, list):
+                    lotes_usuario = parsed[:200]  # tope defensivo, no hace falta más para un proyecto real
+            except (ValueError, TypeError):
+                lotes_usuario = None
+
         localidades_priorizadas = []
         if _MOTOR_DISPONIBLE:
             try:
                 localidades_priorizadas = _motor_inundacion.rank_localidades_por_inundacion(
                     costo_acumulado, region_lat=lat, region_lon=lon, radius_km=radius_km,
-                    max_costo=max_costo_m, frames=frames,
+                    max_costo=max_costo_m, frames=frames, lotes_usuario=lotes_usuario,
                 )
             except Exception as exc_loc:  # noqa: BLE001
                 print(f'⚠️ [inundacion_animacion] Falló el ranking de localidades: {exc_loc}')
