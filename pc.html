@@ -16,6 +16,9 @@
 <script src="https://unpkg.com/tokml@0.4.0/tokml.js"></script>
 <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<!-- Chart.js: única librería de gráficos del proyecto (no había ninguna cargada);
+     se usa exclusivamente para GeoSentinel Vegetation Intelligence PREMIUM. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <style>
   html, body { height: 100%; overflow: hidden; }
   body { font-family: 'Inter', sans-serif; background: #F7FAF7; display: flex; flex-direction: column; }
@@ -126,7 +129,16 @@
     gap: 12px;
     align-items: center;
     flex-wrap: wrap;
+    /* Sin esto, al ser un div de bloque hijo de #mapa-overlay (que va de
+       left:12 a right:12), ocupa TODO el ancho disponible por defecto —
+       aunque el contenido (focos) sea corto, la caja blanca se extiende
+       hasta el borde derecho y queda debajo del panel "Análisis" (#tg-panel),
+       chocando visualmente con él. Con fit-content, el fondo se ajusta al
+       contenido real, igual que hace #panel-riesgo-mapa arriba. */
+    width: fit-content;
+    max-width: calc(100% - 260px); /* deja margen para que no toque #tg-panel (240px + separación) en pantallas angostas */
   }
+
 
   /* ══ BARRA DE PROYECTO (multi-KML/GeoJSON) ══ */
   #barra-proyecto {
@@ -1169,6 +1181,17 @@
     cursor: pointer; display: flex; align-items: center; justify-content: center;
   }
   .pi-cerrar:active { transform: scale(0.9); }
+  /* Navegación <> entre incendios (dentro del panel de detalle) */
+  .pi-nav { display: flex; align-items: center; gap: 4px; margin: 0 6px; flex-shrink: 0; }
+  .pi-nav-btn {
+    background: #f4f4ef; border: none; border-radius: 50%;
+    width: 22px; height: 22px; font-size: 15px; font-weight: 800; color: #1E5E3A;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    line-height: 1; padding: 0;
+  }
+  .pi-nav-btn:active { transform: scale(0.9); }
+  .pi-nav-btn:disabled { opacity: .35; cursor: default; }
+  .pi-nav-contador { font-size: 11px; font-weight: 800; color: #424841; white-space: nowrap; min-width: 30px; text-align: center; }
   .pi-body { padding: 10px 14px 14px; }
   .pi-badge-activo {
     display: inline-block; font-size: 11px; font-weight: 800;
@@ -1930,6 +1953,12 @@
       <span class="material-symbols-outlined" style="color:#1E5E3A;font-size:22px;">water_drop</span>
       <span style="font-weight:600;color:#1a1c1a;font-size:14px;">Análisis de riesgo hídrico</span>
     </button>
+    <button onclick="abrirHistorialPanel();toggleMenuHamburguesa();" class="menu-item-btn"
+      style="width:100%;display:flex;align-items:center;gap:14px;padding:13px 20px;background:none;border:none;cursor:pointer;text-align:left;">
+      <span class="material-symbols-outlined" style="color:#1E5E3A;font-size:22px;">trending_up</span>
+      <span style="font-weight:600;color:#1a1c1a;font-size:14px;flex:1">Historial y Seguimiento</span>
+      <span style="font-size:10px;font-weight:800;color:#fff;background:#ca8a04;border-radius:6px;padding:2px 6px">PRO</span>
+    </button>
     <button onclick="if(window.__authSignOut){window.__authSignOut();} toggleMenuHamburguesa();" class="menu-item-btn"
       style="width:100%;display:flex;align-items:center;gap:14px;padding:13px 20px;background:none;border:none;cursor:pointer;text-align:left;">
       <span class="material-symbols-outlined" style="color:#dc2626;font-size:22px;">logout</span>
@@ -2584,6 +2613,101 @@
       </div>
     </div>
 
+    <!-- ══════════════════════════════════════════════════════════════
+         🌱 GEOSENTINEL VEGETATION INTELLIGENCE — PREMIUM
+         Módulo nuevo e independiente. NO reemplaza card-vegetacion (arriba,
+         puntual/lat-lon) ni el panel GEE genérico: analiza el POLÍGONO
+         completo del lote actual (proyectoActual.loteActual / campoGuardado)
+         vía /vegetacion_temporal, /vegetacion_comparar_fechas y
+         /vegetacion_comparacion_anual. Capas Leaflet propias
+         (capaNdviPremium, capaCambioNdviPremium, capaVariabilidadNdviPremium),
+         sin tocar capaGEE. ══════════════════════════════════════════ -->
+    <div id="card-vegetacion-premium" class="pc-card" style="border:1.5px solid #1e4d2b;background:linear-gradient(135deg,#0c1a0e 0%,#0f2318 100%);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:22px">🌱</span>
+          <div>
+            <p style="font-size:13px;font-weight:800;color:#86efac;margin:0;letter-spacing:.03em">VEGETATION INTELLIGENCE <span style="font-size:9px;background:#1e4d2b;color:#fbbf24;padding:2px 7px;border-radius:8px;margin-left:4px;">🔒 PREMIUM</span></p>
+            <p style="font-size:9.5px;color:#4b7a57;margin:2px 0 0">Análisis temporal del lote · Sentinel-2 + Google Earth Engine + IA</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vista gratuita: NDVI actual (viene de card-vegetacion, no se recalcula)
+           + tarjeta promocional. Se oculta apenas vipEsPro() es true. -->
+      <div id="vip-preview-gratis">
+        <div style="background:#0a1f0d;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+          <p style="font-size:10px;color:#4b7a57;margin:0 0 4px;">NDVI actual (vista gratuita)</p>
+          <p id="vip-ndvi-preview" style="font-size:20px;font-weight:800;color:#86efac;margin:0;">--</p>
+        </div>
+        <p style="font-size:11px;color:#c7e3c0;margin:0 0 10px;line-height:1.5;">
+          Descubrí cómo está cambiando tu lote a través del tiempo: serie temporal,
+          tendencia real, mapa de cambio ΔNDVI dentro del lote y detección de zonas
+          problemáticas — interpretado por IA a partir de datos satelitales reales.
+        </p>
+        <button onclick="vipMostrarUpsell()" class="veg-btn-secundario" style="width:100%;background:#1e4d2b;color:#fbbf24;font-weight:700;">🔓 DESBLOQUEAR VEGETATION INTELLIGENCE</button>
+      </div>
+
+      <!-- Panel completo (requiere usuario.plan === 'pro' o equivalente) -->
+      <div id="vip-panel-pro" class="hidden">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+          <select id="vip-periodo-preset" onchange="vipAplicarPresetPeriodo()" style="flex:1;min-width:110px;font-size:11px;padding:6px 8px;border-radius:8px;border:1px solid #1e4d2b;background:#0a1f0d;color:#e5e7eb;">
+            <option value="30">30 días</option>
+            <option value="90">90 días</option>
+            <option value="180">6 meses</option>
+            <option value="365" selected>1 año</option>
+            <option value="730">2 años</option>
+            <option value="custom">Personalizado</option>
+          </select>
+          <input type="date" id="vip-fecha-inicio" style="font-size:11px;padding:6px 8px;border-radius:8px;border:1px solid #1e4d2b;background:#0a1f0d;color:#e5e7eb;">
+          <input type="date" id="vip-fecha-fin" style="font-size:11px;padding:6px 8px;border-radius:8px;border:1px solid #1e4d2b;background:#0a1f0d;color:#e5e7eb;">
+        </div>
+        <button id="vip-btn-analizar" onclick="vipAnalizarVegetacion()" class="veg-btn-secundario" style="width:100%;background:#1e4d2b;color:#86efac;font-weight:700;margin-bottom:8px;">🔒 ANALIZAR VEGETACIÓN — PRO</button>
+        <p id="vip-msg" style="font-size:10.5px;color:#4b7a57;margin:0 0 8px;"></p>
+
+        <!-- Resultado -->
+        <div id="vip-resultado" class="hidden">
+          <div style="background:#0a1f0d;border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#c7e3c0;margin-bottom:4px;">
+              <span>NDVI actual</span><b id="vip-ndvi-actual" style="color:#fff;">--</b>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#c7e3c0;margin-bottom:4px;">
+              <span>NDVI anterior</span><b id="vip-ndvi-anterior" style="color:#fff;">--</b>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#c7e3c0;margin-bottom:6px;">
+              <span>Variación</span><b id="vip-variacion" style="color:#fff;">--</b>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#c7e3c0;margin-bottom:6px;">
+              <span>Tendencia</span><b id="vip-tendencia-txt" style="color:#fff;">--</b>
+            </div>
+            <p style="font-size:9.5px;color:#4b7a57;margin:0 0 4px;">Superficie afectada (descenso NDVI)</p>
+            <div style="height:6px;border-radius:6px;background:#1a2e1f;overflow:hidden;">
+              <div id="vip-barra-afectada" style="height:100%;width:0%;background:linear-gradient(90deg,#eab308,#ef4444);transition:width .5s;"></div>
+            </div>
+            <p id="vip-afectada-txt" style="font-size:10px;color:#c7e3c0;margin:4px 0 0;">--</p>
+          </div>
+
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+            <button onclick="vipToggleCapa('cambio')" id="vip-btn-mapa-cambio" class="veg-btn-secundario" style="flex:1;">Ver mapa de cambio</button>
+            <button onclick="vipToggleCapa('actual')" id="vip-btn-mapa-actual" class="veg-btn-secundario" style="flex:1;">Ver NDVI actual</button>
+            <button onclick="vipToggleCapa('variabilidad')" id="vip-btn-mapa-variab" class="veg-btn-secundario" style="flex:1;">Ver variabilidad</button>
+          </div>
+
+          <div style="background:#0a1f0d;border-radius:10px;padding:8px;margin-bottom:8px;">
+            <canvas id="vip-chart-serie" height="140"></canvas>
+          </div>
+
+          <button onclick="vipInterpretarIA()" id="vip-btn-ia" class="veg-btn-secundario" style="width:100%;margin-bottom:6px;">🧠 Interpretación IA</button>
+          <div id="vip-ia-texto" class="hidden" style="font-size:11px;color:#c7e3c0;line-height:1.5;background:#0a1f0d;border-radius:10px;padding:10px 12px;margin-bottom:6px;"></div>
+
+          <p style="font-size:9px;color:#4b7a57;margin:6px 0 0;line-height:1.4;">
+            Fuente: <span id="vip-fuente-txt">Sentinel-2 · ESA/Copernicus · Google Earth Engine</span>.
+            Análisis satelital. No reemplaza verificación en campo.
+          </p>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /row3 -->
 
   <!-- ── FILA 3b: Índice Riesgo Hídrico ── -->
@@ -2712,6 +2836,11 @@
         <div class="pi-header-title">
           <span class="material-symbols-outlined" style="color:#ff3b30;font-size:18px">local_fire_department</span>
           <span>Incendio activo</span>
+        </div>
+        <div class="pi-nav" id="pi-nav">
+          <button class="pi-nav-btn" id="pi-nav-prev" onclick="navegarIncendio(-1)" title="Foco anterior">‹</button>
+          <span class="pi-nav-contador" id="pi-nav-contador">1 / 1</span>
+          <button class="pi-nav-btn" id="pi-nav-next" onclick="navegarIncendio(1)" title="Foco siguiente">›</button>
         </div>
         <button class="pi-cerrar" onclick="cerrarPanelIncendio()">✕</button>
       </div>
@@ -3449,11 +3578,8 @@
                 class="simh-escenario-btn" style="font-size:9.5px;padding:5px 8px;border-radius:7px;border:1.5px solid #93c5fd;background:#fff;color:#1e40af;font-weight:700;cursor:pointer">Crecida 2016 (7,15 m)</button>
               <button type="button" onclick="simSeleccionarEscenarioHidro('crecida_historica_1983')" data-escenario="crecida_historica_1983"
                 class="simh-escenario-btn" style="font-size:9.5px;padding:5px 8px;border-radius:7px;border:1.5px solid #93c5fd;background:#fff;color:#1e40af;font-weight:700;cursor:pointer">Crecida 1983 (9,03 m)</button>
-              <button type="button" onclick="simSeleccionarEscenarioHidro('pronostico_glofas')" data-escenario="pronostico_glofas"
-                class="simh-escenario-btn" style="font-size:9.5px;padding:5px 8px;border-radius:7px;border:1.5px solid #93c5fd;background:#fff;color:#1e40af;font-weight:700;cursor:pointer">🛰️ Pronóstico GloFAS (7 días)</button>
             </div>
             <p style="font-size:8px;color:#94a3b8;margin:-6px 0 2px;line-height:1.3">Valores históricos de la escala hidrométrica de Corrientes (fuente: registros IGN / INA). Pueden variar levemente según la fuente consultada; ajustá el valor exacto si contás con otro dato de referencia.</p>
-            <p id="simh-pronostico-info" style="display:none;font-size:8.5px;color:#5b21b6;background:#ede9fe;border-radius:6px;padding:5px 7px;margin:0 0 6px;line-height:1.3"></p>
 
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">
               <div style="background:#dbeafe;border-radius:8px;padding:6px;text-align:center">
@@ -3523,6 +3649,10 @@
                     style="width:56px;font-size:10px;border-radius:6px;border:1px solid #cbd5e1;padding:2px 4px"
                     oninput="simAnimActualizarInfoHidro()"/>
                   <span style="font-size:9px;color:#64748b">m/h</span>
+                </div>
+                <div id="simh-localidades-priorizadas" style="display:none;margin-top:10px;padding-top:8px;border-top:1px solid #a5f3fc">
+                  <p style="font-size:10px;font-weight:700;color:#0e7490;margin:0 0 5px">Orden de anegamiento — localidades 📍 y lotes 🌾</p>
+                  <div id="simh-localidades-lista" style="max-height:140px;overflow-y:auto;font-size:10px;"></div>
                 </div>
               </div>
               <p id="simh-anim-explicacion" style="font-size:9px;color:#64748b;line-height:1.3;margin:6px 0 0">
@@ -3788,7 +3918,8 @@
       <input id="medsup-input-importar" type="file" accept=".kml,.kmz,.geojson,.json"
         style="display:none" onchange="MedicionSuperficie.importarArchivo(event)"/>
 
-      <p id="medsup-instruccion" style="font-size:10.5px;color:rgba(255,255,255,.65);margin:0 0 8px;line-height:1.4;"></p>
+      <p id="medsup-instruccion" style="font-size:10.5px;color:rgba(255,255,255,.65);margin:0 0 6px;line-height:1.4;"></p>
+      <p style="font-size:9.5px;color:rgba(255,255,255,.45);margin:0 0 8px;line-height:1.4;">💡 Click en una forma para seleccionarla, mantené <b>Shift</b> y click en otra para fusionarlas en una sola (mismo nombre, un solo archivo al exportar).</p>
 
       <div style="display:flex;gap:6px;margin-bottom:10px;">
         <button id="medsup-btn-finalizar" onclick="MedicionSuperficie.finalizarPoligono()" style="display:none;flex:1;padding:7px;border-radius:8px;background:#2F855A;color:#fff;font-weight:700;font-size:10.5px;border:none;cursor:pointer;">✅ Finalizar</button>
@@ -4260,6 +4391,14 @@ function historialLimpiar() {
   localStorage.removeItem(HISTORIAL_KEY);
 }
 // ════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════
+//  HISTORIAL & SEGUIMIENTO PRO — persistencia real por lote.
+//  Clave DISTINTA de HISTORIAL_KEY: esta NO se borra al iniciar la app.
+//  Ver módulo completo más abajo (junto a AnalysisSession).
+// ════════════════════════════════════════════════════════════════
+const _HISTORIAL_LOTES_KEY = 'terraos_historial_lotes_pro_v1';
+const _PRO_DEMO_KEY = 'terraos_plan_pro_demo_v1'; // ver nota en esUsuarioPro()
 
 let gpsLat = null, gpsLon = null, gpsListo = false;
 // Posición GPS real del dispositivo (WiFi/IP/GPS del navegador), separada de
@@ -7498,12 +7637,28 @@ const MedicionSuperficie = (() => {
 
   // FIX (a pedido): antes solo se podía tener UNA forma medida a la vez —
   // dibujar/importar una nueva borraba la anterior. Ahora `formas` guarda
-  // TODAS las formas cerradas (dibujadas a mano o importadas) y todas
-  // quedan visibles juntas en el mapa, cada una con su propio color, sus
-  // propias asas editables y su propia hectárea — más una fila de totales.
-  // { id, vertices, layer: L.polygon, asas: L.marker[], nombre, has, km2, m2, perimKm }
+  // TODAS las formas cerradas (dibujadas a mano, importadas o fusionadas) y
+  // todas quedan visibles juntas en el mapa, cada una con su propio color,
+  // sus propias asas editables y su propia hectárea — más una fila de totales.
+  //
+  // MEJORA (a pedido): fusión de formas con mouse + teclado. Click sobre una
+  // forma para seleccionarla (queda con borde punteado), mantener SHIFT y
+  // click sobre otra forma → se fusionan en una sola, mismo nombre, un solo
+  // ítem en la lista y un solo Feature al exportar (GeoJSON/KML). Usa el
+  // motor de geometría real de Turf.js (ya estaba cargado en la app) para la
+  // unión — si las formas se tocan/superponen da un polígono simple; si
+  // están separadas (como el caso de la captura: 2 zonas de anegamiento sin
+  // tocarse) el resultado es "multi-parte": se dibujan como partes
+  // separadas en el mapa pero son UNA sola forma/archivo.
+  //
+  // Por eso cada forma ahora es: { id, anillos: [ [{lat,lon},...], ... ],
+  // capas: [L.polygon, ...] (una capa por anillo), asas, nombre, has, km2,
+  // m2, perimKm, _color }. anillos.length === 1 en el caso normal (una forma
+  // dibujada a mano); > 1 solo cuando es el resultado de fusionar formas que
+  // no se tocan entre sí.
   let formas = [];
   let contadorFormas = 0;
+  let idAncla = null; // id de la forma seleccionada (borde punteado), esperando un SHIFT+click en otra para fusionar
   const COLORES_FORMAS = ['#7c3aed', '#0ea5e9', '#f59e0b', '#ec4899', '#22c55e', '#ef4444', '#14b8a6', '#a855f7'];
 
   const iconoAsa = L.divIcon({
@@ -7533,32 +7688,91 @@ const MedicionSuperficie = (() => {
     if (lineaEnCurso) { mapaHidrologia.removeLayer(lineaEnCurso); lineaEnCurso = null; }
   }
 
-  // Recalcula hectáreas/km²/m²/perímetro de UNA forma y redibuja su
-  // polígono en el mapa. Se usa tanto al cerrarla como cada vez que se
-  // arrastra una de sus asas.
+  /** Suma hectáreas y perímetro de todos los anillos de una forma (una forma multi-parte es la suma simple de sus partes). */
+  function haYPerimDeAnillos(anillos) {
+    let has = 0, perimKm = 0;
+    anillos.forEach(ring => { has += calcularHectareas(ring); perimKm += calcularPerimetroKm(ring); });
+    return { has, perimKm };
+  }
+
+  // Recalcula hectáreas/km²/m²/perímetro de UNA forma (sumando todos sus
+  // anillos) y redibuja sus polígonos en el mapa. Se usa tanto al cerrarla
+  // como cada vez que se arrastra una de sus asas.
   function actualizarForma(forma) {
-    forma.layer.setLatLngs(forma.vertices.map(p => [p.lat, p.lon]));
-    forma.has = calcularHectareas(forma.vertices);
-    forma.km2 = forma.has / 100;
-    forma.m2  = forma.has * 10000;
-    forma.perimKm = calcularPerimetroKm(forma.vertices);
+    forma.capas.forEach((capa, i) => capa.setLatLngs(forma.anillos[i].map(p => [p.lat, p.lon])));
+    const { has, perimKm } = haYPerimDeAnillos(forma.anillos);
+    forma.has = has; forma.km2 = has / 100; forma.m2 = has * 10000; forma.perimKm = perimKm;
     renderListaFormas();
   }
 
-  // Crea, para cada vértice de una forma ya cerrada, un asa (L.marker
-  // arrastrable) que permite reubicarlo a mano. Al soltar, se recalcula
-  // esa forma puntual (las demás no se tocan).
+  // Crea, para cada vértice de cada anillo de una forma ya cerrada, un asa
+  // (L.marker arrastrable) que permite reubicarlo a mano. Al soltar, se
+  // recalcula esa forma puntual (las demás no se tocan).
   function crearAsasEditables(forma) {
     forma.asas.forEach(a => mapaHidrologia.removeLayer(a));
-    forma.asas = forma.vertices.map((v, i) => {
-      const asa = L.marker([v.lat, v.lon], { icon: iconoAsa, draggable: true }).addTo(mapaHidrologia);
-      asa.on('drag', (e) => {
-        const { lat, lng: lon } = e.target.getLatLng();
-        forma.vertices[i] = { lat, lon };
-        actualizarForma(forma);
+    forma.asas = [];
+    forma.anillos.forEach((ring, ri) => {
+      ring.forEach((v, vi) => {
+        const asa = L.marker([v.lat, v.lon], { icon: iconoAsa, draggable: true }).addTo(mapaHidrologia);
+        asa.on('drag', (e) => {
+          const { lat, lng: lon } = e.target.getLatLng();
+          forma.anillos[ri][vi] = { lat, lon };
+          actualizarForma(forma);
+        });
+        forma.asas.push(asa);
       });
-      return asa;
     });
+  }
+
+  function estiloNormal(forma) {
+    forma.capas.forEach(c => c.setStyle({ color: forma._color, weight: 2.5, fillColor: forma._color, fillOpacity: 0.18, dashArray: null }));
+  }
+  function estiloSeleccionada(forma) {
+    forma.capas.forEach(c => c.setStyle({ weight: 4, dashArray: '8,6' }));
+  }
+  function deseleccionarAncla() {
+    if (idAncla === null) return;
+    const anterior = formas.find(f => f.id === idAncla);
+    if (anterior) estiloNormal(anterior);
+    idAncla = null;
+    setProgreso('');
+  }
+  // Escape cancela la selección en curso (para fusionar) en cualquier momento.
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && idAncla !== null) deseleccionarAncla(); });
+
+  // Click sobre una forma en el mapa: sin SHIFT selecciona/deselecciona esa
+  // forma como "ancla" (borde punteado); con SHIFT y ya habiendo una ancla
+  // seleccionada, fusiona la ancla con la forma recién clickeada.
+  function alClickForma(forma, evtOriginal) {
+    if (modo !== null) return; // mientras se está dibujando una forma nueva, el click es para eso, no para seleccionar
+    const conShift = !!(evtOriginal && evtOriginal.shiftKey);
+    if (conShift && idAncla !== null && idAncla !== forma.id) {
+      fusionarFormas(idAncla, forma.id);
+      return;
+    }
+    if (idAncla === forma.id) { deseleccionarAncla(); return; }
+    if (idAncla !== null) {
+      const anterior = formas.find(f => f.id === idAncla);
+      if (anterior) estiloNormal(anterior);
+    }
+    idAncla = forma.id;
+    estiloSeleccionada(forma);
+    setProgreso('🔗 Forma seleccionada — mantené SHIFT y tocá otra forma para fusionarla con esta (Esc para cancelar).');
+  }
+
+  // Crea las capas de una forma (una L.polygon por anillo) y les conecta el
+  // click de selección/fusión. Se usa tanto al cerrar un trazo nuevo como
+  // al terminar una fusión.
+  function crearFormaEnMapa(idx, anillos, color, nombre) {
+    const capas = anillos.map(ring => L.polygon(ring.map(p => [p.lat, p.lon]), {
+      color, weight: 2.5, fillColor: color, fillOpacity: 0.18,
+    }).addTo(mapaHidrologia));
+    const forma = { id: idx, anillos, capas, asas: [], nombre, _color: color };
+    capas.forEach(capa => capa.on('click', (e) => {
+      L.DomEvent.stopPropagation(e); // que el click en la forma no se propague al mapa y la deseleccione en el mismo tap
+      alClickForma(forma, e.originalEvent);
+    }));
+    return forma;
   }
 
   // Dibuja/actualiza la lista de formas en el panel, con nombre editable,
@@ -7568,10 +7782,10 @@ const MedicionSuperficie = (() => {
     if (cont) {
       cont.innerHTML = formas.map(f => `
         <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.08)">
-          <span style="width:10px;height:10px;border-radius:3px;background:${f.layer.options.color};flex-shrink:0"></span>
+          <span style="width:10px;height:10px;border-radius:3px;background:${f._color};flex-shrink:0"></span>
           <input value="${(f.nombre || '').replace(/"/g, '&quot;')}" maxlength="60" oninput="MedicionSuperficie.renombrarForma(${f.id}, this.value)"
                  style="flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:3px 6px;color:#fff;font-size:10.5px"/>
-          <span style="font-size:10.5px;color:#fff;white-space:nowrap">${(f.has || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} ha</span>
+          <span style="font-size:10.5px;color:#fff;white-space:nowrap">${(f.has || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} ha${f.anillos.length > 1 ? ` (${f.anillos.length} partes)` : ''}</span>
           <button onclick="MedicionSuperficie.eliminarForma(${f.id})" title="Eliminar esta forma"
                   style="background:none;border:none;color:#f87171;cursor:pointer;font-size:13px;padding:2px 4px;line-height:1">✕</button>
         </div>`).join('');
@@ -7593,9 +7807,87 @@ const MedicionSuperficie = (() => {
     const idx = formas.findIndex(f => f.id === id);
     if (idx === -1) return;
     const f = formas[idx];
-    if (f.layer) mapaHidrologia.removeLayer(f.layer);
+    f.capas.forEach(c => mapaHidrologia.removeLayer(c));
     f.asas.forEach(a => mapaHidrologia.removeLayer(a));
+    if (idAncla === id) idAncla = null;
     formas.splice(idx, 1);
+    renderListaFormas();
+  }
+
+  // Convierte el anillo interno [{lat,lon},...] al formato [lon,lat] que
+  // exige GeoJSON, cerrando el anillo (primer punto == último) si hiciera
+  // falta — Leaflet no guarda el punto de cierre duplicado, pero GeoJSON sí
+  // lo requiere. La usan tanto la exportación como la fusión con Turf.js.
+  function _coordsAnilloCerrado(ring) {
+    const coords = ring.map(p => [p.lon, p.lat]);
+    const primero = coords[0], ultimo = coords[coords.length - 1];
+    if (!ultimo || primero[0] !== ultimo[0] || primero[1] !== ultimo[1]) coords.push(primero);
+    return coords;
+  }
+
+  /** Arma un Feature (Polygon o MultiPolygon según tenga 1 o varios anillos) a partir de una forma — para pasarle a turf.union(). */
+  function _formaAFeatureTurf(forma) {
+    if (forma.anillos.length === 1) {
+      return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [_coordsAnilloCerrado(forma.anillos[0])] } };
+    }
+    return { type: 'Feature', properties: {}, geometry: { type: 'MultiPolygon', coordinates: forma.anillos.map(ring => [_coordsAnilloCerrado(ring)]) } };
+  }
+
+  /** Extrae los anillos EXTERIORES (se ignoran huecos, no aplica a formas de campo típicas) de una geometría GeoJSON Polygon/MultiPolygon, como listas de {lat,lon}. */
+  function _geometriaAAnillos(geom) {
+    const anillos = [];
+    if (!geom) return anillos;
+    if (geom.type === 'Polygon') anillos.push(geom.coordinates[0]);
+    else if (geom.type === 'MultiPolygon') geom.coordinates.forEach(poly => anillos.push(poly[0]));
+    return anillos.filter(a => a && a.length >= 3).map(anillo => anillo.map(([lon, lat]) => ({ lat, lon })));
+  }
+
+  // Fusiona 2 formas en una sola, usando la unión geométrica real de
+  // Turf.js. Si las formas se tocan o se superponen, el resultado es un
+  // polígono simple (un solo anillo); si están separadas (ej. 2 zonas de
+  // riesgo sin tocarse), el resultado queda "multi-parte": se ven como
+  // formas separadas en el mapa, pero cuentan como UNA sola forma — mismo
+  // nombre, un solo ítem en la lista, un solo Feature al exportar.
+  function fusionarFormas(idA, idB) {
+    const a = formas.find(f => f.id === idA);
+    const b = formas.find(f => f.id === idB);
+    if (!a || !b) return;
+    if (typeof turf === 'undefined' || typeof turf.union !== 'function') {
+      alert('No se pudo cargar la librería de geometría (Turf.js) para fusionar formas — revisá tu conexión a internet.');
+      return;
+    }
+    let unido;
+    try {
+      unido = turf.union(_formaAFeatureTurf(a), _formaAFeatureTurf(b));
+    } catch (err) {
+      alert('No se pudieron fusionar esas 2 formas: ' + (err.message || err));
+      return;
+    }
+    const nuevosAnillos = unido ? _geometriaAAnillos(unido.geometry) : [];
+    if (!nuevosAnillos.length) { alert('No se pudieron fusionar esas 2 formas.'); return; }
+
+    [a, b].forEach(f => {
+      f.capas.forEach(c => mapaHidrologia.removeLayer(c));
+      f.asas.forEach(m => mapaHidrologia.removeLayer(m));
+    });
+    formas = formas.filter(f => f.id !== idA && f.id !== idB);
+
+    // La forma fusionada hereda el nombre de la que ya tenía uno propio (si
+    // el usuario había renombrado alguna); si ninguna fue renombrada, usa
+    // el de la "ancla" (la primera que se había clickeado).
+    const tieneNombrePropio = f => f.nombre && !/^Forma \d+$/.test(f.nombre);
+    const nombreFusion = tieneNombrePropio(a) ? a.nombre : (tieneNombrePropio(b) ? b.nombre : a.nombre);
+
+    const idx = ++contadorFormas;
+    const forma = crearFormaEnMapa(idx, nuevosAnillos, a._color, nombreFusion);
+    formas.push(forma);
+    actualizarForma(forma);
+    crearAsasEditables(forma);
+
+    idAncla = null;
+    const nota = nuevosAnillos.length > 1 ? ' (quedan dibujadas por separado, pero son UNA sola forma/archivo)' : '';
+    setInstruccion(`🔗 Se fusionaron 2 formas en "${forma.nombre}"${nota}. Quedan ${formas.length} forma(s) en total.`);
+    setProgreso('');
     renderListaFormas();
   }
 
@@ -7621,10 +7913,11 @@ const MedicionSuperficie = (() => {
   function limpiarTodo() {
     limpiar();
     formas.forEach(f => {
-      if (f.layer) mapaHidrologia.removeLayer(f.layer);
+      f.capas.forEach(c => mapaHidrologia.removeLayer(c));
       f.asas.forEach(a => mapaHidrologia.removeLayer(a));
     });
     formas = [];
+    idAncla = null;
     renderListaFormas();
     const nombreInput = $el('medsup-nombre');
     if (nombreInput) nombreInput.value = '';
@@ -7632,6 +7925,7 @@ const MedicionSuperficie = (() => {
 
   function iniciar(nuevoModo) {
     limpiar(); // solo cancela el trazo en curso — las formas ya cerradas quedan en el mapa
+    deseleccionarAncla(); // no queda una selección de fusión "colgada" mientras se dibuja una forma nueva
     // Exclusión mutua: si el Inspector de Riesgo Hidrológico (u otra
     // herramienta de click) estaba activo, se apaga acá — así un click
     // sobre el mapa solo lo procesa la Regla, no las dos a la vez.
@@ -7709,35 +8003,29 @@ const MedicionSuperficie = (() => {
 
     const idx = ++contadorFormas;
     const color = COLORES_FORMAS[(idx - 1) % COLORES_FORMAS.length];
-    const layer = L.polygon(vertices.map(p => [p.lat, p.lon]), {
-      color, weight: 2.5, fillColor: color, fillOpacity: 0.18,
-    }).addTo(mapaHidrologia);
-
-    const forma = { id: idx, vertices: vertices.slice(), layer, asas: [], nombre: `Forma ${idx}` };
+    const forma = crearFormaEnMapa(idx, [vertices.slice()], color, `Forma ${idx}`);
     formas.push(forma);
     crearAsasEditables(forma);
     actualizarForma(forma);
 
     // Encuadra TODAS las formas juntas (no solo la recién cerrada), así se
     // ven las 2/3/20 formas a la vez, tal como se pidió.
-    if (formas.length > 1) {
-      const grupo = L.featureGroup(formas.map(f => f.layer));
-      mapaHidrologia.fitBounds(grupo.getBounds(), { padding: [40, 40] });
-    } else {
-      mapaHidrologia.fitBounds(layer.getBounds(), { padding: [40, 40] });
-    }
+    const grupo = L.featureGroup(formas.flatMap(f => f.capas));
+    mapaHidrologia.fitBounds(grupo.getBounds(), { padding: [40, 40] });
 
     vertices = []; modo = null; cerrado = false;
     marcarBotonActivo(null);
     $el('medsup-btn-finalizar').style.display = 'none';
-    setInstruccion(`Forma #${idx} agregada (van ${formas.length}). Tocá "Polígono" o "Rectángulo" de nuevo para agregar otra, arrastrá los puntos violeta para ajustar cualquiera, o "🗑 Limpiar todo" para borrar todas.`);
+    setInstruccion(`Forma #${idx} agregada (van ${formas.length}). Tocá "Polígono" o "Rectángulo" para agregar otra, click+SHIFT+click sobre 2 formas para fusionarlas, arrastrá los puntos violeta para ajustar cualquiera, o "🗑 Limpiar todo" para borrar todas.`);
     renderListaFormas();
     return forma;
   }
 
-  // Exporta TODAS las formas cerradas (dibujadas y/o importadas) juntas,
-  // como una FeatureCollection con una Feature por forma — cada una con su
-  // nombre y hectáreas en las propiedades.
+  // Exporta TODAS las formas cerradas (dibujadas, importadas y/o
+  // fusionadas) juntas, como una FeatureCollection con una Feature por
+  // forma — cada una con su nombre y hectáreas en las propiedades. Una
+  // forma fusionada "multi-parte" exporta como un único Feature MultiPolygon
+  // (no como 2 Features separados), tal como se pidió.
   function exportar(formato) {
     if (formas.length === 0) {
       alert('Todavía no hay ninguna forma cerrada para exportar. Dibujá un polígono/rectángulo, o importá un KML/GeoJSON primero.');
@@ -7753,13 +8041,13 @@ const MedicionSuperficie = (() => {
 
     const featureCollection = {
       type: 'FeatureCollection',
-      features: formas.map(f => {
-        const feat = f.layer.toGeoJSON();
-        feat.properties = feat.properties || {};
-        feat.properties.name = f.nombre || `Forma ${f.id}`;
-        feat.properties.hectareas = Math.round((f.has || 0) * 10) / 10;
-        return feat;
-      }),
+      features: formas.map(f => ({
+        type: 'Feature',
+        properties: { name: f.nombre || `Forma ${f.id}`, hectareas: Math.round((f.has || 0) * 10) / 10 },
+        geometry: f.anillos.length === 1
+          ? { type: 'Polygon', coordinates: [_coordsAnilloCerrado(f.anillos[0])] }
+          : { type: 'MultiPolygon', coordinates: f.anillos.map(ring => [_coordsAnilloCerrado(ring)]) },
+      })),
     };
 
     if (formato === 'geojson') {
@@ -7844,14 +8132,22 @@ const MedicionSuperficie = (() => {
   }
 
   // Devuelve los vértices de la forma cerrada MÁS RECIENTE (la última
-  // dibujada, importada o editada), o null si todavía no hay ninguna. Lo
-  // usa calcularRiesgoHidrologico() como fuente alternativa de área cuando
-  // no hay un campo delimitado con "Mi Campo". Si se midieron varias formas
-  // a la vez, el riesgo hidrológico sigue evaluando UN campo por vez — se
-  // toma la última agregada, que es la que normalmente se está mirando.
+  // dibujada, importada, editada o fusionada), o null si todavía no hay
+  // ninguna. Lo usa calcularRiesgoHidrologico() como fuente alternativa de
+  // área cuando no hay un campo delimitado con "Mi Campo". Si esa forma es
+  // "multi-parte" (fusión de formas que no se tocan), no hay un único límite
+  // de "campo" posible — se toma el anillo más grande como aproximación,
+  // ya que el riesgo hidrológico evalúa un solo polígono por vez.
   function getVertices() {
     if (formas.length === 0) return null;
-    return formas[formas.length - 1].vertices;
+    const ultima = formas[formas.length - 1];
+    if (ultima.anillos.length === 1) return ultima.anillos[0];
+    let mayor = ultima.anillos[0], mayorHa = calcularHectareas(mayor);
+    ultima.anillos.forEach(ring => {
+      const ha = calcularHectareas(ring);
+      if (ha > mayorHa) { mayor = ring; mayorHa = ha; }
+    });
+    return mayor;
   }
 
   return {
@@ -9409,18 +9705,6 @@ function simSeleccionarEscenarioHidro(nombre) {
     btn.style.color      = activo ? '#fff'    : '#1e40af';
   });
 
-  const infoPronostico = document.getElementById('simh-pronostico-info');
-
-  if (nombre === 'pronostico_glofas') {
-    if (infoPronostico) {
-      infoPronostico.style.display = 'block';
-      infoPronostico.textContent = '🛰️ Consultando pronóstico GloFAS (Copernicus, vía Open-Meteo)…';
-    }
-    simAplicarPronosticoGloFASHidro();
-    return;
-  }
-  if (infoPronostico) infoPronostico.style.display = 'none';
-
   const altura = (nombre === 'actual') ? simInaBaseHidro.nivel : escenario.alturaM;
   if (altura == null) { simActualizarPanelINAHidro(); return; }
 
@@ -9429,40 +9713,6 @@ function simSeleccionarEscenarioHidro(nombre) {
   if (slider) slider.value = altura;
   if (input)  input.value  = altura.toFixed(2);
   actualizarSimuladorHidro(altura);
-}
-
-// Escenario "Pronóstico GloFAS (7 días)": busca el PICO de caudal
-// proyectado (no solo el nivel de hoy) y lo aplica como altura del
-// simulador. Gratuito, sin API key — Open-Meteo Flood API (GloFAS v4).
-async function simAplicarPronosticoGloFASHidro() {
-  const infoPronostico = document.getElementById('simh-pronostico-info');
-  if (!mapaHidrologia) return;
-  const centro = mapaHidrologia.getCenter();
-  const datos = await hFetchGloFASPronostico(centro.lat, centro.lng, 7);
-
-  // El usuario pudo haber cambiado de escenario mientras esperábamos la respuesta
-  if (simEscenarioActivoHidro !== 'pronostico_glofas') return;
-
-  if (!datos) {
-    if (infoPronostico) {
-      infoPronostico.textContent = '⚠️ No se pudo obtener el pronóstico GloFAS para este punto. Probá con otro escenario.';
-    }
-    return;
-  }
-
-  const altura = datos.alturaEstimadaM;
-  const slider = document.getElementById('simh-nivel-slider');
-  const input  = document.getElementById('simh-nivel-input');
-  if (slider) slider.value = altura;
-  if (input)  input.value  = altura.toFixed(2);
-  actualizarSimuladorHidro(altura);
-
-  if (infoPronostico) {
-    const fechaFmt = datos.fechaPico ? new Date(datos.fechaPico + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : '—';
-    infoPronostico.textContent =
-      `🛰️ Pico proyectado a ${datos.dias} días: ${altura.toFixed(2)} m estimados el ${fechaFmt} ` +
-      `· caudal ${datos.caudalPico.toFixed(0)} m³/s · categoría ${datos.categoria} (GloFAS/Copernicus, gratuito).`;
-  }
 }
 
 async function simActualizarPanelINAHidro() {
@@ -9657,6 +9907,7 @@ function reiniciarSimuladorHidro() {
   quitarZonasInundablesHidro();
   _simUltimoUmbralMHidro = null;
   _capaEsHistoricaRealHidro = false;
+  _renderLocalidadesPriorizadasHidro([]);
 }
 
 // Muestra la extensión REAL observada por satélite para un escenario
@@ -9871,6 +10122,63 @@ async function simCargarAnimacionHidro() {
 }
 
 // ── Animación HAND (avance simulado por distancia de conectividad) ──
+
+/**
+ * Junta los lugares que el propio usuario marcó y nombró en el mapa, para
+ * sumarlos al ranking de "orden de anegamiento" junto con las localidades
+ * conocidas. Prioridad: si hay un Proyecto con varios lotes cargados, se
+ * usa CADA lote (su nombre real); si no hay Proyecto pero sí "Mi campo"
+ * (modo clásico) delimitado y guardado, se usa ese. Nunca inventa
+ * nombres ni usa la posición GPS -- solo lugares que el usuario mismo
+ * marcó y nombró.
+ */
+function _recolectarLotesUsuarioHidro() {
+  const lotes = [];
+  if (typeof proyectoActual !== 'undefined' && proyectoActual && proyectoActual.files.length > 0) {
+    proyectoActual.files.forEach(l => {
+      let centro = l.centro;
+      if (!centro && l.bounds && l.bounds.isValid && l.bounds.isValid()) {
+        const c = l.bounds.getCenter();
+        centro = { lat: c.lat, lon: c.lng };
+      }
+      if (centro && l.nombre) lotes.push({ nombre: l.nombre, lat: centro.lat, lon: centro.lon });
+    });
+  } else if (typeof campoGuardado !== 'undefined' && campoGuardado &&
+             Array.isArray(campoGuardado.puntos) && campoGuardado.puntos.length >= 3) {
+    const centro = calcularCentroide(campoGuardado.puntos);
+    lotes.push({ nombre: campoGuardado.nombre || 'Mi campo', lat: centro.lat, lon: centro.lon });
+  }
+  return lotes;
+}
+
+function _renderLocalidadesPriorizadasHidro(localidades) {
+  const cont = document.getElementById('simh-localidades-priorizadas');
+  const lista = document.getElementById('simh-localidades-lista');
+  if (!localidades.length) {
+    cont.style.display = 'none';
+    lista.innerHTML = '';
+    return;
+  }
+  cont.style.display = 'block';
+  // Mismo orden en que se van mojando (el backend ya lo devuelve ordenado
+  // ascendente por costo_acumulado) -- NO se muestra tiempo estimado acá
+  // a propósito: el "orden" entre localidades/lotes sale del mismo campo
+  // que arma la animación (confiable), pero convertirlo a horas depende
+  // de la velocidad de avance que el usuario carga a mano arriba
+  // (estimación suya, no del modelo) -- mezclar ambas cosas en la misma
+  // lista confundiría qué parte es dato y qué parte es supuesto.
+  lista.innerHTML = localidades.map((loc, i) => `
+    <div style="display:flex;align-items:center;gap:6px;padding:3px 2px;cursor:pointer;border-radius:6px"
+         onmouseover="this.style.background='#ecfeff'" onmouseout="this.style.background='transparent'"
+         onclick="mapaHidrologia.setView([${loc.lat},${loc.lon}], 13)">
+      <span style="flex-shrink:0;width:18px;height:18px;border-radius:50%;background:#0e7490;color:#fff;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center">${i + 1}</span>
+      <span style="flex-shrink:0;font-size:11px" title="${loc.tipo === 'lote' ? 'Lote propio' : 'Localidad'}">${loc.tipo === 'lote' ? '🌾' : '📍'}</span>
+      <span style="flex:1;color:#155e75;font-weight:600">${loc.nombre}</span>
+      <span style="flex-shrink:0;font-size:9px;color:#0891b2;background:#cffafe;border-radius:5px;padding:1px 5px">Fotograma ${loc.orden_fotograma}/${simAnimFotogramasHidro.length}</span>
+    </div>
+  `).join('');
+}
+
 async function simCargarAnimacionHandHidro() {
   const btn = document.getElementById('simh-anim-btn');
   const textoOriginal = btn.textContent;
@@ -9888,6 +10196,8 @@ async function simCargarAnimacionHandHidro() {
     };
     if (umbralM != null) paramsObj.umbral_m = umbralM;
     if (campoCoords) paramsObj.poligono = JSON.stringify(campoCoords);
+    const lotesUsuario = _recolectarLotesUsuarioHidro();
+    if (lotesUsuario.length) paramsObj.lotes_usuario = JSON.stringify(lotesUsuario);
     const params = new URLSearchParams(paramsObj);
     const r = await fetch(`${GEE_SERVER}/inundacion_animacion?${params}`);
     const j = await r.json();
@@ -9902,6 +10212,7 @@ async function simCargarAnimacionHandHidro() {
     _simAnimSetModoUiHidro('hand');
     simAnimIrAFrameHidro(0);
     btn.textContent = '🔄 Regenerar animación';
+    _renderLocalidadesPriorizadasHidro(j.localidades_priorizadas || []);
 
     const esRelativo = j.umbral_metodo === 'percentil_regional_10';
     _msgHidro(
@@ -10938,6 +11249,41 @@ async function cargarAguaCercanaIncendio(inc) {
   }
 }
 
+/** Actualiza el contador "X / N" y habilita/deshabilita las flechas <> del panel de detalle. */
+function actualizarNavIncendioUI() {
+  const nav = $el('pi-nav');
+  const contador = $el('pi-nav-contador');
+  const btnPrev = $el('pi-nav-prev');
+  const btnNext = $el('pi-nav-next');
+  if (!nav || !contador || !btnPrev || !btnNext) return;
+  const total = incendiosActivos.length;
+  if (total <= 1) { nav.style.display = 'none'; return; }
+  nav.style.display = 'flex';
+  const idx = incendiosActivos.findIndex(i => i.id === panelIncendioAbiertoId);
+  contador.textContent = `${idx >= 0 ? idx + 1 : 1} / ${total}`;
+  // La lista es circular (< > dan la vuelta), así que nunca quedan deshabilitados
+  // salvo que solo haya un incendio (caso ya cubierto arriba).
+  btnPrev.disabled = false;
+  btnNext.disabled = false;
+}
+
+/** Botones <> del panel: pasa al incendio anterior/siguiente sin cerrar el panel ni volver a la lista. */
+function navegarIncendio(delta) {
+  const total = incendiosActivos.length;
+  if (total <= 1) return;
+  let idx = incendiosActivos.findIndex(i => i.id === panelIncendioAbiertoId);
+  if (idx === -1) idx = 0;
+  idx = (idx + delta + total) % total;
+  const inc = incendiosActivos[idx];
+  if (!inc) return;
+  clearTimeout(timerFaseUnoFuego);
+  if (mapa) mapa.flyTo([inc.lat, inc.lon], mapa.getZoom() < 11 ? 12 : mapa.getZoom(), { duration: 0.6 });
+  mostrarConoFuego(inc, false);
+  renderPanelIncendioBody(inc);
+  panelIncendioAbiertoId = inc.id;
+  actualizarNavIncendioUI();
+}
+
 function abrirPanelIncendio(id) {
   const inc = incendiosActivos.find(i => i.id === id);
   if (!inc) return;
@@ -10948,6 +11294,7 @@ function abrirPanelIncendio(id) {
   panelIncendioAbiertoId = inc.id;
   const panel = $el('panel-incendio-lateral');
   if (panel) panel.classList.add('abierto');
+  actualizarNavIncendioUI();
 }
 
 function cerrarPanelIncendio() {
@@ -11066,7 +11413,7 @@ function procesarIncendiosActivos(hotspots) {
     if (!inc.municipio) {
       obtenerLugar(lat, lon).then(nombre => {
         inc.municipio = nombre || 'Zona rural';
-        if (panelIncendioAbiertoId === inc.id) renderPanelIncendioBody(inc);
+        if (panelIncendioAbiertoId === inc.id) { renderPanelIncendioBody(inc); actualizarNavIncendioUI(); }
         const listaEl = $el('panel-lista-incendios');
         if (listaEl && listaEl.classList.contains('abierto')) abrirListaIncendios();
       });
@@ -11083,6 +11430,7 @@ function procesarIncendiosActivos(hotspots) {
     if (incAbierto) {
       renderPanelIncendioBody(incAbierto);
       mostrarConoFuego(incAbierto, false);
+      actualizarNavIncendioUI();
     } else {
       panelIncendioAbiertoId = null;
       _cerrarPanelesFuegoUI();
@@ -13433,10 +13781,6 @@ const ESCENARIOS_SIMULADOR_INUNDACION = {
   crecida_historica_2016 : { etiqueta: 'Crecida histórica 2016',  implementado: true,  alturaM: 7.15, anioJRC: '2016' },
   crecida_historica_1983 : { etiqueta: 'Crecida histórica 1983',  implementado: true,  alturaM: 9.03 },                    // sin anioJRC a propósito: JRC GSW YearlyHistory arranca en 1984, así que este año sigue con la simulación HAND genérica
   pronostico_ina         : { etiqueta: 'Pronóstico INA',          implementado: false, alturaM: null },
-  // Pico proyectado a 7 días según GloFAS v4 (Copernicus), vía Open-Meteo
-  // Flood API — 100% gratuita, sin API key. `alturaM` se completa de forma
-  // dinámica (async) al seleccionar el escenario, igual que 'actual'.
-  pronostico_glofas      : { etiqueta: 'Pronóstico GloFAS (7 días)', implementado: true, alturaM: null, esPronostico: true },
 };
 
 // ════════════════════════════════════════════════
@@ -13475,6 +13819,286 @@ function quitarCapaGEE() {
   $el('gee-mensaje').textContent = '';
   ocultarLeyendaGEE();
 }
+
+// ══════════════════════════════════════════════════════════════════════
+// 🌱 GEOSENTINEL VEGETATION INTELLIGENCE — PREMIUM (frontend)
+// Módulo nuevo e independiente de capaGEE/aplicarCapaGEE (arriba) y de
+// card-vegetacion (puntual). Analiza el POLÍGONO del lote activo vía
+// /vegetacion_temporal. Capas propias: capaNdviPremium, capaCambioNdviPremium,
+// capaVariabilidadNdviPremium. Arquitectura preparada para un plan real
+// (usuarioGeoSentinel.plan === 'pro'); sin sistema de pago todavía, el
+// estado premium se guarda en localStorage como demo/testing.
+// ══════════════════════════════════════════════════════════════════════
+window.usuarioGeoSentinel = window.usuarioGeoSentinel || { plan: localStorage.getItem('gs_plan') === 'pro' ? 'pro' : 'free' };
+
+let capaNdviPremium = null;
+let capaCambioNdviPremium = null;
+let capaVariabilidadNdviPremium = null;
+let vipUltimoResultado = null;
+let vipChartSerie = null;
+
+function vipEsPro() { return usuarioGeoSentinel.plan === 'pro'; }
+
+// Se llama después de actualizar #veg-ndvi (card-vegetacion puntual, ya
+// existente) para reflejar el mismo valor en la vista gratuita premium —
+// no se recalcula nada, solo se refleja el dato que ya trajo /vegetacion.
+function vipActualizarPreview() {
+  const val = document.getElementById('veg-ndvi')?.textContent || '--';
+  const prev = document.getElementById('vip-ndvi-preview');
+  if (prev) prev.textContent = val;
+}
+
+function vipRenderEstadoAcceso() {
+  const gratis = document.getElementById('vip-preview-gratis');
+  const pro = document.getElementById('vip-panel-pro');
+  if (!gratis || !pro) return;
+  if (vipEsPro()) { gratis.classList.add('hidden'); pro.classList.remove('hidden'); }
+  else { gratis.classList.remove('hidden'); pro.classList.add('hidden'); }
+}
+
+function vipMostrarUpsell() {
+  // Sin sistema de pago real todavía: switch local de demo/testing,
+  // preparado para reemplazarse por el flujo de suscripción real
+  // (usuarioGeoSentinel.plan vendría entonces del backend/autenticación).
+  const activar = confirm(
+    '🌱 Vegetation Intelligence es una función PREMIUM.\n\n' +
+    '(Demo interno: todavía no hay sistema de pago conectado.)\n\n' +
+    '¿Activar el modo premium en este navegador para probarlo?'
+  );
+  if (activar) {
+    usuarioGeoSentinel.plan = 'pro';
+    localStorage.setItem('gs_plan', 'pro');
+    vipRenderEstadoAcceso();
+  }
+}
+
+// Mismo criterio que el resto de la app: prioriza el lote activo del
+// proyecto multi-lote; si no hay proyecto en curso, usa el campo dibujado
+// individualmente (campoGuardado).
+function vipObtenerGeometriaLoteActivo() {
+  let puntos = null;
+  if (typeof proyectoActual !== 'undefined' && proyectoActual && proyectoActual.loteActual &&
+      proyectoActual.loteActual.puntos && proyectoActual.loteActual.puntos.length >= 3) {
+    puntos = proyectoActual.loteActual.puntos;
+  } else if (typeof campoGuardado !== 'undefined' && campoGuardado && campoGuardado.puntos &&
+             campoGuardado.puntos.length >= 3) {
+    puntos = campoGuardado.puntos;
+  }
+  if (!puntos) return null;
+  const anillo = puntos.map(p => [p.lon, p.lat]);
+  const primero = anillo[0], ultimo = anillo[anillo.length - 1];
+  if (primero[0] !== ultimo[0] || primero[1] !== ultimo[1]) anillo.push(primero);
+  return { type: 'Polygon', coordinates: [anillo] };
+}
+
+function vipAplicarPresetPeriodo() {
+  const preset = document.getElementById('vip-periodo-preset').value;
+  const inputInicio = document.getElementById('vip-fecha-inicio');
+  const inputFin = document.getElementById('vip-fecha-fin');
+  if (preset === 'custom') return; // el usuario elige las fechas manualmente
+  const dias = parseInt(preset, 10);
+  const hoy = new Date();
+  const desde = new Date(hoy.getTime() - dias * 86400000);
+  inputFin.value = hoy.toISOString().slice(0, 10);
+  inputInicio.value = desde.toISOString().slice(0, 10);
+}
+
+async function vipAnalizarVegetacion() {
+  const geometry = vipObtenerGeometriaLoteActivo();
+  const msg = document.getElementById('vip-msg');
+  const btn = document.getElementById('vip-btn-analizar');
+  const resultadoDiv = document.getElementById('vip-resultado');
+
+  if (!geometry) {
+    msg.textContent = '⚠️ Dibujá o seleccioná un lote con polígono antes de analizar.';
+    msg.style.color = '#fbbf24';
+    return;
+  }
+  if (!document.getElementById('vip-fecha-inicio').value) vipAplicarPresetPeriodo();
+
+  const fechaInicio = document.getElementById('vip-fecha-inicio').value;
+  const fechaFin = document.getElementById('vip-fecha-fin').value;
+
+  btn.disabled = true; btn.textContent = 'Analizando (Earth Engine)...';
+  msg.textContent = 'Consultando Sentinel-2 real vía Google Earth Engine…';
+  msg.style.color = '#4b7a57';
+  resultadoDiv.classList.add('hidden');
+
+  try {
+    const r = await fetch(`${GEE_SERVER}/vegetacion_temporal`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ geometry, fecha_inicio: fechaInicio, fecha_fin: fechaFin }),
+    });
+    const j = await r.json();
+
+    if (!j.ok) {
+      msg.textContent = `⚠️ ${j.error || 'No se pudo completar el análisis.'}`;
+      msg.style.color = '#fbbf24';
+      return;
+    }
+
+    vipUltimoResultado = j;
+    vipRenderResultado(j);
+    vipDibujarCapas(j);
+    await vipRegistrarAnalisis(j);
+
+    msg.textContent = `${j.observaciones_validas} observación(es) Sentinel-2 válida(s) en el período.`;
+    msg.style.color = '#86efac';
+  } catch (e) {
+    console.error('[Vegetation Intelligence]', e);
+    msg.textContent = '⚠️ No se pudo conectar con el servidor de análisis.';
+    msg.style.color = '#fbbf24';
+  } finally {
+    btn.disabled = false; btn.textContent = '🔒 ANALIZAR VEGETACIÓN — PRO';
+  }
+}
+
+function vipRenderResultado(j) {
+  document.getElementById('vip-resultado').classList.remove('hidden');
+  setText('vip-fuente-txt', j.fuente || 'Sentinel-2 · ESA/Copernicus · Google Earth Engine');
+
+  if (j.comparacion) {
+    setText('vip-ndvi-actual', j.comparacion.ndvi_promedio_actual);
+    setText('vip-ndvi-anterior', j.comparacion.ndvi_promedio_anterior);
+    const signo = j.comparacion.variacion_absoluta >= 0 ? '+' : '';
+    setText('vip-variacion', `${signo}${j.comparacion.variacion_absoluta} (${j.comparacion.variacion_porcentual}%)`);
+  } else {
+    setText('vip-ndvi-actual', '--'); setText('vip-ndvi-anterior', '--'); setText('vip-variacion', '--');
+  }
+
+  if (j.tendencia) {
+    const iconos = { positiva: '🟢', estable: '🟡', negativa_moderada: '🟠', negativa_fuerte: '🔴', sin_datos: '⚪' };
+    setText('vip-tendencia-txt', `${iconos[j.tendencia.clasificacion] || ''} ${j.tendencia.clasificacion.replace(/_/g, ' ')} (${j.tendencia.cambio_porcentual}%, R²=${j.tendencia.r2})`);
+  } else {
+    setText('vip-tendencia-txt', j.aviso || 'Datos insuficientes');
+  }
+
+  const barra = document.getElementById('vip-barra-afectada');
+  if (j.espacial) {
+    const pct = j.espacial.porcentaje_descenso ?? 0;
+    barra.style.width = `${Math.min(100, pct)}%`;
+    const haDescenso = (j.espacial.area_descenso_fuerte_ha + j.espacial.area_descenso_moderado_ha).toFixed(2);
+    setText('vip-afectada-txt', `${j.espacial.porcentaje_descenso}% del lote (${haDescenso} ha) con descenso de NDVI, sobre ${j.espacial.area_total_ha} ha totales.`);
+  } else {
+    barra.style.width = '0%';
+    setText('vip-afectada-txt', j.aviso_comparacion || '--');
+  }
+
+  vipRenderChart(j.serie_temporal || []);
+
+  // Reset de la interpretación IA anterior (corresponde a otro período)
+  const iaDiv = document.getElementById('vip-ia-texto');
+  iaDiv.classList.add('hidden'); iaDiv.textContent = '';
+}
+
+function vipRenderChart(serie) {
+  const ctx = document.getElementById('vip-chart-serie');
+  if (!ctx || typeof Chart === 'undefined') return;
+  const labels = serie.map(s => s.fecha);
+  const datos = serie.map(s => s.ndvi_medio);
+  if (vipChartSerie) vipChartSerie.destroy();
+  vipChartSerie = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'NDVI medio del lote', data: datos,
+        borderColor: '#86efac', backgroundColor: 'rgba(134,239,172,0.15)',
+        tension: 0.25, pointRadius: 3, fill: true,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#c7e3c0', font: { size: 9 } } } },
+      scales: {
+        x: { ticks: { color: '#4b7a57', font: { size: 8 } }, grid: { color: '#1a2e1f' } },
+        y: { ticks: { color: '#4b7a57', font: { size: 8 } }, grid: { color: '#1a2e1f' }, suggestedMin: 0, suggestedMax: 1 },
+      },
+    },
+  });
+}
+
+function vipDibujarCapas(j) {
+  if (!mapa || !j.tiles) return;
+  if (capaNdviPremium) { mapa.removeLayer(capaNdviPremium); capaNdviPremium = null; }
+  if (capaCambioNdviPremium) { mapa.removeLayer(capaCambioNdviPremium); capaCambioNdviPremium = null; }
+  if (capaVariabilidadNdviPremium) { mapa.removeLayer(capaVariabilidadNdviPremium); capaVariabilidadNdviPremium = null; }
+
+  if (j.tiles.actual) capaNdviPremium = L.tileLayer(j.tiles.actual, { opacity: 0.75, maxZoom: 20 });
+  if (j.tiles.cambio) capaCambioNdviPremium = L.tileLayer(j.tiles.cambio, { opacity: 0.75, maxZoom: 20 });
+  if (j.tiles.variabilidad) capaVariabilidadNdviPremium = L.tileLayer(j.tiles.variabilidad, { opacity: 0.75, maxZoom: 20 });
+
+  // Por defecto se muestra el mapa de cambio (el resultado más relevante de
+  // esta herramienta); actual/variabilidad quedan disponibles por botón.
+  if (capaCambioNdviPremium) { capaCambioNdviPremium.addTo(mapa); _vipCapaActivaBtn('vip-btn-mapa-cambio'); }
+}
+
+function _vipCapaActivaBtn(idActivo) {
+  ['vip-btn-mapa-cambio', 'vip-btn-mapa-actual', 'vip-btn-mapa-variab'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.style.background = (id === idActivo) ? '#2F855A' : '';
+  });
+}
+
+function vipToggleCapa(cual) {
+  if (!mapa) return;
+  const capas = { actual: capaNdviPremium, cambio: capaCambioNdviPremium, variabilidad: capaVariabilidadNdviPremium };
+  Object.values(capas).forEach(c => { if (c && mapa.hasLayer(c)) mapa.removeLayer(c); });
+  const capaElegida = capas[cual];
+  const idBtn = cual === 'cambio' ? 'vip-btn-mapa-cambio' : cual === 'actual' ? 'vip-btn-mapa-actual' : 'vip-btn-mapa-variab';
+  if (capaElegida) { capaElegida.addTo(mapa); _vipCapaActivaBtn(idBtn); }
+}
+
+// Solo datos ya calculados por GEE — la IA no recibe nada que no provenga
+// de un cálculo real (cumple el requisito de "0% inventado").
+function vipArmarPayloadIA(j) {
+  return {
+    tendencia: j.tendencia, comparacion: j.comparacion, espacial: j.espacial,
+    anomalias: j.anomalias, homogeneidad: j.homogeneidad,
+    observaciones_validas: j.observaciones_validas, periodo: j.periodo,
+  };
+}
+
+async function vipInterpretarIA() {
+  if (!vipUltimoResultado) return;
+  const btn = document.getElementById('vip-btn-ia');
+  const div = document.getElementById('vip-ia-texto');
+  btn.disabled = true; btn.textContent = 'Consultando IA...';
+  const payload = vipArmarPayloadIA(vipUltimoResultado);
+  const interpretacion = await interpretarModuloIA('vegetacion', payload);
+  btn.disabled = false; btn.textContent = '🧠 Interpretación IA';
+  div.textContent = interpretacion || 'No se pudo obtener la interpretación de IA en este momento.';
+  div.classList.remove('hidden');
+}
+
+async function vipRegistrarAnalisis(j) {
+  if (typeof _registrarAnalisis !== 'function') return;
+  const clasificacion = j.tendencia?.clasificacion || j.comparacion?.estado || 'sin_datos';
+  const estadisticas = {
+    'NDVI actual': j.comparacion?.ndvi_promedio_actual ?? '--',
+    'NDVI anterior': j.comparacion?.ndvi_promedio_anterior ?? '--',
+    'Variación': j.comparacion ? `${j.comparacion.variacion_porcentual}%` : '--',
+    'Tendencia': j.tendencia?.clasificacion || '--',
+    'R²': j.tendencia?.r2 ?? '--',
+    '% superficie con descenso': j.espacial?.porcentaje_descenso ?? '--',
+    'Observaciones válidas': j.observaciones_validas,
+  };
+  const conclusion = j.comparacion
+    ? `NDVI ${j.comparacion.estado.replace(/_/g, ' ')} respecto al período anterior (${j.comparacion.variacion_porcentual}%).`
+    : (j.aviso || j.aviso_comparacion || 'Análisis sin conclusión (datos insuficientes).');
+
+  await _registrarAnalisis({
+    tipo: 'vegetacion_temporal',
+    nombre: '🌱 Vegetation Intelligence',
+    fuente: j.fuente,
+    clasificacion,
+    estadisticas,
+    conclusion,
+    resultado: { payloadIA: vipArmarPayloadIA(j) },
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => { vipRenderEstadoAcceso(); });
 
 // ════════════════════════════════════════════════
 //  MI CAMPO — POLÍGONO + BUFFER 30%
@@ -14421,7 +15045,7 @@ function _colorLote(indiceGlobal) {
 // resultado (actualizándolo en el mismo lugar), no uno nuevo por cada
 // recálculo — si no, la tarjeta y el informe se llenaban de decenas de
 // entradas repetidas del mismo indicador en una sola sesión.
-const _TIPOS_ANALISIS_RECALCULABLES = ['incendio', 'inundacion', 'sequia', 'vegetacion', 'iipdi', 'riesgo_hidrologico_suelo'];
+const _TIPOS_ANALISIS_RECALCULABLES = ['incendio', 'inundacion', 'sequia', 'vegetacion', 'vegetacion_temporal', 'iipdi', 'riesgo_hidrologico_suelo'];
 
 class AnalysisSession {
   constructor(nombreLote, geometry) {
@@ -14565,6 +15189,7 @@ async function _registrarAnalisis(datos) {
     const sesion = _sesionActiva();
     const registro = sesion.addAnalysis({ ...datos, capturaMapa: captura });
     _actualizarTarjetaSesion();
+    registrarSnapshotHistorico(registro, sesion); // Historial PRO — no bloquea ni altera lo anterior (ver módulo más abajo)
     return registro;
   } catch (err) {
     console.warn('[AnalysisSession] No se pudo registrar el análisis:', err);
@@ -14582,6 +15207,7 @@ async function _registrarAnalisisHidro(datos) {
     const sesion = _sesionActiva();
     const registro = sesion.addAnalysis({ ...datos, capturaMapa: captura });
     _actualizarTarjetaSesion();
+    registrarSnapshotHistorico(registro, sesion); // Historial PRO — no bloquea ni altera lo anterior
     return registro;
   } catch (err) {
     console.warn('[AnalysisSession] No se pudo registrar el análisis de Hidrología:', err);
@@ -14619,6 +15245,700 @@ function _actualizarTarjetaSesion() {
     tarjeta.classList.remove('activa');
     _tarjetaSesionTimer = null;
   }, 5000);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  📈 HISTORIAL & SEGUIMIENTO PRO
+//  ------------------------------------------------------------
+//  Capa de persistencia y análisis histórico que se construye ENCIMA de
+//  AnalysisSession, sin reemplazarla ni tocar su comportamiento actual:
+//  - AnalysisSession sigue siendo el expediente EN MEMORIA de la sesión
+//    activa (se vacía al emitir el PDF de sesión, como siempre).
+//  - Este módulo agrega, además, snapshots PERSISTENTES por lote
+//    (localStorage, clave _HISTORIAL_LOTES_KEY, separada de HISTORIAL_KEY
+//    y de LOTES_MANUALES_KEY) para poder comparar en el tiempo.
+//  - Solo corre para usuarios PRO (ver esUsuarioPro()); para FREE no se
+//    persiste nada nuevo, solo se sigue viendo el "estado actual" en
+//    memoria de la sesión (igual que hoy).
+//
+//  Submódulos (mismo archivo, separados por claridad — punto 37 del
+//  pedido): HistorialStore, IdentidadLote, SnapshotManager,
+//  HistoryAnalyzer, HistoryUI, HistoryAI, HistoryPDF/CSV.
+// ════════════════════════════════════════════════════════════════
+
+// ── PLAN DEL USUARIO (punto 33) ──────────────────────────────────
+// No hay sistema de pagos ni backend de usuarios todavía (solo Firebase
+// Auth para login). Por pedido explícito del punto 33, NO se implementan
+// pagos reales: se deja preparado `esUsuarioPro()` como único punto de
+// verdad, hoy resuelto con un flag local de demo/QA. El día que exista un
+// backend de suscripciones, basta con reescribir el cuerpo de esta única
+// función (todo el resto del módulo ya llama solo a esUsuarioPro()).
+function esUsuarioPro() {
+  try { return localStorage.getItem(_PRO_DEMO_KEY) === '1'; } catch (e) { return false; }
+}
+// Activar/desactivar PRO en modo demo — pensado para vos (QA), no para el
+// usuario final: se dispara desde el botón de la propia pantalla de
+// Historial ("🔓 Desbloquear seguimiento PRO"), pero también queda
+// disponible desde la consola del navegador si hace falta probar rápido:
+// activarProDemo() / desactivarProDemo().
+function activarProDemo() {
+  try { localStorage.setItem(_PRO_DEMO_KEY, '1'); } catch (e) {}
+  _renderHistorialUI();
+}
+function desactivarProDemo() {
+  try { localStorage.removeItem(_PRO_DEMO_KEY); } catch (e) {}
+  _renderHistorialUI();
+}
+
+// ── HistorialStore — persistencia (localStorage estructurado) ───
+function _historialLeerTodo() {
+  try { return JSON.parse(localStorage.getItem(_HISTORIAL_LOTES_KEY) || '{}'); }
+  catch (e) { return {}; }
+}
+function _historialGuardarTodo(datos) {
+  try { localStorage.setItem(_HISTORIAL_LOTES_KEY, JSON.stringify(datos)); }
+  catch (e) { console.warn('[Historial PRO] No se pudo persistir (¿localStorage lleno?):', e); }
+}
+function _historialObtenerEntradaLote(clave) {
+  if (!clave) return null;
+  return _historialLeerTodo()[clave] || null;
+}
+
+// ── Identidad del lote (punto 4) ─────────────────────────────────
+// Hash determinístico de la geometría (redondeado a ~1m) — es la
+// identidad PRINCIPAL de un lote, independiente de su nombre. Editar
+// asas mínimamente no cambia el hash (5 decimales ≈ 1.1m de tolerancia);
+// un polígono realmente distinto sí lo cambia.
+function _hashGeometriaLote(puntos) {
+  if (!Array.isArray(puntos) || puntos.length < 3) return null;
+  const cadena = puntos.map(p => `${(+p.lat).toFixed(5)},${(+p.lon).toFixed(5)}`).join('|');
+  let hash = 0;
+  for (let i = 0; i < cadena.length; i++) hash = (hash * 31 + cadena.charCodeAt(i)) | 0;
+  return 'geo_' + (hash >>> 0).toString(36);
+}
+// Identidad a partir de una AnalysisSession ya activa (reutiliza
+// sesion.lote / sesion.geometry — NO crea un selector de lote paralelo).
+function _identidadDesdeSesion(sesion) {
+  const nombre = sesion?.lote || null;
+  const geometryHash = sesion?.geometry ? _hashGeometriaLote(sesion.geometry) : null;
+  if (!nombre && !geometryHash) return null;
+  return { nombre, geometryHash };
+}
+// ¿Esta identidad "choca" con una entrada guardada del mismo NOMBRE pero
+// con un hash de geometría DISTINTO? Ese es el único caso ambiguo (punto
+// 4): mismo hash → mismo lote sin dudas; nombre nuevo → lote nuevo sin
+// dudas. Solo "mismo nombre + geometría distinta" necesita preguntar.
+function _detectarConflictoIdentidad(identidad) {
+  if (!identidad || !identidad.geometryHash) return null;
+  const todo = _historialLeerTodo();
+  if (todo[identidad.geometryHash]) return null;
+  const homonimo = Object.values(todo).find(e => e.nombre === identidad.nombre && e.geometryHash);
+  if (!homonimo) return null;
+  return { identidadNueva: identidad, entradaExistente: homonimo };
+}
+function _historialGuardarSnapshot(identidad, snapshot) {
+  const todo = _historialLeerTodo();
+  const clave = identidad.geometryHash || `nombre_${identidad.nombre}`;
+  if (!todo[clave]) {
+    todo[clave] = {
+      loteId: clave, nombre: identidad.nombre, geometryHash: identidad.geometryHash,
+      creadoEn: new Date().toISOString(), snapshots: [],
+    };
+  }
+  todo[clave].nombre = identidad.nombre; // el nombre pudo cambiar; la geometría manda
+  todo[clave].snapshots.push(snapshot);
+  _historialGuardarTodo(todo);
+  return clave;
+}
+// Diálogo del punto 4 ("Este polígono parece ser diferente al lote
+// registrado anteriormente" + [Crear nuevo] / [Vincular con lote existente]).
+function _mostrarConflictoIdentidadLote(conflicto, onNuevo, onVincular) {
+  const modal = $el('historial-conflicto-modal');
+  if (!modal) { onNuevo(); return; } // defensivo: si la UI no cargó, no bloquear el registro
+  $el('historial-conflicto-texto').textContent =
+    `Este polígono parece ser diferente al lote "${conflicto.entradaExistente.nombre}" registrado anteriormente.`;
+  modal.style.display = 'flex';
+  const cerrar = () => { modal.style.display = 'none'; };
+  $el('historial-conflicto-btn-nuevo').onclick = () => { cerrar(); onNuevo(); };
+  $el('historial-conflicto-btn-vincular').onclick = () => {
+    // Vincula: la entrada existente (por nombre) pasa a usar el hash de
+    // geometría ACTUAL — se asume que es el mismo lote con el polígono
+    // corregido/redibujado, no se mezclan snapshots de lotes distintos.
+    const todo = _historialLeerTodo();
+    todo[conflicto.entradaExistente.loteId].geometryHash = conflicto.identidadNueva.geometryHash;
+    _historialGuardarTodo(todo);
+    cerrar();
+    onVincular();
+  };
+}
+
+// ── Extracción de un valor numérico REAL (nunca inventado) por snapshot ──
+// Reglas científicas del pedido (punto 34): no inventar datos. Esta función
+// NUNCA fabrica un número — si no encuentra ninguno real, devuelve null y
+// ese indicador simplemente no se grafica ni entra en tendencias.
+// Convención de escala ordinal SOLO para clasificaciones textuales de riesgo
+// ya calculadas por la app (Bajo/Moderado/Alto/Crítico) — es una conversión
+// de escala, documentada acá, no un dato nuevo (punto 21: cualquier índice
+// combinado debe documentar variables/normalización).
+const _ESCALA_ORDINAL_RIESGO = {
+  'bajo': 1, 'moderado': 2, 'medio': 2, 'moderado-alto': 2.5, 'medio-alto': 2.5,
+  'alto': 3, 'muy alto': 3.5, 'crítico': 4, 'critico': 4, 'severo': 4,
+};
+function _extraerValorNumericoIndicador(registro) {
+  if (typeof registro.resultado === 'number' && isFinite(registro.resultado)) {
+    return { valor: registro.resultado, etiqueta: registro.nombre || registro.tipo, escala: 'valor_directo' };
+  }
+  const clasifTxt = (registro.clasificacion || registro?.resultado?.riesgoNivel || '').toString().trim().toLowerCase();
+  if (clasifTxt && _ESCALA_ORDINAL_RIESGO[clasifTxt] !== undefined) {
+    return { valor: _ESCALA_ORDINAL_RIESGO[clasifTxt], etiqueta: registro.clasificacion, escala: 'ordinal_riesgo_1_4' };
+  }
+  const estad = registro.estadisticas || {};
+  for (const clave of Object.keys(estad)) {
+    const val = estad[clave];
+    const num = typeof val === 'number' ? val : parseFloat(String(val).replace(',', '.').replace(/[^\d.-]/g, ''));
+    if (isFinite(num)) return { valor: num, etiqueta: clave, escala: 'estadistica_original' };
+  }
+  return null; // sin dato numérico real disponible -- no se inventa.
+}
+
+// Reduce una captura PNG pesada (html2canvas a escala 2) a una miniatura
+// JPEG liviana antes de guardarla en el historial persistente — punto 35
+// (rendimiento): NO se guardan imágenes originales de Earth Engine ni
+// capturas de tamaño completo, solo esta miniatura comprimida.
+function _comprimirCapturaParaHistorial(dataUrlPng) {
+  return new Promise(resolve => {
+    if (!dataUrlPng) return resolve(null);
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const anchoMax = 320;
+          const escala = Math.min(1, anchoMax / img.width);
+          const w = Math.max(1, Math.round(img.width * escala));
+          const h = Math.max(1, Math.round(img.height * escala));
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.55));
+        } catch (e) { resolve(null); }
+      };
+      img.onerror = () => resolve(null);
+      img.src = dataUrlPng;
+    } catch (e) { resolve(null); }
+  });
+}
+
+// ── SnapshotManager — punto único llamado desde _registrarAnalisis()
+// y _registrarAnalisisHidro() cuando terminan correctamente. NO cambia
+// en nada el comportamiento de esas funciones: si esto falla o el
+// usuario es FREE, el resto sigue exactamente igual que hoy. ──
+async function registrarSnapshotHistorico(registro, sesion, forzarNuevo) {
+  try {
+    if (!esUsuarioPro()) return null; // FREE: sin persistencia nueva (punto 33)
+    if (!registro || !sesion) return null;
+
+    const identidad = _identidadDesdeSesion(sesion);
+    if (!identidad) return null; // ni nombre ni geometría -- no hay a qué lote asociarlo
+
+    if (!forzarNuevo) {
+      const conflicto = _detectarConflictoIdentidad(identidad);
+      if (conflicto) {
+        _mostrarConflictoIdentidadLote(
+          conflicto,
+          () => registrarSnapshotHistorico(registro, sesion, true), // [Crear nuevo historial]
+          () => registrarSnapshotHistorico(registro, sesion, true), // [Vincular con lote existente] (ya actualizó el hash arriba)
+        );
+        return null; // se guarda recién cuando el usuario elija una opción
+      }
+    }
+
+    const snapshot = {
+      id: `snap_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      fecha: new Date().toISOString(),
+      fechaLegible: new Date().toLocaleDateString('es-AR'),
+      hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+      tipo: registro.tipo,
+      fuente: registro.fuente || 'GeoSentinel',
+      periodoDatos: registro.periodoDatos || null, // solo si el propio análisis lo trae -- nunca inventado
+      valores: { resultado: registro.resultado ?? null, clasificacion: registro.clasificacion || null, estadisticas: registro.estadisticas || {} },
+      conclusion: registro.conclusion || '',
+      recomendacion: (Array.isArray(registro.recomendaciones) && registro.recomendaciones[0]) || null,
+      capturaMapa: await _comprimirCapturaParaHistorial(registro.capturaMapa),
+      valorNumerico: _extraerValorNumericoIndicador(registro),
+    };
+
+    _historialGuardarSnapshot(identidad, snapshot);
+    if (typeof _historialPanelAbierto !== 'undefined' && _historialPanelAbierto) _renderHistorialUI();
+    return snapshot;
+  } catch (e) {
+    console.warn('[Historial PRO] No se pudo registrar el snapshot histórico:', e);
+    return null;
+  }
+}
+
+// ── HistoryAnalyzer — tendencias y detección de cambios ──────────
+// Umbrales de "cambio relevante" configurables por módulo (punto 13) —
+// por debajo de esto NO se genera alerta de cambio.
+const _UMBRALES_CAMBIO_POR_TIPO = {
+  incendio: 20, inundacion: 20, sequia: 20, vegetacion: 15,
+  vegetacion_temporal: 15, riesgo_hidrologico: 20, riesgo_hidrologico_suelo: 20, default: 20,
+};
+// Tipos donde un valor MÁS ALTO es una MEJORA (no un empeoramiento) —
+// solo afecta el color/flecha mostrados, nunca el número en sí.
+const _TIPOS_INVERTIDOS = new Set(['vegetacion', 'vegetacion_temporal']);
+
+/** Regresión lineal simple (mínimos cuadrados) sobre TODOS los snapshots
+ *  con valor numérico de un mismo tipo — no se limita a "último - primero"
+ *  (punto 10, explícito). Requiere ≥2 observaciones (punto 38, caso 2). */
+function _calcularTendencia(snapshotsTipo) {
+  const conValor = snapshotsTipo.filter(s => s.valorNumerico);
+  const puntos = conValor.map(s => s.valorNumerico.valor);
+  if (puntos.length < 2) return null;
+
+  const n = puntos.length;
+  const xs = puntos.map((_, i) => i);
+  const mediaX = xs.reduce((a, b) => a + b, 0) / n;
+  const mediaY = puntos.reduce((a, b) => a + b, 0) / n;
+  let num = 0, den = 0;
+  for (let i = 0; i < n; i++) { num += (xs[i] - mediaX) * (puntos[i] - mediaY); den += (xs[i] - mediaX) ** 2; }
+  const pendiente = den !== 0 ? num / den : 0;
+
+  const inicial = puntos[0], final = puntos[n - 1];
+  const variacionAbsoluta = final - inicial;
+  const variacionPorcentual = inicial !== 0 ? (variacionAbsoluta / Math.abs(inicial)) * 100 : null;
+
+  // Umbral relativo a la propia dispersión de la serie (no un número fijo
+  // arbitrario): pendiente chica frente al rango observado = estable.
+  const rango = Math.max(...puntos) - Math.min(...puntos) || 1;
+  const pendienteRelativa = Math.abs(pendiente * (n - 1)) / rango;
+  const direccion = pendienteRelativa < 0.15 ? 'estable' : (pendiente > 0 ? 'creciente' : 'decreciente');
+
+  return {
+    direccion, pendiente, variacionAbsoluta, variacionPorcentual,
+    observaciones: n, periodoDesde: conValor[0].fechaLegible, periodoHasta: conValor[n - 1].fechaLegible,
+    calidad: n >= 5 ? 'buena' : n >= 3 ? 'aceptable' : 'limitada', // punto 10: nivel de confianza/calidad
+  };
+}
+/** Compara el penúltimo y último valor numérico de un tipo; devuelve null
+ *  (sin alerta) si el cambio no supera el umbral de ese módulo. */
+function _detectarCambioReciente(tipo, snapshotsTipo) {
+  const conValor = snapshotsTipo.filter(s => s.valorNumerico);
+  if (conValor.length < 2) return null;
+  const anterior = conValor[conValor.length - 2].valorNumerico.valor;
+  const actual = conValor[conValor.length - 1].valorNumerico.valor;
+  if (anterior === 0) return null;
+  const variacionPct = ((actual - anterior) / Math.abs(anterior)) * 100;
+  const umbral = _UMBRALES_CAMBIO_POR_TIPO[tipo] ?? _UMBRALES_CAMBIO_POR_TIPO.default;
+  if (Math.abs(variacionPct) < umbral) return null;
+  const empeora = _TIPOS_INVERTIDOS.has(tipo) ? variacionPct < 0 : variacionPct > 0;
+  return { anterior, actual, variacionPct, empeora };
+}
+
+// ── HistoryUI — estado del panel ─────────────────────────────────
+let _historialPanelAbierto = false;
+let _historialLoteSeleccionadoClave = null;
+let _historialFiltroTipo = 'todos';
+let _historialFiltroPeriodoDias = null; // null = sin filtro de período
+
+const _ICONO_POR_TIPO = {
+  incendio: '🔥', inundacion: '🌊', sequia: '🌿', vegetacion: '🌱',
+  vegetacion_temporal: '🌱', riesgo_hidrologico: '💧', riesgo_hidrologico_suelo: '💧',
+  aptitud_productiva: '🌾', gee: '🛰️', suelo: '🟤', clima: '⛅', analisis_integral: '📊',
+};
+const _NOMBRE_POR_TIPO = {
+  incendio: 'Incendio', inundacion: 'Inundación', sequia: 'Sequía', vegetacion: 'Vegetación',
+  vegetacion_temporal: 'Vegetación (temporal)', riesgo_hidrologico: 'Hidrología',
+  riesgo_hidrologico_suelo: 'Riesgo hidrológico del suelo', aptitud_productiva: 'Aptitud productiva',
+  gee: 'Satélite (GEE)', suelo: 'Suelo', clima: 'Clima', analisis_integral: 'Análisis integral',
+};
+
+/** Lista de lotes disponibles para el selector — reutiliza proyectoActual /
+ *  campoGuardado, NUNCA crea un selector de lote paralelo (punto 40). */
+function _historialLotesDisponibles() {
+  if (typeof proyectoActual !== 'undefined' && proyectoActual && proyectoActual.files.length > 0) {
+    return proyectoActual.files.map(l => ({
+      nombre: l.nombre,
+      geometryHash: (l.puntos && l.puntos.length >= 3) ? _hashGeometriaLote(l.puntos) : null,
+    }));
+  }
+  if (typeof campoGuardado !== 'undefined' && campoGuardado && Array.isArray(campoGuardado.puntos) && campoGuardado.puntos.length >= 3) {
+    return [{ nombre: campoGuardado.nombre || 'Mi campo', geometryHash: _hashGeometriaLote(campoGuardado.puntos) }];
+  }
+  return [];
+}
+function _historialClaveLote(lote) { return lote.geometryHash || `nombre_${lote.nombre}`; }
+
+function abrirHistorialPanel() {
+  _historialPanelAbierto = true;
+  const disponibles = _historialLotesDisponibles();
+  if (!_historialLoteSeleccionadoClave || !disponibles.some(l => _historialClaveLote(l) === _historialLoteSeleccionadoClave)) {
+    _historialLoteSeleccionadoClave = disponibles.length ? _historialClaveLote(disponibles[0]) : null;
+  }
+  const backdrop = $el('historial-backdrop'), panel = $el('historial-panel');
+  if (backdrop) backdrop.style.display = 'block';
+  // FIX: el panel trae `transform:translateX(100%)` puesto INLINE en el
+  // HTML — un estilo inline siempre le gana en especificidad a una regla
+  // de clase (`#historial-panel.abierto`) puesta en un <style> aparte, así
+  // que agregar solo la clase nunca movía el panel (se veía el fondo
+  // oscurecido del backdrop, pero el panel quedaba invisible fuera de
+  // pantalla). Se fija el transform directo por JS para no depender de
+  // esa pelea de especificidad.
+  if (panel) { panel.classList.add('abierto'); panel.style.transform = 'translateX(0)'; }
+  _renderHistorialUI();
+}
+function cerrarHistorialPanel() {
+  _historialPanelAbierto = false;
+  const backdrop = $el('historial-backdrop'), panel = $el('historial-panel');
+  if (backdrop) backdrop.style.display = 'none';
+  if (panel) { panel.classList.remove('abierto'); panel.style.transform = 'translateX(100%)'; }
+}
+function historialSeleccionarLote(clave) {
+  _historialLoteSeleccionadoClave = clave;
+  _renderHistorialUI();
+}
+function historialSetFiltroTipo(tipo) { _historialFiltroTipo = tipo; _renderHistorialUI(); }
+function historialSetFiltroPeriodo(dias) { _historialFiltroPeriodoDias = dias ? parseInt(dias, 10) : null; _renderHistorialUI(); }
+
+/** "Estado actual" — disponible para TODOS (FREE y PRO): sale de la
+ *  AnalysisSession en memoria del lote seleccionado (si es el lote activo)
+ *  o, si no coincide con el activo, del último snapshot guardado (solo PRO). */
+function _historialEstadoActual(loteSeleccionado, entradaGuardada) {
+  const sesionActual = (typeof _sesionActiva === 'function') ? (() => { try { return _sesionActiva(); } catch { return null; } })() : null;
+  const esLoteActivo = sesionActual && loteSeleccionado && sesionActual.lote === loteSeleccionado.nombre;
+
+  if (esLoteActivo && sesionActual.analyses.length > 0) {
+    const porTipo = {};
+    sesionActual.analyses.forEach(a => { porTipo[a.tipo] = a; });
+    return Object.values(porTipo).map(a => ({
+      tipo: a.tipo, clasificacion: a.clasificacion, fecha: `${a.fecha} ${a.hora}`, enVivo: true,
+    }));
+  }
+  if (entradaGuardada) {
+    const ultimoPorTipo = {};
+    entradaGuardada.snapshots.forEach(s => { ultimoPorTipo[s.tipo] = s; });
+    return Object.values(ultimoPorTipo).map(s => ({
+      tipo: s.tipo, clasificacion: s.valores.clasificacion, fecha: `${s.fechaLegible} ${s.hora}`, enVivo: false,
+    }));
+  }
+  return [];
+}
+
+function _svgGraficoLinea(puntos, colorLinea) {
+  if (puntos.length < 2) return '';
+  const w = 260, h = 70, pad = 8;
+  const minY = Math.min(...puntos), maxY = Math.max(...puntos);
+  const rangoY = (maxY - minY) || 1;
+  const coords = puntos.map((v, i) => {
+    const x = pad + (i / (puntos.length - 1)) * (w - pad * 2);
+    const y = h - pad - ((v - minY) / rangoY) * (h - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const puntosSvg = coords.map(c => {
+    const [x, y] = c.split(',');
+    return `<circle cx="${x}" cy="${y}" r="2.5" fill="${colorLinea}"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:70px;display:block">
+    <polyline points="${coords.join(' ')}" fill="none" stroke="${colorLinea}" stroke-width="2"/>
+    ${puntosSvg}
+  </svg>`;
+}
+
+function _renderHistorialUI() {
+  const cont = $el('historial-contenido');
+  if (!cont) return;
+  const disponibles = _historialLotesDisponibles();
+
+  if (disponibles.length === 0) {
+    cont.innerHTML = `<p style="font-size:13px;color:#727971;text-align:center;padding:30px 10px">
+      No hay ningún lote cargado todavía. Delimitá "Mi campo" o cargá un Proyecto para ver su seguimiento.</p>`;
+    return;
+  }
+
+  const loteSel = disponibles.find(l => _historialClaveLote(l) === _historialLoteSeleccionadoClave) || disponibles[0];
+  _historialLoteSeleccionadoClave = _historialClaveLote(loteSel);
+  const entrada = _historialObtenerEntradaLote(_historialLoteSeleccionadoClave);
+  const estadoActual = _historialEstadoActual(loteSel, entrada);
+  const esPro = esUsuarioPro();
+
+  const selectorLotes = disponibles.length > 1 ? `
+    <select onchange="historialSeleccionarLote(this.value)" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid #E2E8F0;font-size:13px;margin-bottom:10px;font-weight:600;color:#1a1c1a">
+      ${disponibles.map(l => `<option value="${_historialClaveLote(l)}" ${_historialClaveLote(l) === _historialLoteSeleccionadoClave ? 'selected' : ''}>${l.nombre}</option>`).join('')}
+    </select>` : `<p style="font-weight:800;color:#1E5E3A;font-size:15px;margin:0 0 10px">${loteSel.nombre}</p>`;
+
+  const tarjetaEstado = estadoActual.length === 0 ? `
+    <div style="background:#F7FAF7;border-radius:10px;padding:14px;text-align:center;color:#727971;font-size:12.5px">
+      Sin datos históricos disponibles todavía. Corré un análisis sobre este lote para empezar el seguimiento.
+    </div>` : `
+    <div style="background:#F7FAF7;border-radius:10px;padding:12px;">
+      <p style="font-size:10px;font-weight:800;color:#727971;text-transform:uppercase;letter-spacing:.05em;margin:0 0 8px">Estado actual</p>
+      ${estadoActual.map(e => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px">
+          <span>${_ICONO_POR_TIPO[e.tipo] || '📌'} ${_NOMBRE_POR_TIPO[e.tipo] || e.tipo}</span>
+          <span style="font-weight:700;color:#1E5E3A">${e.clasificacion || '—'}</span>
+        </div>`).join('')}
+      <p style="font-size:10px;color:#a1a8a0;margin:8px 0 0">Última actualización: ${estadoActual[0]?.fecha || '—'}</p>
+    </div>`;
+
+  if (!esPro) {
+    cont.innerHTML = `
+      ${selectorLotes}
+      ${tarjetaEstado}
+      <div style="margin-top:14px;background:linear-gradient(135deg,#1E5E3A,#2F855A);border-radius:12px;padding:16px;text-align:center;color:#fff">
+        <p style="font-weight:800;font-size:14px;margin:0 0 4px">🔒 Historial & Seguimiento PRO</p>
+        <p style="font-size:12px;opacity:.9;margin:0 0 12px">Desbloqueá línea de tiempo, tendencias, comparaciones, gráficos, IA histórica y exportación.</p>
+        <button onclick="activarProDemo()" style="background:#fff;color:#1E5E3A;border:none;border-radius:9px;padding:9px 16px;font-weight:800;font-size:12.5px;cursor:pointer">🔓 Desbloquear seguimiento PRO</button>
+      </div>`;
+    return;
+  }
+
+  // ── A partir de acá: solo PRO ──
+  const snapshots = entrada ? entrada.snapshots.slice() : [];
+  const ahora = Date.now();
+  const snapshotsFiltrados = snapshots.filter(s => {
+    if (_historialFiltroTipo !== 'todos' && s.tipo !== _historialFiltroTipo) return false;
+    if (_historialFiltroPeriodoDias) {
+      const diasTranscurridos = (ahora - new Date(s.fecha).getTime()) / 86400000;
+      if (diasTranscurridos > _historialFiltroPeriodoDias) return false;
+    }
+    return true;
+  }).sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+
+  const tiposPresentes = [...new Set(snapshots.map(s => s.tipo))];
+  const filtrosBtns = ['todos', ...tiposPresentes].map(t => `
+    <button onclick="historialSetFiltroTipo('${t}')" style="padding:5px 10px;border-radius:20px;border:1.5px solid ${_historialFiltroTipo === t ? '#1E5E3A' : '#E2E8F0'};background:${_historialFiltroTipo === t ? '#1E5E3A' : '#fff'};color:${_historialFiltroTipo === t ? '#fff' : '#41453f'};font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">
+      ${t === 'todos' ? 'Todos' : `${_ICONO_POR_TIPO[t] || ''} ${_NOMBRE_POR_TIPO[t] || t}`}
+    </button>`).join('');
+
+  const periodosBtns = [
+    [null, 'Todos'], [7, '7 días'], [30, '1 mes'], [90, '3 meses'], [180, '6 meses'], [365, '1 año'],
+  ].map(([dias, label]) => `
+    <button onclick="historialSetFiltroPeriodo(${dias})" style="padding:4px 9px;border-radius:20px;border:1.5px solid ${_historialFiltroPeriodoDias === dias ? '#1E5E3A' : '#E2E8F0'};background:${_historialFiltroPeriodoDias === dias ? '#1E5E3A' : '#fff'};color:${_historialFiltroPeriodoDias === dias ? '#fff' : '#41453f'};font-size:10.5px;font-weight:700;cursor:pointer">${label}</button>`).join('');
+
+  // Tendencias + cambios recientes, por tipo con ≥2 observaciones numéricas.
+  const bloquesTendencia = tiposPresentes.map(tipo => {
+    const deTipo = snapshots.filter(s => s.tipo === tipo).sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    const tendencia = _calcularTendencia(deTipo);
+    if (!tendencia) return '';
+    const invertido = _TIPOS_INVERTIDOS.has(tipo);
+    const empeorando = invertido ? tendencia.direccion === 'decreciente' : tendencia.direccion === 'creciente';
+    const color = tendencia.direccion === 'estable' ? '#2F855A' : (empeorando ? '#dc2626' : '#2F855A');
+    const flecha = tendencia.direccion === 'estable' ? '→' : (tendencia.direccion === 'creciente' ? '↗' : '↘');
+    const puntosSerie = deTipo.filter(s => s.valorNumerico).map(s => s.valorNumerico.valor);
+    return `
+      <div style="border:1px solid #F0F0EB;border-radius:10px;padding:10px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:12.5px;font-weight:700">${_ICONO_POR_TIPO[tipo] || ''} ${_NOMBRE_POR_TIPO[tipo] || tipo}</span>
+          <span style="font-size:12px;font-weight:800;color:${color}">${flecha} ${tendencia.variacionPorcentual !== null ? tendencia.variacionPorcentual.toFixed(1) + '%' : tendencia.direccion}</span>
+        </div>
+        ${_svgGraficoLinea(puntosSerie, color)}
+        <p style="font-size:10px;color:#a1a8a0;margin:4px 0 0">${tendencia.observaciones} observaciones · ${tendencia.periodoDesde} → ${tendencia.periodoHasta} · calidad ${tendencia.calidad}</p>
+      </div>`;
+  }).filter(Boolean).join('') || `<p style="font-size:12px;color:#727971;text-align:center;padding:10px">Todavía no hay suficientes observaciones para calcular tendencias (se necesitan al menos 2 por indicador).</p>`;
+
+  // Cambios importantes recientes (punto 13).
+  const cambios = tiposPresentes.map(tipo => {
+    const deTipo = snapshots.filter(s => s.tipo === tipo).sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    const c = _detectarCambioReciente(tipo, deTipo);
+    if (!c) return null;
+    return { tipo, ...c };
+  }).filter(Boolean);
+
+  const bloqueCambios = cambios.length ? `
+    <div style="margin:10px 0">
+      <p style="font-size:10px;font-weight:800;color:#727971;text-transform:uppercase;letter-spacing:.05em;margin:0 0 6px">⚠️ ${cambios.length} cambio${cambios.length > 1 ? 's' : ''} importante${cambios.length > 1 ? 's' : ''}</p>
+      ${cambios.map(c => `
+        <div style="font-size:12px;padding:6px 8px;border-radius:8px;background:${c.empeora ? '#fee2e2' : '#EAF4ED'};color:${c.empeora ? '#991b1b' : '#166534'};margin-bottom:4px">
+          ${_ICONO_POR_TIPO[c.tipo] || ''} ${_NOMBRE_POR_TIPO[c.tipo] || c.tipo}: ${c.variacionPct > 0 ? '+' : ''}${c.variacionPct.toFixed(1)}% respecto a la evaluación anterior.
+        </div>`).join('')}
+    </div>` : '';
+
+  // Línea de tiempo.
+  const timeline = snapshotsFiltrados.slice().reverse().map(s => `
+    <div onclick="historialAbrirSnapshot('${s.id}')" style="display:flex;gap:8px;align-items:flex-start;padding:6px 2px;cursor:pointer;border-radius:6px" onmouseover="this.style.background='#F7FAF7'" onmouseout="this.style.background='transparent'">
+      <span style="font-size:14px">${_ICONO_POR_TIPO[s.tipo] || '📌'}</span>
+      <div style="flex:1">
+        <p style="font-size:12px;font-weight:700;margin:0">${_NOMBRE_POR_TIPO[s.tipo] || s.tipo} — ${s.valores.clasificacion || '—'}</p>
+        <p style="font-size:10.5px;color:#a1a8a0;margin:0">${s.fechaLegible} ${s.hora}</p>
+      </div>
+    </div>`).join('') || `<p style="font-size:12px;color:#727971;text-align:center;padding:14px">Sin snapshots en este filtro.</p>`;
+
+  cont.innerHTML = `
+    ${selectorLotes}
+    ${tarjetaEstado}
+    ${bloqueCambios}
+    <p style="font-size:10px;font-weight:800;color:#727971;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 6px">Tendencia</p>
+    ${bloquesTendencia}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 6px">${filtrosBtns}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${periodosBtns}</div>
+    <p style="font-size:10px;font-weight:800;color:#727971;text-transform:uppercase;letter-spacing:.05em;margin:6px 0">Línea de tiempo</p>
+    <div style="max-height:220px;overflow-y:auto;border:1px solid #F0F0EB;border-radius:10px;padding:4px 8px">${timeline}</div>
+    <div style="display:flex;gap:6px;margin-top:12px">
+      <button onclick="abrirComparadorHistorial()" style="flex:1;padding:9px;border-radius:9px;border:1.5px solid #E2E8F0;background:#fff;color:#1E5E3A;font-weight:700;font-size:12px;cursor:pointer">📊 Comparar fechas</button>
+      <button onclick="solicitarInterpretacionHistorial()" style="flex:1;padding:9px;border-radius:9px;border:none;background:#1E5E3A;color:#fff;font-weight:700;font-size:12px;cursor:pointer">🧠 Análisis IA</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <button onclick="exportarHistorialPDF()" style="flex:1;padding:8px;border-radius:9px;border:1.5px solid #E2E8F0;background:#fff;color:#41453f;font-weight:700;font-size:11.5px;cursor:pointer">⬇ Exportar PDF</button>
+      <button onclick="exportarHistorialCSV()" style="flex:1;padding:8px;border-radius:9px;border:1.5px solid #E2E8F0;background:#fff;color:#41453f;font-weight:700;font-size:11.5px;cursor:pointer">⬇ Exportar CSV</button>
+    </div>
+    <div id="historial-ia-resultado" style="margin-top:10px"></div>
+    <div id="historial-comparador" style="margin-top:10px;display:none"></div>
+    <div id="historial-snapshot-detalle" style="margin-top:10px;display:none"></div>
+  `;
+}
+
+function historialAbrirSnapshot(id) {
+  const entrada = _historialObtenerEntradaLote(_historialLoteSeleccionadoClave);
+  const s = entrada?.snapshots.find(x => x.id === id);
+  const cont = $el('historial-snapshot-detalle');
+  if (!s || !cont) return;
+  cont.style.display = 'block';
+  cont.innerHTML = `
+    <div style="border:1.5px solid #1E5E3A;border-radius:10px;padding:10px">
+      <p style="font-weight:800;font-size:13px;margin:0 0 6px">${_ICONO_POR_TIPO[s.tipo] || ''} ${_NOMBRE_POR_TIPO[s.tipo] || s.tipo} — ${s.fechaLegible} ${s.hora}</p>
+      <p style="font-size:12px;margin:0 0 4px"><b>Clasificación:</b> ${s.valores.clasificacion || '—'}</p>
+      ${Object.keys(s.valores.estadisticas || {}).map(k => `<p style="font-size:11.5px;margin:0;color:#41453f"><b>${k}:</b> ${s.valores.estadisticas[k]}</p>`).join('')}
+      ${s.conclusion ? `<p style="font-size:11.5px;margin:6px 0 0;color:#41453f">${s.conclusion}</p>` : ''}
+      ${s.capturaMapa ? `<button onclick="window.open('${s.capturaMapa}','_blank')" style="margin-top:8px;padding:6px 10px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:11px;cursor:pointer">🗺️ Ver mapa</button>` : ''}
+    </div>`;
+}
+
+// ── Comparador de fechas (punto 9) ────────────────────────────────
+function abrirComparadorHistorial() {
+  const entrada = _historialObtenerEntradaLote(_historialLoteSeleccionadoClave);
+  const cont = $el('historial-comparador');
+  if (!entrada || !cont) return;
+  cont.style.display = 'block';
+  const opciones = entrada.snapshots.map(s => `<option value="${s.id}">${s.fechaLegible} ${s.hora} — ${_NOMBRE_POR_TIPO[s.tipo] || s.tipo}</option>`).join('');
+  cont.innerHTML = `
+    <p style="font-size:10px;font-weight:800;color:#727971;text-transform:uppercase;margin:0 0 6px">Comparar dos fechas</p>
+    <div style="display:flex;gap:6px">
+      <select id="historial-cmp-a" style="flex:1;padding:6px;border-radius:8px;border:1px solid #E2E8F0;font-size:11px">${opciones}</select>
+      <select id="historial-cmp-b" style="flex:1;padding:6px;border-radius:8px;border:1px solid #E2E8F0;font-size:11px">${opciones}</select>
+    </div>
+    <button onclick="ejecutarComparacionHistorial()" style="width:100%;margin-top:6px;padding:7px;border-radius:8px;border:none;background:#1E5E3A;color:#fff;font-size:11.5px;font-weight:700;cursor:pointer">Comparar</button>
+    <div id="historial-cmp-resultado" style="margin-top:8px"></div>`;
+}
+function ejecutarComparacionHistorial() {
+  const entrada = _historialObtenerEntradaLote(_historialLoteSeleccionadoClave);
+  const idA = $el('historial-cmp-a')?.value, idB = $el('historial-cmp-b')?.value;
+  const a = entrada?.snapshots.find(s => s.id === idA), b = entrada?.snapshots.find(s => s.id === idB);
+  const res = $el('historial-cmp-resultado');
+  if (!a || !b || !res) return;
+  // Cada indicador define su propio método de comparación (punto 9): acá
+  // se compara SOLO si ambos snapshots tienen valorNumerico real, y en el
+  // mismo tipo -- nunca se comparan escalas distintas entre sí.
+  let html;
+  if (a.tipo !== b.tipo) {
+    html = `<p style="font-size:11.5px;color:#ca8a04;text-align:center">Elegí dos snapshots del mismo indicador para comparar (tipos distintos no son comparables entre sí).</p>`;
+  } else if (!a.valorNumerico || !b.valorNumerico) {
+    html = `<p style="font-size:11.5px;color:#727971;text-align:center">Alguno de los dos snapshots no tiene un valor numérico real para comparar.</p>`;
+  } else {
+    const [antes, despues] = new Date(a.fecha) <= new Date(b.fecha) ? [a, b] : [b, a];
+    const delta = despues.valorNumerico.valor - antes.valorNumerico.valor;
+    const deltaPct = antes.valorNumerico.valor !== 0 ? (delta / Math.abs(antes.valorNumerico.valor)) * 100 : null;
+    html = `
+      <div style="background:#F7FAF7;border-radius:9px;padding:10px;text-align:center">
+        <p style="font-weight:800;font-size:12.5px;margin:0 0 4px">${_ICONO_POR_TIPO[a.tipo] || ''} ${_NOMBRE_POR_TIPO[a.tipo] || a.tipo}</p>
+        <p style="font-size:13px;margin:0">${antes.valorNumerico.valor} → ${despues.valorNumerico.valor}</p>
+        <p style="font-size:12px;font-weight:800;color:${delta > 0 ? '#dc2626' : '#2F855A'};margin:2px 0 0">${delta > 0 ? '↑' : delta < 0 ? '↓' : '→'} ${deltaPct !== null ? deltaPct.toFixed(1) + '%' : ''}</p>
+      </div>`;
+  }
+  res.innerHTML = html;
+}
+
+// ── HistoryAI — /interpretar_historial ───────────────────────────
+async function solicitarInterpretacionHistorial() {
+  const cont = $el('historial-ia-resultado');
+  if (!cont) return;
+  const entrada = _historialObtenerEntradaLote(_historialLoteSeleccionadoClave);
+  if (!entrada || entrada.snapshots.length < 2) {
+    cont.innerHTML = `<p style="font-size:11.5px;color:#727971;text-align:center;padding:8px">Hace falta al menos 2 snapshots para pedir una interpretación histórica.</p>`;
+    return;
+  }
+  cont.innerHTML = `<p style="font-size:11.5px;color:#727971;text-align:center;padding:8px">⏳ Consultando IA...</p>`;
+
+  // Payload: SOLO datos agregados ya calculados por la app (nunca imágenes
+  // sin contexto, nunca cifras inventadas acá) -- mismo espíritu que
+  // /interpretar_riesgo, punto 18/19 del pedido.
+  const tiposPresentes = [...new Set(entrada.snapshots.map(s => s.tipo))];
+  const indicadores = {};
+  tiposPresentes.forEach(tipo => {
+    const deTipo = entrada.snapshots.filter(s => s.tipo === tipo && s.valorNumerico).sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    if (deTipo.length >= 2) {
+      const actual = deTipo[deTipo.length - 1].valorNumerico.valor, anterior = deTipo[0].valorNumerico.valor;
+      indicadores[tipo] = {
+        actual, anterior,
+        variacion_pct: anterior !== 0 ? Math.round(((actual - anterior) / Math.abs(anterior)) * 1000) / 10 : null,
+      };
+    }
+  });
+
+  const body = {
+    lote: { nombre: entrada.nombre },
+    periodo: { inicio: entrada.snapshots[0].fecha, fin: entrada.snapshots[entrada.snapshots.length - 1].fecha },
+    indicadores,
+  };
+
+  try {
+    const r = await fetch(`${GEE_SERVER}/interpretar_historial`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.motivo || j.error || 'Sin respuesta de la IA');
+    cont.innerHTML = `<div style="background:#EAF4ED;border-radius:9px;padding:12px">
+      <p style="font-size:10px;font-weight:800;color:#1E5E3A;text-transform:uppercase;margin:0 0 6px">🧠 Interpretación</p>
+      <p style="font-size:12px;color:#1a1c1a;white-space:pre-line;margin:0">${j.interpretacion}</p>
+    </div>`;
+  } catch (e) {
+    cont.innerHTML = `<p style="font-size:11.5px;color:#dc2626;text-align:center;padding:8px">No se pudo obtener la interpretación: ${e.message}</p>`;
+  }
+}
+
+// ── HistoryPDF / HistoryCSV ───────────────────────────────────────
+// Genera un informe SEPARADO del PDF de sesión existente (no lo toca ni
+// lo reemplaza) — reusa la misma librería ya cargada (jsPDF), punto 30.
+function exportarHistorialPDF() {
+  if (typeof window.jspdf === 'undefined') { alert('No se pudo cargar el generador de PDF.'); return; }
+  const entrada = _historialObtenerEntradaLote(_historialLoteSeleccionadoClave);
+  if (!entrada || entrada.snapshots.length === 0) { alert('Este lote todavía no tiene historial para exportar.'); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const margin = 15; let y = 20;
+  doc.setFontSize(16); doc.setFont(undefined, 'bold');
+  doc.text('Informe de evolución del lote', margin, y); y += 8;
+  doc.setFontSize(11); doc.setFont(undefined, 'normal');
+  doc.text(`Lote: ${entrada.nombre}`, margin, y); y += 6;
+  doc.text(`Período: ${entrada.snapshots[0].fechaLegible} - ${entrada.snapshots[entrada.snapshots.length - 1].fechaLegible}`, margin, y); y += 6;
+  doc.text(`Generado: ${new Date().toLocaleString('es-AR')}`, margin, y); y += 10;
+
+  const filas = entrada.snapshots.map(s => [
+    s.fechaLegible, s.hora, _NOMBRE_POR_TIPO[s.tipo] || s.tipo, s.valores.clasificacion || '—',
+    s.valorNumerico ? String(s.valorNumerico.valor) : '—', s.fuente,
+  ]);
+  doc.autoTable({
+    startY: y, margin: { left: margin, right: margin },
+    head: [['Fecha', 'Hora', 'Indicador', 'Clasificación', 'Valor', 'Fuente']],
+    body: filas, styles: { fontSize: 8 }, headStyles: { fillColor: [30, 94, 58] },
+  });
+
+  doc.save(`GeoSentinel_evolucion_${entrada.nombre.replace(/\s+/g, '_')}.pdf`);
+}
+function exportarHistorialCSV() {
+  const entrada = _historialObtenerEntradaLote(_historialLoteSeleccionadoClave);
+  if (!entrada || entrada.snapshots.length === 0) { alert('Este lote todavía no tiene historial para exportar.'); return; }
+  const encabezado = ['fecha', 'hora', 'tipo', 'clasificacion', 'valor_numerico', 'etiqueta_valor', 'fuente', 'conclusion'];
+  const filas = entrada.snapshots.map(s => [
+    s.fechaLegible, s.hora, s.tipo, s.valores.clasificacion || '', s.valorNumerico?.valor ?? '',
+    s.valorNumerico?.etiqueta ?? '', s.fuente, (s.conclusion || '').replace(/\n/g, ' '),
+  ]);
+  const csv = [encabezado, ...filas].map(fila => fila.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `GeoSentinel_evolucion_${entrada.nombre.replace(/\s+/g, '_')}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ── Clase principal: administra el proyecto completo ──
@@ -15888,6 +17208,7 @@ function renderizarVegetacion(riesgo, datos) {
   setText('veg-ndvi', ndviStr);
   setText('veg-evi',  eviEst);
   setText('chip-veg-ndvi', `NDVI ${ndviStr} (estimado)`);
+  vipActualizarPreview();
 
   // ── Badge Sentinel-2 vegetación ──
   const vsBadge = $el('veg-sentinel-badge');
@@ -15935,6 +17256,7 @@ async function obtenerVegetacionReal(lat, lon) {
     setText('veg-msavi', j.msavi_promedio ?? '--');
     setText('veg-ndre',  j.ndre_promedio  ?? '--');
     setText('veg-gndvi', j.gndvi_promedio ?? '--');
+    vipActualizarPreview();
 
     setText('chip-veg-ndvi', `NDVI ${j.ndvi_promedio}`);
     setText('chip-veg-ndmi', j.ndmi_promedio !== null && j.ndmi_promedio !== undefined ? `NDMI ${j.ndmi_promedio}` : 'NDMI --');
@@ -16562,7 +17884,13 @@ async function generarInformeSesionPDF() {
           lluvia_30d_mm: a.resultado?.lluvia30, humedad_suelo: a.resultado?.humSuelo,
         };
       }
-      return null; // otras herramientas (vegetación, IIPDI, etc.) no tienen interpretación IA todavía
+      if (a.tipo === 'vegetacion_temporal') {
+        // Mismo payload que ya se le manda a /interpretar_riesgo (modulo:'vegetacion')
+        // desde interpretarVegetacionPremiumIA() — se reutiliza tal cual, sin
+        // recalcular nada, para que el PDF muestre la misma interpretación.
+        return a.resultado?.payloadIA || null;
+      }
+      return null; // otras herramientas (IIPDI, etc.) no tienen interpretación IA todavía
     }
 
     // — Un capítulo por sesión (lote o global) —
@@ -16629,7 +17957,8 @@ async function generarInformeSesionPDF() {
         const payloadIA = _payloadIAparaAnalisis(a);
         if (payloadIA) {
           if (btn) btn.textContent = `Consultando IA (${a.nombre})...`;
-          const interpretacion = await interpretarModuloIA(a.tipo, payloadIA);
+          const moduloIA = a.tipo === 'vegetacion_temporal' ? 'vegetacion' : a.tipo;
+          const interpretacion = await interpretarModuloIA(moduloIA, payloadIA);
           if (interpretacion) {
             doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...verdeOscuro);
             salto(6); doc.text('Interpretación técnica (IA)', margin, y); y += 5;
@@ -17127,52 +18456,6 @@ async function hFetchGloFAS(lat, lon) {
     };
   } catch (e) {
     console.warn('GloFAS (Open-Meteo Flood API):', e);
-    return null;
-  }
-}
-
-// ── Pronóstico GloFAS a varios días (busca el PICO proyectado, no solo
-// el valor de hoy) — mismo servicio (Open-Meteo Flood API / GloFAS v4),
-// pero con forecast_days>1. Se usa como escenario propio y separado del
-// "Nivel actual (GloFAS · estimado)", que solo mira el día de hoy.
-async function hFetchGloFASPronostico(lat, lon, dias = 7) {
-  const url = `https://flood-api.open-meteo.com/v1/flood?` +
-    `latitude=${lat}&longitude=${lon}` +
-    `&daily=river_discharge&past_days=365&forecast_days=${dias}` +
-    `&timeformat=iso8601`;
-  try {
-    const r = await fetch(url);
-    const d = await r.json();
-    const serie  = d.daily?.river_discharge || [];
-    const fechas = d.daily?.time || [];
-    const validos = serie.map((v, i) => ({ v, f: fechas[i] })).filter(x => x.v != null);
-    if (!validos.length) return null;
-
-    // Historial (para el percentil) = todo menos los últimos `dias` (que son el pronóstico)
-    const historicos = validos.slice(0, Math.max(validos.length - dias, 1)).map(x => x.v).sort((a, b) => a - b);
-    const pronostico  = validos.slice(-dias);
-    if (!pronostico.length || !historicos.length) return null;
-
-    // Pico = mayor caudal proyectado dentro de la ventana de pronóstico
-    const pico = pronostico.reduce((max, x) => x.v > max.v ? x : max, pronostico[0]);
-    const idx  = historicos.findIndex(v => v >= pico.v);
-    const percentil = idx < 0 ? 1 : idx / Math.max(historicos.length - 1, 1);
-
-    let categoria;
-    if      (percentil < 0.30) categoria = 'BAJO';
-    else if (percentil < 0.60) categoria = 'NORMAL';
-    else if (percentil < 0.85) categoria = 'ALTO';
-    else                        categoria = 'CRÍTICO';
-
-    return {
-      caudalPico: pico.v,
-      fechaPico: pico.f,
-      percentil, categoria,
-      alturaEstimadaM: _percentilASubidaEstimadaM(percentil),
-      dias,
-    };
-  } catch (e) {
-    console.warn('Pronóstico GloFAS (Open-Meteo Flood API):', e);
     return null;
   }
 }
@@ -19144,5 +20427,41 @@ function toggleMedidorHidro() { _medidorHidro.toggle('btnh-medidor'); }
 })();
 // ════════════════════════════════════════════════════════════════
 </script>
+
+<!-- ══ Historial & Seguimiento PRO — panel lateral ══ -->
+<div id="historial-backdrop" onclick="cerrarHistorialPanel()"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:4000;"></div>
+<div id="historial-panel"
+  style="position:fixed;top:0;right:0;bottom:0;width:92%;max-width:400px;background:#fff;z-index:4100;
+         transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+         display:flex;flex-direction:column;overflow:hidden;">
+  <div style="background:#1E5E3A;padding:16px 18px;flex-shrink:0;display:flex;justify-content:space-between;align-items:center;">
+    <div>
+      <p style="color:#fff;font-weight:800;font-size:15px;margin:0">📈 Historial y Seguimiento</p>
+      <p style="color:#aad0ad;font-size:11px;margin:2px 0 0">Monitoreá cómo cambia tu lote a través del tiempo</p>
+    </div>
+    <button onclick="cerrarHistorialPanel()" style="width:30px;height:30px;background:rgba(255,255,255,0.12);border:none;border-radius:8px;cursor:pointer;flex-shrink:0">
+      <span class="material-symbols-outlined" style="color:#fff;font-size:18px">close</span>
+    </button>
+  </div>
+  <div id="historial-contenido" style="flex:1;overflow-y:auto;padding:16px;"></div>
+</div>
+<style>
+  #historial-panel.abierto { transform: translateX(0); }
+</style>
+
+<!-- Modal de conflicto de identidad de lote (punto 4 del pedido) -->
+<div id="historial-conflicto-modal"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:4200;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:14px;padding:20px;max-width:340px;width:100%;">
+    <p style="font-weight:800;font-size:14px;margin:0 0 8px;color:#1a1c1a">⚠️ Lote diferente detectado</p>
+    <p id="historial-conflicto-texto" style="font-size:12.5px;color:#41453f;margin:0 0 16px;line-height:1.4"></p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button id="historial-conflicto-btn-nuevo" style="padding:10px;border-radius:9px;border:1.5px solid #1E5E3A;background:#fff;color:#1E5E3A;font-weight:700;font-size:12.5px;cursor:pointer">Crear nuevo historial</button>
+      <button id="historial-conflicto-btn-vincular" style="padding:10px;border-radius:9px;border:none;background:#1E5E3A;color:#fff;font-weight:700;font-size:12.5px;cursor:pointer">Vincular con lote existente</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
