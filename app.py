@@ -1738,11 +1738,29 @@ def _interpretar_con_groq(prompt_sistema, datos):
             {'role': 'user', 'content': json.dumps(datos, ensure_ascii=False)},
         ],
         model='openai/gpt-oss-120b',
-        max_tokens=450,  # margen amplio: ~100 palabras pedidas + colchón para que
-                         # el modelo pueda cerrar la idea sin cortarse a mitad de frase
+        max_tokens=900,   # gpt-oss es un modelo "razonador": con payloads grandes
+                          # (ej. vegetación, con tendencia+comparación+espacial+
+                          # anomalías+homogeneidad) puede gastar buena parte del
+                          # presupuesto de tokens en razonamiento interno antes de
+                          # escribir la respuesta final. 450 se quedaba corto y
+                          # devolvía texto vacío; con más margen alcanza para
+                          # razonar Y escribir el párrafo.
         temperature=0.2,
+        reasoning_effort='low',  # gpt-oss soporta este parámetro en Groq: reduce
+                                 # el razonamiento interno al mínimo necesario,
+                                 # dejando más tokens disponibles para la respuesta.
     )
     texto = respuesta.choices[0].message.content.strip()
+
+    # Si a pesar de todo el modelo devuelve contenido vacío (por ejemplo, si
+    # gastó todo el presupuesto de tokens en razonamiento), no se responde
+    # ok:true con un párrafo vacío: se trata como error explícito para que
+    # el frontend lo muestre como "no se pudo obtener" en vez de un éxito
+    # silencioso sin texto.
+    if not texto:
+        raise RuntimeError(
+            f'El modelo no devolvió contenido (finish_reason={respuesta.choices[0].finish_reason}).'
+        )
 
     # Salvavidas: si Groq igual se quedó sin tokens (finish_reason='length'),
     # el texto llega cortado a mitad de frase. En ese caso se recorta hasta
