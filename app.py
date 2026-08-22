@@ -1738,29 +1738,11 @@ def _interpretar_con_groq(prompt_sistema, datos):
             {'role': 'user', 'content': json.dumps(datos, ensure_ascii=False)},
         ],
         model='openai/gpt-oss-120b',
-        max_tokens=900,   # gpt-oss es un modelo "razonador": con payloads grandes
-                          # (ej. vegetación, con tendencia+comparación+espacial+
-                          # anomalías+homogeneidad) puede gastar buena parte del
-                          # presupuesto de tokens en razonamiento interno antes de
-                          # escribir la respuesta final. 450 se quedaba corto y
-                          # devolvía texto vacío; con más margen alcanza para
-                          # razonar Y escribir el párrafo.
+        max_tokens=450,  # margen amplio: ~100 palabras pedidas + colchón para que
+                         # el modelo pueda cerrar la idea sin cortarse a mitad de frase
         temperature=0.2,
-        reasoning_effort='low',  # gpt-oss soporta este parámetro en Groq: reduce
-                                 # el razonamiento interno al mínimo necesario,
-                                 # dejando más tokens disponibles para la respuesta.
     )
     texto = respuesta.choices[0].message.content.strip()
-
-    # Si a pesar de todo el modelo devuelve contenido vacío (por ejemplo, si
-    # gastó todo el presupuesto de tokens en razonamiento), no se responde
-    # ok:true con un párrafo vacío: se trata como error explícito para que
-    # el frontend lo muestre como "no se pudo obtener" en vez de un éxito
-    # silencioso sin texto.
-    if not texto:
-        raise RuntimeError(
-            f'El modelo no devolvió contenido (finish_reason={respuesta.choices[0].finish_reason}).'
-        )
 
     # Salvavidas: si Groq igual se quedó sin tokens (finish_reason='length'),
     # el texto llega cortado a mitad de frase. En ese caso se recorta hasta
@@ -1822,6 +1804,76 @@ def interpretar_riesgo():
 
     try:
         texto = _interpretar_con_groq(prompt_sistema, datos)
+        return jsonify({'ok': True, 'interpretacion': texto})
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({'ok': False, 'error': str(exc)}), 500
+
+
+# ── Historial & Seguimiento PRO — interpretación de datos ya agregados ──
+# Mismo principio que _PROMPT_BASE_INTERPRETACION: la IA nunca inventa
+# datos, separa DATO/INTERPRETACIÓN/HIPÓTESIS/RECOMENDACIÓN (puntos 18/19
+# del pedido) y no afirma causalidad cuando solo hay coincidencia temporal.
+_PROMPT_HISTORIAL_INTERPRETACION = (
+    "Sos un asistente técnico de GeoSentinel especializado en interpretar la "
+    "EVOLUCIÓN histórica de un lote a partir de indicadores ya calculados "
+    "por la app (nunca imágenes crudas, nunca datos sin contexto). Recibís "
+    "un JSON con: lote, período consultado, e indicadores (cada uno con "
+    "valor actual, valor anterior y variación porcentual, ya calculados por "
+    "la app -- NO los recalcules ni los corrijas).\n\n"
+    "Estructura tu respuesta en cuatro partes, cada una en su propio "
+    "párrafo corto, con estos encabezados EXACTOS en mayúsculas seguidos de "
+    "dos puntos (sin markdown, sin viñetas, sin emojis):\n"
+    "DATO: qué cambió y cuánto, citando los números recibidos tal cual.\n"
+    "INTERPRETACION: qué sugiere ese cambio en términos generales.\n"
+    "HIPOTESIS: qué factores podrían explicarlo (planteados como "
+    "posibilidades, nunca como certezas).\n"
+    "RECOMENDACION: qué convendría revisar o contrastar en el campo.\n\n"
+    "Reglas estrictas e innegociables:\n"
+    "- NUNCA inventes datos, fechas, cifras ni eventos que no estén en el "
+    "JSON recibido. Si un indicador no está presente, no hables de él.\n"
+    "- NUNCA afirmes causalidad a partir de una simple coincidencia "
+    "temporal entre dos indicadores. Si dos cambios coinciden en el "
+    "tiempo, decilo así: 'la variación de X coincide temporalmente con la "
+    "de Y; la relación causal no puede determinarse únicamente con estos "
+    "datos.' Jamás escribas frases como 'X causó Y'.\n"
+    "- NUNCA presentes una proyección o estimación futura como un hecho. "
+    "Si mencionás algo a futuro, etiquetalo explícitamente como "
+    "'Estimacion:' o 'Proyeccion:' dentro del texto.\n"
+    "- Ante un dato límite o incompleto, priorizá la cautela.\n"
+    "- No uses emojis, íconos, ni caracteres especiales: el texto puede "
+    "insertarse en un PDF que solo soporta texto plano (ASCII/Latin-1).\n"
+    "- Máximo 220 palabras en total entre las cuatro partes. Preferí un "
+    "texto más corto y completo antes que uno largo cortado a mitad de "
+    "frase."
+)
+
+
+@app.route('/interpretar_historial', methods=['POST'])
+def interpretar_historial():
+    """
+    Interpretación IA (Groq) del historial agregado de UN lote — Historial
+    & Seguimiento PRO (puntos 18/19 del pedido). Igual que /interpretar_riesgo,
+    NO es un chat: recibe datos ya agregados por el frontend (variación por
+    indicador, nunca imágenes ni series completas sin resumir) y devuelve un
+    texto estructurado en DATO / INTERPRETACION / HIPOTESIS / RECOMENDACION.
+
+    Body esperado:
+      { "lote": {"nombre": str}, "periodo": {"inicio": str, "fin": str},
+        "indicadores": { "<tipo>": {"actual": num, "anterior": num,
+        "variacion_pct": num|null}, ... } }
+
+    Devuelve: { ok: true, interpretacion: str } o { ok: false, error/motivo }
+    """
+    if _groq_client is None:
+        return jsonify({'ok': False, 'motivo': 'Interpretación por IA no disponible en este servidor.'}), 503
+
+    body = request.get_json(force=True, silent=True) or {}
+    indicadores = body.get('indicadores') or {}
+    if not indicadores:
+        return jsonify({'ok': False, 'motivo': 'No se recibieron indicadores históricos para interpretar.'}), 400
+
+    try:
+        texto = _interpretar_con_groq(_PROMPT_HISTORIAL_INTERPRETACION, body)
         return jsonify({'ok': True, 'interpretacion': texto})
     except Exception as exc:  # noqa: BLE001
         return jsonify({'ok': False, 'error': str(exc)}), 500
@@ -3601,6 +3653,11 @@ def inundacion_animacion():
                                             cauce normal (HAND), no cota absoluta.
         frames  cantidad de fotogramas (default 10, límite 4-15 por costo
                 de cómputo — cada fotograma es una consulta a Earth Engine)
+        lotes_usuario  JSON opcional (string), lista de {'nombre','lat','lon'}
+                con lugares/lotes que el usuario marcó y nombró en el mapa.
+                Se suman a las localidades conocidas en
+                'localidades_priorizadas' de la respuesta (ver
+                rank_localidades_por_inundacion en flood_simulation_engine.py).
     """
     if not _ee_ready:
         return jsonify({'error': f'Earth Engine no inicializado: {_ee_error}'}), 503
@@ -3704,12 +3761,30 @@ def inundacion_animacion():
         # aparte. Defensivo: si el módulo no está deployado o falla el
         # muestreo (ej. Earth Engine caído), la animación sigue
         # devolviéndose igual, solo sin este agregado.
+        #
+        # Lotes/lugares que el propio usuario marcó y nombró en el mapa
+        # (cada lote de un Proyecto cargado, o "Mi campo" en modo clásico)
+        # -- se suman al ranking junto con las localidades conocidas, para
+        # que el productor vea en una sola lista qué se inunda primero,
+        # sean pueblos o sus propios campos. Parseo defensivo: un JSON
+        # inválido o con forma inesperada no debe tirar abajo la
+        # animación, solo se ignora ese agregado.
+        lotes_usuario = None
+        lotes_usuario_raw = request.args.get('lotes_usuario')
+        if lotes_usuario_raw:
+            try:
+                parsed = json.loads(lotes_usuario_raw)
+                if isinstance(parsed, list):
+                    lotes_usuario = parsed[:200]  # tope defensivo, no hace falta más para un proyecto real
+            except (ValueError, TypeError):
+                lotes_usuario = None
+
         localidades_priorizadas = []
         if _MOTOR_DISPONIBLE:
             try:
                 localidades_priorizadas = _motor_inundacion.rank_localidades_por_inundacion(
                     costo_acumulado, region_lat=lat, region_lon=lon, radius_km=radius_km,
-                    max_costo=max_costo_m, frames=frames,
+                    max_costo=max_costo_m, frames=frames, lotes_usuario=lotes_usuario,
                 )
             except Exception as exc_loc:  # noqa: BLE001
                 print(f'⚠️ [inundacion_animacion] Falló el ranking de localidades: {exc_loc}')
