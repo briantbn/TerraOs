@@ -1815,6 +1815,19 @@ def _advertencia_escala(capa):
 # ──────────────────────────────────────────────────────────────────────────
 # API PÚBLICA — llamada desde app.py
 # ──────────────────────────────────────────────────────────────────────────
+def _escala_a_numero(escala_txt):
+    """'1:50.000' -> 50000; '1:500.000' -> 500000. Devuelve None si no puede
+    parsearlo (nunca inventa un número -- el frontend ya maneja fuente=None
+    con su propio texto genérico de respaldo)."""
+    if not escala_txt:
+        return None
+    try:
+        parte = str(escala_txt).split(':')[-1]  # '1:50.000' -> '50.000'
+        return int(parte.replace('.', '').replace(',', ''))
+    except (ValueError, TypeError):
+        return None
+
+
 def consultar_mejor_capa(lat, lon):
     """Consulta puntual: prueba cada capa en orden de prioridad (mejor
     escala primero) y devuelve el primer polígono que contiene (lat, lon).
@@ -1836,9 +1849,23 @@ def consultar_mejor_capa(lat, lon):
             if geom.covers(punto):
                 props = datos['props'][i]
                 norm = _normalizar(props)
+                # FIX: acá estaba el bug de "siempre dice 1:500.000 en la
+                # app aunque el dato haya salido de una carta 1:50.000" --
+                # antes 'fuente' era directamente capa['nombre'] (un texto
+                # plano, ej. "Corrientes (m58_m29_5)"). El frontend (tanto
+                # en Aptitud Productiva como en el Inspector de Suelos)
+                # SIEMPRE esperó un OBJETO con .provincia/.depto/.escala
+                # (ver 'fuenteInfo.escala?.toLocaleString(...)' del lado
+                # JS) -- como un string no tiene esas propiedades, siempre
+                # caía en el texto genérico de respaldo "1:500.000",
+                # sin importar qué carta hubiera respondido en realidad.
                 return {
                     'encontrado': True,
-                    'fuente': capa['nombre'],
+                    'fuente': {
+                        'provincia': _provincia_de_capa_detalle(capa) or capa['nombre'],
+                        'depto': None,  # nuestras cartas no tienen división por departamento -- si en el futuro se agrega, va acá
+                        'escala': _escala_a_numero(capa.get('escala')),
+                    },
                     'clase': norm['clase'],
                     'subclase': norm['subclase'],
                     'capacidad_uso': norm['capacidad_uso'],
