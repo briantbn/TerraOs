@@ -12277,6 +12277,17 @@ async function calcularRiesgoHidrologico() {
     rhUltimaFirmaCampo = rhFirmaPuntos(puntos);
     rhCacheLotes.set(rhUltimaFirmaCampo, rhDatosCampo); // queda guardado: si se vuelve a este polígono, no se recalcula
 
+    // FIX: esto es el ÚNICO lugar donde el cálculo realmente termina con éxito,
+    // sin importar si se llegó acá desde el botón "Analizar" (rhAnalizarLoteActual,
+    // que ya marcaba analizadoHidro) o desde el botón "🌧 Calcular" (que llama a esta
+    // función directo y antes NUNCA marcaba la palomita, dejando el lote analizado
+    // pero sin tilde en "Lista de proyectos"). Se marca acá para que la palomita
+    // sea siempre un reflejo fiel de "esto ya se calculó", venga de donde venga.
+    if (typeof proyectoActual !== 'undefined' && proyectoActual && proyectoActual.loteActual) {
+      proyectoActual.loteActual.analizadoHidro = true;
+      try { rhRenderListaProyectos(); } catch (e) {}
+    }
+
     rhRecalcularClasificacion();
 
     // ── Registrar en la sesión de análisis (AnalysisSession del lote activo, o global) ──
@@ -12778,14 +12789,49 @@ function rhRenderListaProyectos() {
     const activo = i === proyectoActual.currentIndex;
     const area = (lote.puntos && lote.puntos.length >= 3) ? `${calcularHectareas(lote.puntos).toFixed(1)} ha` : '—';
     return `
-      <button onclick="rhIrALote(${i})" title="${_nombreCortoArchivo(lote.nombre)}"
-        style="display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;
-        padding:6px 8px;border-radius:8px;border:1px solid ${activo ? '#2563eb' : 'rgba(255,255,255,.15)'};
-        background:${activo ? 'rgba(37,99,235,.25)' : 'rgba(255,255,255,.05)'};color:#fff;font-size:11px;cursor:pointer;">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${lote.analizadoHidro ? '<span style="color:#4ade80;font-weight:800;">✓</span> ' : ''}${_nombreCortoArchivo(lote.nombre)}</span>
-        <span style="flex-shrink:0;color:rgba(255,255,255,.6);">${area}</span>
-      </button>`;
+      <div draggable="true" data-idx="${i}"
+        ondragstart="_rhDragStart(event, ${i})" ondragover="_rhDragOver(event)"
+        ondragleave="_rhDragLeave(event)" ondrop="_rhDrop(event, ${i})" ondragend="_rhDragEnd(event)"
+        style="display:flex;align-items:stretch;gap:4px;">
+        <span title="Arrastrar para reordenar" style="cursor:grab;display:flex;align-items:center;padding:0 2px;color:rgba(255,255,255,.4);font-size:13px;user-select:none;">⋮⋮</span>
+        <button onclick="rhIrALote(${i})" title="${_nombreCortoArchivo(lote.nombre)}"
+          style="display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;
+          padding:6px 8px;border-radius:8px;border:1px solid ${activo ? '#2563eb' : 'rgba(255,255,255,.15)'};
+          background:${activo ? 'rgba(37,99,235,.25)' : 'rgba(255,255,255,.05)'};color:#fff;font-size:11px;cursor:pointer;">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${lote.analizadoHidro ? '<span style="color:#4ade80;font-weight:800;">✓</span> ' : ''}${_nombreCortoArchivo(lote.nombre)}</span>
+          <span style="flex-shrink:0;color:rgba(255,255,255,.6);">${area}</span>
+        </button>
+      </div>`;
   }).join('');
+}
+
+// ── FEATURE: drag & drop para reordenar "Lista de proyectos" a gusto del usuario.
+// rhDragIndexActual guarda qué lote se está arrastrando; al soltar sobre otro
+// item, se llama a proyectoActual.moverLote(origen, destino).
+let rhDragIndexActual = null;
+function _rhDragStart(ev, i) {
+  rhDragIndexActual = i;
+  ev.dataTransfer.effectAllowed = 'move';
+  ev.currentTarget.style.opacity = '0.4';
+}
+function _rhDragOver(ev) {
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'move';
+  ev.currentTarget.style.outline = '2px dashed #2563eb';
+}
+function _rhDragLeave(ev) {
+  ev.currentTarget.style.outline = '';
+}
+function _rhDrop(ev, destino) {
+  ev.preventDefault();
+  ev.currentTarget.style.outline = '';
+  if (rhDragIndexActual === null || typeof proyectoActual === 'undefined' || !proyectoActual) return;
+  proyectoActual.moverLote(rhDragIndexActual, destino);
+  rhDragIndexActual = null;
+}
+function _rhDragEnd(ev) {
+  ev.currentTarget.style.opacity = '';
+  rhDragIndexActual = null;
 }
 
 // Recalcular automáticamente cuando Open-Meteo tenga lluvia nueva (liviano: 1 sola consulta,
@@ -16129,6 +16175,7 @@ class ProjectManager {
       centro: extra.centro || null,
       puntos: extra.puntos || null,
       analizado: false,
+      analizadoHidro: false, // riesgo hidrológico: solo pasa a true cuando calcularRiesgoHidrologico() termina con éxito para este lote
       resultado: null,
       session: null, // AnalysisSession propia del lote — se crea sola en el primer análisis (ver _sesionActiva())
       notaClave,     // clave para recuperar/guardar la nota en NOTAS_LOTES_KEY
@@ -16224,6 +16271,7 @@ class ProjectManager {
       centro,
       puntos,
       analizado: false,
+      analizadoHidro: false, // riesgo hidrológico: solo pasa a true cuando calcularRiesgoHidrologico() termina con éxito para este lote
       resultado: null,
       session: null,
       notaClave: null,
@@ -16238,7 +16286,29 @@ class ProjectManager {
     this._persistirLotesManuales();
     _renderBarraProyecto();
     _renderizarListaLotesProyecto();
+    try { rhRenderListaProyectos(); } catch (e) {} // si el panel de Riesgo Hidrológico ya estaba abierto, que el lote nuevo aparezca ya mismo sin palomita
     return lote;
+  }
+
+  // ── FEATURE: reordenar los lotes del proyecto a mano (drag & drop).
+  // desde/hasta son índices dentro de this.files. Mueve el lote de una
+  // posición a otra, se asegura de que currentIndex siga apuntando al
+  // MISMO lote que estaba activo (aunque haya cambiado de posición en
+  // el array), y refresca las listas que dependen de este orden. ──
+  moverLote(desde, hasta) {
+    if (desde === hasta || desde < 0 || hasta < 0 ||
+        desde >= this.files.length || hasta >= this.files.length) return;
+    const loteActivo = this.loteActual;
+    const [lote] = this.files.splice(desde, 1);
+    this.files.splice(hasta, 0, lote);
+    if (loteActivo) {
+      const nuevoIndex = this.files.indexOf(loteActivo);
+      if (nuevoIndex !== -1) this.currentIndex = nuevoIndex;
+    }
+    this._persistirLotesManuales(); // el orden de los manuales se guarda; los importados no persisten entre sesiones, como ya pasaba con el resto de sus datos
+    _renderBarraProyecto();
+    _renderizarListaLotesProyecto();
+    try { rhRenderListaProyectos(); } catch (e) {}
   }
 
   // ── Guarda en localStorage SOLO los lotes dibujados a mano (los
@@ -16264,7 +16334,7 @@ class ProjectManager {
         color: _colorLote(idx), visible: true,
         bounds: L.latLngBounds(g.puntos.map(p => [p.lat, p.lon])),
         centro: calcularCentroide(g.puntos), puntos: g.puntos,
-        analizado: false, resultado: null, session: null, notaClave: null, nota: g.nota || '',
+        analizado: false, analizadoHidro: false, resultado: null, session: null, notaClave: null, nota: g.nota || '',
       });
     });
   }
@@ -16449,7 +16519,16 @@ class ProjectManager {
     // FIX: refrescar clima/riesgo/focos activos para ESTA ubicación ya mismo.
     // Antes quedaban los datos del lote (o de la ubicación) anterior hasta
     // que pasara el refresco automático cada 10 minutos.
-    cargarDatos();
+    // EXCEPCIÓN: si este cambio de lote es un salto INTERNO del auto-avance
+    // de "Riesgo Hidrológico" (rhNavegandoProyecto === true), no se dispara
+    // cargarDatos() -- esa función re-corre Incendios/Inundación/Vegetación/
+    // Sequía para el lote nuevo, algo que ese auto-avance no pidió y que
+    // saturaba Earth Engine (429 Too Many Requests) y el backend de
+    // incendios/meteorología (502 Bad Gateway) al saltar varios lotes
+    // seguidos, dando la sensación de que el auto-avance se "trababa".
+    if (typeof rhNavegandoProyecto === 'undefined' || !rhNavegandoProyecto) {
+      cargarDatos();
+    }
 
     // 2) Centrar el mapa en la capa. Esto va ANTES de dibujar/actualizar la UI
     //    a propósito: si algo de los pasos siguientes llegara a fallar, el
@@ -16759,8 +16838,12 @@ function _renderizarListaLotesProyecto() {
     const notaAbierta = _lotesNotaAbierta.has(i);
     const tieneNota = !!(lote.nota && lote.nota.trim());
     return `
-    <div style="border:1.5px solid ${activo ? '#1E5E3A' : '#eceee9'};border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;${oculto ? 'opacity:0.55;' : ''}">
+    <div draggable="true" data-idx="${i}"
+      ondragstart="_rhDragStart(event, ${i})" ondragover="_rhDragOver(event)"
+      ondragleave="_rhDragLeave(event)" ondrop="_rhDrop(event, ${i})" ondragend="_rhDragEnd(event)"
+      style="border:1.5px solid ${activo ? '#1E5E3A' : '#eceee9'};border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;${oculto ? 'opacity:0.55;' : ''}">
       <div style="display:flex;align-items:center;gap:8px;">
+        <span title="Arrastrar para reordenar" style="cursor:grab;color:#9ca3af;font-size:13px;user-select:none;">⋮⋮</span>
         <span style="width:10px;height:10px;border-radius:50%;background:${lote.color || '#c8cdc6'};flex-shrink:0;"></span>
         <span style="font-size:12px;font-weight:700;color:#1a1c1a;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_nombreCortoArchivo(lote.nombre)}</span>
         <span style="font-size:11px;">${estado}</span>
