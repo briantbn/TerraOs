@@ -393,53 +393,504 @@ SUELO_CAPAS = [
         'bbox': (-64.1, -41.5, -56.5, -32.5),
         'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
     },
-    # ── Corrientes 1:50.000 -- capas remotas de GeoINTA (geo-nodo09),
-    # descargadas en vivo vía WFS (no pre-alojadas en Hugging Face como
-    # las de arriba). Ninguna traía attribute_set en la metadata de
-    # GeoNode (son capas "remote" -- GeoNode no las introspecciona) --
-    # los nombres de campo reales quedan sin confirmar hasta una consulta
-    # de prueba tras el deploy; si _normalizar() no encuentra clase/
-    # cap_uso/indice_prod con sus alias genéricos actuales, avisar para
-    # sumar los alias correctos.
+    # ── Corrientes 1:50.000/1:100.000/1:500.000 -- Instituto de Suelos INTA,
+    # cartas provinciales completas (17.847 polígonos), autoalojadas en HF
+    # (antes: 5 capas remotas WFS de INTA con cobertura parcial, reemplazadas
+    # del todo por esta carta completa). Igual criterio que Santa Fe/Córdoba:
+    # partida en grilla adaptativa (0.5° base, subdividida solo donde hacía
+    # falta) para que ningún tile pase ~8MB. bbox = extensión REAL de cada
+    # archivo (no el borde nominal de la celda).
     {
-        'nombre': 'Corrientes — Monte Caseros / Empedrado',
-        'url': 'https://geo-nodo09.inta.gob.ar/geoserver/wfs?service=WFS&version=2.0.0&request=GetFeature&typeName=geonode:suelos_monte_caseros1_50000&outputFormat=application/json',
+        'nombre': 'Corrientes (m56_5_m27_5)',
+        'url': _HF_BASE + 'corrientes_m56_5_m27_5.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-58.0831, -30.7210, -57.5591, -29.8189),
-        'simplificar_grados': 0.0005,
+        'bbox': (-56.2839, -27.5608, -55.9747, -27.3126),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
     },
     {
-        'nombre': 'Corrientes — Yaciretá',
-        'url': 'https://geo-nodo09.inta.gob.ar/geoserver/wfs?service=WFS&version=2.0.0&request=GetFeature&typeName=geonode:suelos_yacireta&outputFormat=application/json',
+        'nombre': 'Corrientes (m56_5_m28)',
+        'url': _HF_BASE + 'corrientes_m56_5_m28.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-58.8570, -28.0058, -55.8304, -27.2643),
-        'simplificar_grados': 0.0005,
+        'bbox': (-56.54, -28.0258, -55.8543, -27.4704),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
     },
     {
-        'nombre': 'Corrientes — Sauce',
-        'url': 'https://geo-nodo09.inta.gob.ar/geoserver/wfs?service=WFS&version=2.0.0&request=GetFeature&typeName=geonode:suelos_sauce&outputFormat=application/json',
+        'nombre': 'Corrientes (m56_5_m28_5)',
+        'url': _HF_BASE + 'corrientes_m56_5_m28_5.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-59.1262, -30.2734, -58.4451, -29.6303),
-        'simplificar_grados': 0.0005,
+        'bbox': (-56.5527, -28.7834, -55.8841, -27.8401),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
     },
     {
-        'nombre': 'Corrientes — Curuzú Cuatiá',
-        'url': 'https://geo-nodo09.inta.gob.ar/geoserver/wfs?service=WFS&version=2.0.0&request=GetFeature&typeName=geonode:suelos_curuzu&outputFormat=application/json',
+        'nombre': 'Corrientes (m56_5_m29)',
+        'url': _HF_BASE + 'corrientes_m56_5_m29.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-58.9107, -30.4224, -57.6099, -29.0446),
-        'simplificar_grados': 0.0005,
+        'bbox': (-56.5856, -29.1162, -56.0104, -28.4519),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
     },
     {
-        'nombre': 'Corrientes — Goya',
-        'url': 'https://geo-nodo09.inta.gob.ar/geoserver/wfs?service=WFS&version=2.0.0&request=GetFeature&typeName=geonode:Suelos_Goya&outputFormat=application/json',
+        'nombre': 'Corrientes (m56_5_m29_5)',
+        'url': _HF_BASE + 'corrientes_m56_5_m29_5.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-59.6652, -30.0475, -58.7880, -29.0503),
-        'simplificar_grados': 0.0005,
+        'bbox': (-56.5021, -29.0692, -56.4321, -29.0042),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m56_m28)',
+        'url': _HF_BASE + 'corrientes_m56_m28.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-56.0421, -28.0235, -55.7703, -27.5473),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m56_m28_5)',
+        'url': _HF_BASE + 'corrientes_m56_m28_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-56.3063, -28.8129, -55.62, -27.9658),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m57_5_m27_5)',
+        'url': _HF_BASE + 'corrientes_m57_5_m27_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-57.6539, -27.5849, -57.2274, -27.4025),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m57_5_m28)',
+        'url': _HF_BASE + 'corrientes_m57_5_m28.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-57.6554, -27.9497, -56.9127, -27.4336),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m57_5_m29)',
+        'url': _HF_BASE + 'corrientes_m57_5_m29.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-57.5346, -28.9938, -57.1712, -28.4994),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m57_5_m29_5)',
+        'url': _HF_BASE + 'corrientes_m57_5_m29_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-57.5612, -29.283, -57.1644, -28.5674),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m57_75_m30_25)',
+        'url': _HF_BASE + 'corrientes_m57_75_m30_25.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-57.7799, -30.2634, -57.5591, -29.9918),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m57_75_m30_5)',
+        'url': _HF_BASE + 'corrientes_m57_75_m30_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-57.7685, -30.3967, -57.6212, -30.2082),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m57_m27_5)',
+        'url': _HF_BASE + 'corrientes_m57_m27_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-56.717, -27.5147, -56.5467, -27.4554),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m57_m28)',
+        'url': _HF_BASE + 'corrientes_m57_m28.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-57.0332, -28.0194, -56.4852, -27.4713),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m57_m28_5)',
+        'url': _HF_BASE + 'corrientes_m57_m28_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-56.8809, -28.5049, -56.3642, -27.8493),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m57_m29)',
+        'url': _HF_BASE + 'corrientes_m57_m29.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-56.7076, -29.1139, -56.3655, -28.4288),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m57_m29_5)',
+        'url': _HF_BASE + 'corrientes_m57_m29_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-56.6068, -29.106, -56.4978, -28.9886),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_25_m29_25)',
+        'url': _HF_BASE + 'corrientes_m58_25_m29_25.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.3325, -29.2726, -57.9513, -28.9635),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_25_m29_5)',
+        'url': _HF_BASE + 'corrientes_m58_25_m29_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.2868, -29.5159, -57.9339, -29.2115),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_25_m29_75)',
+        'url': _HF_BASE + 'corrientes_m58_25_m29_75.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.2923, -29.7733, -57.9715, -29.4788),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_25_m30)',
+        'url': _HF_BASE + 'corrientes_m58_25_m30.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.2732, -30.018, -57.9861, -29.6939),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_375_m29_625)',
+        'url': _HF_BASE + 'corrientes_m58_375_m29_625.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.3889, -29.6309, -58.237, -29.4703),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_375_m29_75)',
+        'url': _HF_BASE + 'corrientes_m58_375_m29_75.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.9107, -30.2115, -57.6396, -29.0446),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_5_m27_5)',
+        'url': _HF_BASE + 'corrientes_m58_5_m27_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.63, -27.468, -57.9119, -27.2643),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_5_m28)',
+        'url': _HF_BASE + 'corrientes_m58_5_m28.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.5282, -27.9944, -58.3039, -27.7565),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_5_m29)',
+        'url': _HF_BASE + 'corrientes_m58_5_m29.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.5186, -29.0254, -57.9594, -28.7004),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_5_m29_25)',
+        'url': _HF_BASE + 'corrientes_m58_5_m29_25.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.6018, -29.3184, -58.0222, -28.9031),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_5_m29_5)',
+        'url': _HF_BASE + 'corrientes_m58_5_m29_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.5213, -29.5202, -58.2296, -29.1882),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_5_m29_625)',
+        'url': _HF_BASE + 'corrientes_m58_5_m29_625.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.5213, -29.6327, -58.3474, -29.4726),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_5_m29_75)',
+        'url': _HF_BASE + 'corrientes_m58_5_m29_75.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.5883, -29.7538, -58.3336, -29.6137),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_5_m30)',
+        'url': _HF_BASE + 'corrientes_m58_5_m30.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.5828, -30.0358, -58.2287, -29.7241),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_5_m30_5)',
+        'url': _HF_BASE + 'corrientes_m58_5_m30_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.5775, -30.6406, -57.9623, -29.978),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_5_m31)',
+        'url': _HF_BASE + 'corrientes_m58_5_m31.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.056, -30.598, -57.9897, -30.4854),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_m27_5)',
+        'url': _HF_BASE + 'corrientes_m58_m27_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.0552, -27.5393, -57.4863, -27.2706),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_m28)',
+        'url': _HF_BASE + 'corrientes_m58_m28.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-57.6919, -27.8077, -57.4583, -27.4773),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_m29)',
+        'url': _HF_BASE + 'corrientes_m58_m29.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.1199, -29.0384, -57.2142, -28.5107),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_m29_5)',
+        'url': _HF_BASE + 'corrientes_m58_m29_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.1529, -29.7447, -57.4909, -28.9213),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_m30)',
+        'url': _HF_BASE + 'corrientes_m58_m30.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.034, -30.0313, -57.5102, -29.4589),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_m30_25)',
+        'url': _HF_BASE + 'corrientes_m58_m30_25.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.0336, -30.2888, -57.7015, -29.9558),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_m30_5)',
+        'url': _HF_BASE + 'corrientes_m58_m30_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.0635, -30.5145, -57.7256, -30.2147),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m58_m31)',
+        'url': _HF_BASE + 'corrientes_m58_m31.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.0251, -30.721, -57.7292, -30.3617),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m59_25_m29_25)',
+        'url': _HF_BASE + 'corrientes_m59_25_m29_25.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.2593, -29.2542, -58.9805, -28.9582),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m59_25_m29_5)',
+        'url': _HF_BASE + 'corrientes_m59_25_m29_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.4579, -29.8431, -58.788, -29.0847),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m59_5_m29)',
+        'url': _HF_BASE + 'corrientes_m59_5_m29.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.2386, -29.0951, -58.9551, -28.7688),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m59_5_m29_25)',
+        'url': _HF_BASE + 'corrientes_m59_5_m29_25.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.4927, -29.2778, -59.232, -29.088),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m59_5_m29_5)',
+        'url': _HF_BASE + 'corrientes_m59_5_m29_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.6652, -30.0475, -59.1878, -29.0693),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m59_5_m30)',
+        'url': _HF_BASE + 'corrientes_m59_5_m30.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.6548, -30.0173, -58.983, -29.1613),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m59_5_m30_5)',
+        'url': _HF_BASE + 'corrientes_m59_5_m30_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.1262, -30.2734, -58.9341, -30.0067),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m59_m27_5)',
+        'url': _HF_BASE + 'corrientes_m59_m27_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.857, -27.5175, -58.395, -27.2807),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m59_m28)',
+        'url': _HF_BASE + 'corrientes_m59_m28.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.093, -28.2026, -58.3469, -27.4626),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m59_m28_5)',
+        'url': _HF_BASE + 'corrientes_m59_m28_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.0592, -28.2234, -58.5757, -27.9851),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m59_m29)',
+        'url': _HF_BASE + 'corrientes_m59_m29.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.0183, -29.0187, -58.6631, -28.825),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m59_m29_5)',
+        'url': _HF_BASE + 'corrientes_m59_m29_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.2144, -29.5317, -58.4587, -28.9414),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m59_m30)',
+        'url': _HF_BASE + 'corrientes_m59_m30.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.047, -30.0199, -58.481, -29.4581),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m59_m30_5)',
+        'url': _HF_BASE + 'corrientes_m59_m30_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.113, -30.2692, -58.4451, -29.6303),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m60_m29_5)',
+        'url': _HF_BASE + 'corrientes_m60_m29_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.5941, -29.49, -59.491, -29.265),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m60_m30)',
+        'url': _HF_BASE + 'corrientes_m60_m30.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.6277, -29.7425, -59.5017, -29.4886),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    {
+        'nombre': 'Corrientes (m60_m30_5)',
+        'url': _HF_BASE + 'corrientes_m60_m30_5.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.5883, -30.0411, -59.5575, -30.0),
+        'simplificar_grados': None,  # sin pre-simplificar -- si pesa mucho en el mapa, ajustar acá
+    },
+    # Corrientes 1:100.000 -- respaldo de escala intermedia (menos detalle que
+    # la grilla de arriba, pero más que la carta nacional).
+    {
+        'nombre': 'Corrientes (1:100.000)',
+        'url': _HF_BASE + 'corrientes_1_100000.geojson?download=true',
+        'escala': '1:100.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.7117, -30.434, -57.2734, -27.6376),
+        'simplificar_grados': None,
+    },
+    # Corrientes 1:500.000 -- último respaldo antes de caer a la carta
+    # nacional 1:1.000.000 (menos detalle, pero mejor que nada).
+    {
+        'nombre': 'Corrientes (1:500.000)',
+        'url': _HF_BASE + 'corrientes_1_500000.geojson?download=true',
+        'escala': '1:500.000',
+        'confiabilidad': 'media',
+        'bbox': (-59.0837, -30.7221, -56.4607, -27.4039),
+        'simplificar_grados': None,
     },
     # ── Santiago del Estero 1:50.000 (geo-nodo02 / geo-nodo05) ──
     {
@@ -556,34 +1007,10 @@ SUELO_CAPAS = [
         # _normalizar_noa().
         'simplificar_grados': 0.005,
     },
-    # ── Corrientes 1:100.000 (geo-nodo09) ──
-    {
-        'nombre': 'Corrientes — Esquina',
-        'url': 'https://geo-nodo09.inta.gob.ar/geoserver/wfs?service=WFS&version=2.0.0&request=GetFeature&typeName=geonode:Suelos_Esquina2&outputFormat=application/json',
-        'escala': '1:100.000',
-        'confiabilidad': 'alta',
-        'bbox': (-59.7117, -30.4340, -58.7179, -29.4683),
-        'simplificar_grados': 0.001,
-    },
-    {
-        # Mezcla Esquina 1:100k + Goya/Lavalle 1:50k en una sola capa
-        # remota (no se puede separar desde la metadata) -- se ubica en
-        # el escalón 1:100.000 por precaución (el peor de los dos).
-        'nombre': 'Corrientes — Esquina/Goya/Lavalle',
-        'url': 'https://geo-nodo09.inta.gob.ar/geoserver/wfs?service=WFS&version=2.0.0&request=GetFeature&typeName=geonode:Suelos_Lavalle&outputFormat=application/json',
-        'escala': '1:50.000-1:100.000 (mixta)',
-        'confiabilidad': 'alta',
-        'bbox': (-59.2386, -29.2576, -58.6001, -28.7688),
-        'simplificar_grados': 0.0007,
-    },
-    {
-        'nombre': 'Corrientes — Llanura Arenosa',
-        'url': 'https://geo-nodo09.inta.gob.ar/geoserver/wfs?service=WFS&version=2.0.0&request=GetFeature&typeName=geonode:Lomas_arenosas&outputFormat=application/json',
-        'escala': '1:100.000',
-        'confiabilidad': 'alta',
-        'bbox': (-59.1211, -29.0248, -57.1511, -27.4839),
-        'simplificar_grados': 0.001,
-    },
+    # (Las 3 capas remotas WFS de Corrientes 1:100.000 que estaban acá --
+    # Esquina, Esquina/Goya/Lavalle, Llanura Arenosa -- se sacaron: la
+    # carta provincial completa autoalojada ya cubre esa misma zona con
+    # más detalle, ver el bloque 'Corrientes (...)' más arriba.)
     # ── Entre Ríos 1:100.000 (geo-nodo03) -- OJO: esquema de atributos
     # complejo por serie (fase_2/3/5, serie_6, pos_1/2/7, ipc, ipcp,
     # eros_act, etc., hasta 7 series por unidad cartográfica), muy
@@ -1277,13 +1704,19 @@ def _normalizar(props):
     # alias explícitos porque _g() solo prueba variantes de MAYÚSCULA/
     # minúscula/Capitalizada de la MISMA palabra -- 'cap_uso' con guion
     # bajo nunca matchea 'Cap Uso' con espacio, son strings distintos.
-    cap_uso = _g(props, 'cap_uso', 'capacidad_uso', 'Cap Uso')
+    # 'cu_s1' (Corrientes, componente de suelo DOMINANTE del polígono --
+    # la propia carta lo lista primero por tener el mayor % de superficie,
+    # ver porcent_s1) viene en el mismo formato "romano+letras" que ya usa
+    # Buenos Aires (ej. 'VIIws', 'IIIes'), así que cae directo en el mismo
+    # parser de abajo (_parse_cap_uso_romano) sin necesitar uno nuevo.
+    cap_uso = _g(props, 'cap_uso', 'capacidad_uso', 'Cap Uso', 'cu_s1')
     drenaje_crudo = _g(props, 'drenaje_estimado', 'drenaje', 'drenaje_s1')
     # 'Ipc' (Valle de Lerma / Valles Calchaquíes, Salta) es un índice de
     # productividad numérico igual que 'IP' de Córdoba, solo con otro
     # nombre de columna -- se agrega como alias explícito por el mismo
     # motivo que 'Cap Uso' arriba: _g() no matchea nombres distintos.
-    indice_prod = _g(props, 'ind_prod', 'indice_prod', 'IP', 'Ipc')
+    # 'ip_s1' (Corrientes) es el mismo concepto, del componente dominante.
+    indice_prod = _g(props, 'ind_prod', 'indice_prod', 'IP', 'Ipc', 'ip_s1')
 
     # Esquema GAT/IAT (ej. Santa Fe 1:50.000) -- ver _parse_gat() arriba.
     # Solo se usa como respaldo si el esquema estándar no trajo nada, así
@@ -1330,7 +1763,7 @@ def _normalizar(props):
     if indice_prod in (None, ''):
         indice_prod = _INDICE_POR_CLASE.get(str(clase or '').split('/')[0].upper())
 
-    limitante = _g(props, 'limit_ppal', 'limitante') or _limitante_desde_subclase(subclase)
+    limitante = _g(props, 'limit_ppal', 'limitante', 'limit_s1') or _limitante_desde_subclase(subclase)
     anegabilidad = _g(props, 'anegab_s1', 'anegabilidad') or _anegabilidad_desde_drenaje(drenaje_crudo)
     if anegabilidad is None and subclase and 'w' in str(subclase).lower():
         anegabilidad = 'Probable (limitante por anegamiento/drenaje según carta GAT)'
@@ -1338,6 +1771,16 @@ def _normalizar(props):
     # cartografía original, más allá de lo que diga la subclase.
     if anegabilidad is None and str(_g(props, 'bajo') or '') == '1':
         anegabilidad = 'Probable (zona baja según carta de Santa Fe)'
+    # Corrientes trae 3 flags binarios (0/1) explícitos en vez de una
+    # descripción de texto -- mismo criterio que 'bajo' de Santa Fe arriba:
+    # si la carta ya lo marca a nivel de polígono, se refleja tal cual, sin
+    # inferir nada adicional.
+    if anegabilidad is None and str(_g(props, 'inundables') or '') == '1':
+        anegabilidad = 'Probable (zona inundable según carta de Corrientes)'
+    if anegabilidad is None and str(_g(props, 'anegables') or '') == '1':
+        anegabilidad = 'Probable (zona anegable según carta de Corrientes)'
+    if anegabilidad is None and str(_g(props, 'encharcabl') or '') == '1':
+        anegabilidad = 'Probable (riesgo de encharcamiento según carta de Corrientes)'
 
     if cap_uso is None and clase:
         cap_uso = f"Clase {clase}{subclase or ''}"
