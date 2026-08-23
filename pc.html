@@ -3805,6 +3805,40 @@
           style="padding:6px 2px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:10px;font-weight:700;cursor:pointer;">72 h<br><span id="rh-v72-val" style="font-size:11px;">--</span></button>
       </div>
 
+      <!-- ── Persiana: Humedad antecedente del suelo (AMC) ── -->
+      <div style="border-top:1px solid rgba(255,255,255,.12);padding-top:10px;margin-bottom:12px;">
+        <div onclick="const b=$el('rh-amc-body'); const abierta=b.style.display!=='none'; b.style.display=abierta?'none':'block'; $el('rh-amc-flecha').textContent=abierta?'▸':'▾';"
+          style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:6px;">
+          <p style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.55);margin:0;">💧 Humedad antecedente del suelo</p>
+          <span id="rh-amc-flecha" style="color:rgba(255,255,255,.5);font-size:11px;">▸</span>
+        </div>
+        <div id="rh-amc-body" style="display:none;">
+          <p style="font-size:10.5px;color:rgba(255,255,255,.65);margin:0 0 8px;">
+            Un campo que ya viene saturado por meses de lluvia por encima de lo normal reacciona distinto a uno que arranca seco, aunque caiga la misma lluvia puntual. Elegí la condición del suelo ANTES del escenario de lluvia de arriba (combina con la textura/drenaje INTA del campo, ya tenidos en cuenta).
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:10px;" id="rh-amc-btns">
+            <button onclick="rhSetAmcCondicion('seco')" data-amc="seco" class="rh-amc-btn"
+              style="padding:7px 2px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:10.5px;font-weight:700;cursor:pointer;">🟤 Seco</button>
+            <button onclick="rhSetAmcCondicion('normal')" data-amc="normal" class="rh-amc-btn"
+              style="padding:7px 2px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:#2563eb;color:#fff;font-size:10.5px;font-weight:700;cursor:pointer;">Normal</button>
+            <button onclick="rhSetAmcCondicion('saturado')" data-amc="saturado" class="rh-amc-btn"
+              style="padding:7px 2px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:10.5px;font-weight:700;cursor:pointer;">🔵 Saturado</button>
+          </div>
+          <p style="font-size:10px;color:rgba(255,255,255,.55);margin:0 0 4px;">¿No estás seguro cuál elegir? Comparalo con un promedio de referencia:</p>
+          <div style="display:flex;gap:5px;margin-bottom:6px;">
+            <input id="rh-amc-acumulado" type="number" placeholder="Acumulado (mm)"
+              style="flex:1;min-width:0;padding:6px 7px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:11px;">
+            <input id="rh-amc-promedio" type="number" placeholder="Promedio (mm)"
+              style="flex:1;min-width:0;padding:6px 7px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:11px;">
+          </div>
+          <button onclick="rhSugerirAMCPorMeses()"
+            style="width:100%;padding:6px;border-radius:8px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:10.5px;font-weight:700;cursor:pointer;margin-bottom:6px;">Sugerir según estos valores</button>
+          <p id="rh-amc-sugerencia" style="font-size:10px;color:rgba(255,255,255,.6);margin:0;line-height:1.4;">
+            Ej: "1100 mm acumulados este año" vs. "900 mm promedio anual de la zona" (ambos datos de tu fuente de confianza — INTA, SMN, Recursos Hídricos provincial, etc. — la app no los calcula sola).
+          </p>
+        </div>
+      </div>
+
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
         <div style="display:flex;gap:8px;align-items:flex-start;">
           <span style="width:12px;height:12px;border-radius:50%;background:#ffd54f;margin-top:2px;flex-shrink:0;"></span>
@@ -11624,6 +11658,61 @@ function rhAjusteRelieve(pendientePct, twiNormalizado, cnBase) {
   return rhAjustePendienteCN(cnBase, pendientePct) + rhAjusteTWI(twiNormalizado);
 }
 
+// ── Humedad antecedente del suelo (AMC — Antecedent Moisture Condition) ──
+// El CN de tabla (CN2, calculado arriba con textura+drenaje+relieve) representa
+// una condición "promedio" de humedad previa del suelo. El propio método
+// SCS-CN define dos condiciones alternativas -- seca (AMC I) y húmeda (AMC
+// III) -- para cuando el suelo llega a un evento de lluvia ya más seco o ya
+// más saturado de lo habitual (ej. varios meses acumulando lluvia muy por
+// encima de lo normal, como describía la nota de Vera/La Gallareta). Las
+// fórmulas de conversión CN2→CN1/CN3 son las PUBLICADAS de Chow, Maidment &
+// Mays (1988), "Applied Hydrology" -- las mismas ampliamente citadas en la
+// literatura del método SCS-CN -- no un número inventado por la app.
+//   CN1 (seco)    = CN2 / (2.281 − 0.01281·CN2)
+//   CN3 (saturado)= CN2 / (0.427  + 0.00573·CN2)
+// La app NO decide sola qué condición aplica (no tiene un promedio histórico
+// de lluvia por zona con el que compararse): el usuario elige "Seco" /
+// "Normal" / "Saturado" a mano, opcionalmente ayudado por el comparador de
+// lluvia acumulada de varios meses vs. su propio promedio de referencia
+// (ambos datos los aporta el usuario, de una fuente que él confíe -- INTA,
+// SMN, Secretaría de Recursos Hídricos, etc. -- la app no inventa ninguno).
+let rhAmcCondicion = 'normal'; // 'seco' (AMC I) | 'normal' (AMC II, comportamiento de siempre) | 'saturado' (AMC III)
+
+function rhAjusteAMC(cn2, condicion) {
+  if (condicion === 'seco')     return cn2 / (2.281 - 0.01281 * cn2);
+  if (condicion === 'saturado') return cn2 / (0.427 + 0.00573 * cn2);
+  return cn2; // 'normal' — AMC II, sin cambios
+}
+
+/** Selector manual de condición AMC (botones "Seco"/"Normal"/"Saturado" en la persiana). */
+function rhSetAmcCondicion(cond) {
+  rhAmcCondicion = cond;
+  document.querySelectorAll('.rh-amc-btn').forEach(b => {
+    const activo = b.dataset.amc === cond;
+    b.style.background = activo ? '#2563eb' : 'rgba(255,255,255,.08)';
+  });
+  if (rhDatosCampo) rhRecalcularClasificacion();
+}
+
+/** Sugerencia opcional: compara la lluvia acumulada de varios meses que el usuario
+ *  tipeó contra el promedio que él mismo indica para ese período, y a partir del
+ *  cociente sugiere (no fuerza) una condición AMC -- umbrales propios de la app,
+ *  igual de heurísticos y declarados como tales que los de rhClasificar() más abajo. */
+function rhSugerirAMCPorMeses() {
+  const acum = parseFloat($el('rh-amc-acumulado')?.value);
+  const prom = parseFloat($el('rh-amc-promedio')?.value);
+  const msg = $el('rh-amc-sugerencia');
+  if (!isFinite(acum) || !isFinite(prom) || prom <= 0) {
+    if (msg) msg.textContent = 'Ingresá los dos valores (acumulado y promedio) para obtener una sugerencia.';
+    return;
+  }
+  const ratio = acum / prom;
+  const cond = ratio > 1.25 ? 'saturado' : ratio < 0.85 ? 'seco' : 'normal';
+  rhSetAmcCondicion(cond);
+  const etiqueta = cond === 'saturado' ? 'Saturado' : cond === 'seco' ? 'Seco' : 'Normal';
+  if (msg) msg.textContent = `${acum.toFixed(0)} mm vs. ${prom.toFixed(0)} mm de promedio (${(ratio * 100).toFixed(0)}%) → sugerencia: ${etiqueta}. Podés cambiarla a mano si conocés mejor la situación real del campo.`;
+}
+
 /** Escorrentía superficial estimada (mm) — método SCS Curve Number. */
 function rhEscorrentiaSCS(P_mm, CN) {
   if (!P_mm || P_mm <= 0) return 0;
@@ -12215,6 +12304,7 @@ async function calcularRiesgoHidrologico() {
           'Anegamiento'         : `${haC('anegamiento')} ha (${pct('anegamiento')}%)`,
           'Inundación'          : `${haC('inundacion')} ha (${pct('inundacion')}%)`,
           'Humedal natural (INTA)': `${haC('humedal_natural')} ha (${pct('humedal_natural')}%)`,
+          'Humedad antecedente del suelo': rhAmcCondicion === 'saturado' ? 'Saturado (AMC III)' : rhAmcCondicion === 'seco' ? 'Seco (AMC I)' : 'Normal (AMC II)',
         },
         fuente       : 'INTA (suelo y humedales) · Open-Meteo · Servidor de relieve GeoSentinel',
         conclusion   : `${clasifTxt} — ${critico}% de la superficie con anegamiento/inundación potencial` +
@@ -12255,7 +12345,7 @@ function rhRecalcularClasificacion() {
     const tieneRelieve = c.relieve && c.relieve.elevacion !== null && c.relieve.elevacion !== undefined;
     const twiNorm      = (tieneRelieve && c.twi !== null && c.twi !== undefined) ? (c.twi - minTWI) / rangoTWI : null; // sin dato → sin ajuste
     const pendiente   = (tieneRelieve ? c.relieve.pendiente : null) ?? (suelo?.pendientePct || 2);
-    const cn          = Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendiente, twiNorm, cnBase) + rhAjusteSueloDetalle(c.sueloDetalle)));
+    const cn          = rhAjusteAMC(Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendiente, twiNorm, cnBase) + rhAjusteSueloDetalle(c.sueloDetalle))), rhAmcCondicion);
     const Q           = rhEscorrentiaSCS(P, cn);
     const clas         = rhAplicarHumedal(rhClasificar(Q), c.humedalPct, c.humedalCapaNombre);
     c.clasificacion = clas; c.cn = cn; c.Q = Q; c.tieneRelieve = tieneRelieve;
@@ -12380,7 +12470,7 @@ function rhPintarConMm(P) {
     const tieneRelieve = c.relieve && c.relieve.elevacion !== null && c.relieve.elevacion !== undefined;
     const twiNorm      = (tieneRelieve && c.twi !== null && c.twi !== undefined) ? (c.twi - minTWI) / rangoTWI : null;
     const pendiente   = (tieneRelieve ? c.relieve.pendiente : null) ?? (suelo?.pendientePct || 2);
-    const cn = Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendiente, twiNorm, cnBase) + rhAjusteSueloDetalle(c.sueloDetalle)));
+    const cn = rhAjusteAMC(Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendiente, twiNorm, cnBase) + rhAjusteSueloDetalle(c.sueloDetalle))), rhAmcCondicion);
     c.clasificacion = rhAplicarHumedal(rhClasificar(rhEscorrentiaSCS(P, cn)), c.humedalPct, c.humedalCapaNombre);
   });
   rhPintarGrid(celdas);
@@ -12600,13 +12690,23 @@ async function rhAnalizarLoteActual(reiniciarSiHayLote = true) {
 
   const auto = $el('rh-proyecto-autoavanzar');
 
-  // FIX: con "Ir al siguiente al finalizar" tildado, la corrida en lote debe
-  // recorrer TODOS los lotes en orden — Monte Caseros → Curuzu Cuatia → Esquina.
-  // Antes arrancaba desde el lote que hubiera quedado activo en proyectoActual
-  // (compartido con el resto de la app, ej. el último visto en Incendios), así
-  // que si ese era el último de la lista, no había "siguiente" y la corrida
-  // terminaba ahí mismo — daba la sensación de "empieza desde abajo y no avanza".
-  if (reiniciarSiHayLote && auto && auto.checked && proyectoActual.currentIndex !== 0) {
+  // Con "Ir al siguiente al finalizar" tildado, la corrida SIEMPRE debe
+  // recorrer los lotes de arriba hacia abajo (primero → último), sin
+  // importar en qué lote haya quedado parado proyectoActual (compartido
+  // con el resto de la app, ej. el último visto en Incendios). Por eso
+  // se fuerza goTo(0) de forma incondicional al arrancar la corrida,
+  // en vez de solo "si no está ya en 0" — así queda garantizado el orden
+  // de arriba hacia abajo en cada corrida, sin depender de dónde venía.
+  if (reiniciarSiHayLote && auto && auto.checked) {
+    // FIX: además de arrancar en el primer lote, hay que borrar la palomita
+    // verde de TODOS los lotes al arrancar la corrida -- antes solo se
+    // apagaba la del lote que estaba por analizarse en cada paso, así que
+    // los lotes todavía no visitados en esta corrida se quedaban mostrando
+    // la palomita de una corrida anterior (parecía que ya estaban listos,
+    // o que el orden iba "de abajo hacia arriba"). Ahora todos arrancan
+    // sin palomita y cada uno la recupera recién cuando termina SU análisis.
+    proyectoActual.files.forEach(lote => { lote.analizadoHidro = false; });
+    rhRenderListaProyectos();
     await proyectoActual.goTo(0);
   }
 
@@ -12616,21 +12716,33 @@ async function rhAnalizarLoteActual(reiniciarSiHayLote = true) {
     btn.disabled = true;
     btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px">hourglass_empty</span> Analizando…';
   }
-  // FIX: si este lote ya se había analizado antes (ej. se lo vuelve a analizar
-  // con lluvia/parámetros nuevos), se le saca la palomita mientras se está
-  // recalculando — así no queda una palomita "vieja" confundiendo al usuario
-  // sobre si el resultado que está viendo ya terminó o no.
+  // Se usa 'analizadoHidro' (propio de este módulo) y NO 'analizado'
+  // (esa propiedad la usa también el módulo de Incendios vía
+  // proyectoActual.analyzeAll()/analyzeCurrent() -- reutilizarla acá
+  // hacía que, si ya habías corrido "Analizar todo" en Incendios, TODOS
+  // los lotes aparecieran con la palomita verde en esta lista aunque el
+  // riesgo hidrológico nunca se hubiera calculado). Se apaga mientras se
+  // recalcula, para no dejar una palomita "vieja" mostrando un resultado
+  // que en realidad todavía se está recalculando.
   const loteEnCurso = proyectoActual.loteActual;
-  if (loteEnCurso) { loteEnCurso.analizado = false; }
+  if (loteEnCurso) { loteEnCurso.analizadoHidro = false; }
   rhRenderListaProyectos();
+
+  let huboError = false;
   try {
     await calcularRiesgoHidrologico();
+  } catch (err) {
+    // No relanzar: si un lote falla (ej. error de red al pedir suelo/relieve),
+    // la cadena de "ir al siguiente" no debe cortarse ahí -- tiene que seguir
+    // con el resto de los lotes hasta llegar al final de la lista.
+    huboError = true;
+    console.warn(`[Riesgo Hidrológico] No se pudo analizar "${loteEnCurso ? loteEnCurso.nombre : '?'}":`, err);
   } finally {
     if (btn && htmlOriginal !== null) { btn.disabled = false; btn.innerHTML = htmlOriginal; }
   }
 
   const lote = proyectoActual.loteActual;
-  if (lote) { lote.analizado = true; } // marca visual en la lista, aunque el resultado en sí vive en rhDatosCampo
+  if (lote) { lote.analizadoHidro = !huboError; } // marca visual en la lista, aunque el resultado en sí vive en rhDatosCampo
   rhRenderListaProyectos();
 
   if (auto && auto.checked && proyectoActual.currentIndex < proyectoActual.files.length - 1) {
@@ -12643,6 +12755,7 @@ async function rhAnalizarLoteActual(reiniciarSiHayLote = true) {
     await rhAnalizarLoteActual(false); // encadena: analiza también el siguiente lote, sin volver a reiniciar, y así hasta el final de la lista
   }
 }
+
 
 // ── Lista buscable de todos los lotes cargados, con salto directo ──
 function rhRenderListaProyectos() {
@@ -12669,7 +12782,7 @@ function rhRenderListaProyectos() {
         style="display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;
         padding:6px 8px;border-radius:8px;border:1px solid ${activo ? '#2563eb' : 'rgba(255,255,255,.15)'};
         background:${activo ? 'rgba(37,99,235,.25)' : 'rgba(255,255,255,.05)'};color:#fff;font-size:11px;cursor:pointer;">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${lote.analizado ? '<span style="color:#4ade80;font-weight:800;">✓</span> ' : ''}${_nombreCortoArchivo(lote.nombre)}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${lote.analizadoHidro ? '<span style="color:#4ade80;font-weight:800;">✓</span> ' : ''}${_nombreCortoArchivo(lote.nombre)}</span>
         <span style="flex-shrink:0;color:rgba(255,255,255,.6);">${area}</span>
       </button>`;
   }).join('');
@@ -12706,7 +12819,7 @@ function rhMostrarEnInspectorSuelos(lat, lon, data) {
 
   const render = (lluvia) => {
     const P = lluvia['l' + ventana] ?? lluvia.l48 ?? 0;
-    const cn = Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendienteSuelo, 0.5, cnBase))); // TWI neutro: es una consulta puntual sin vecinos, no se puede calcular acumulación de flujo real
+    const cn = rhAjusteAMC(Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendienteSuelo, 0.5, cnBase))), rhAmcCondicion); // TWI neutro: es una consulta puntual sin vecinos, no se puede calcular acumulación de flujo real
     const Q  = rhEscorrentiaSCS(P, cn);
     const clas = rhClasificar(Q);
 
@@ -14041,6 +14154,16 @@ function _vipCapaActivaBtn(idActivo) {
 }
 
 function vipToggleCapa(cual) {
+  // Pedido: los 3 botones (mapa de cambio / NDVI actual / variabilidad) deben
+  // llevar directo al mapa satelital en vez de que el usuario tenga que ir
+  // manualmente por el menú -- se navega primero con irA('mapa') y recién
+  // ahí se prende la capa elegida. Si el mapa ya estaba abierto, irA('mapa')
+  // no molesta (vuelve a marcar la misma pantalla activa).
+  irA('mapa');
+  setTimeout(() => _vipAplicarCapa(cual), 150);
+}
+
+function _vipAplicarCapa(cual) {
   if (!mapa) return;
   const capas = { actual: capaNdviPremium, cambio: capaCambioNdviPremium, variabilidad: capaVariabilidadNdviPremium };
   Object.values(capas).forEach(c => { if (c && mapa.hasLayer(c)) mapa.removeLayer(c); });
@@ -15388,9 +15511,30 @@ function _extraerValorNumericoIndicador(registro) {
   if (typeof registro.resultado === 'number' && isFinite(registro.resultado)) {
     return { valor: registro.resultado, etiqueta: registro.nombre || registro.tipo, escala: 'valor_directo' };
   }
+  // FIX: varios análisis (ej. Riesgo de Inundación, IIPDI) guardan su score
+  // real DENTRO de "resultado" (resultado.score, resultado.iipdi) en vez de
+  // que "resultado" sea directamente ese número -- antes esto se ignoraba
+  // por completo y la función terminaba cayendo en la primera estadística
+  // numérica que encontrara (ej. "Lluvia 24h", que puede no tener nada que
+  // ver con el riesgo que el usuario quiere comparar en el historial).
+  const camposScorePrioritarios = ['score', 'iipdi'];
+  for (const campo of camposScorePrioritarios) {
+    const val = registro?.resultado?.[campo];
+    if (typeof val === 'number' && isFinite(val)) {
+      return { valor: val, etiqueta: campo === 'score' ? 'Score de riesgo' : campo.toUpperCase(), escala: 'valor_directo' };
+    }
+  }
   const clasifTxt = (registro.clasificacion || registro?.resultado?.riesgoNivel || '').toString().trim().toLowerCase();
-  if (clasifTxt && _ESCALA_ORDINAL_RIESGO[clasifTxt] !== undefined) {
-    return { valor: _ESCALA_ORDINAL_RIESGO[clasifTxt], etiqueta: registro.clasificacion, escala: 'ordinal_riesgo_1_4' };
+  // FIX: antes exigía que el texto completo sea EXACTAMENTE igual a una
+  // clave de la escala ("bajo"), pero las clasificaciones reales vienen con
+  // emoji o prefijos ("🟢 Bajo", "RIESGO ALTO"), así que nunca matcheaba y
+  // también caía al mismo fallback. Ahora busca la clave más específica
+  // (más larga) que aparezca dentro del texto, sin exigir igualdad exacta.
+  const clavesOrdenadas = Object.keys(_ESCALA_ORDINAL_RIESGO).sort((a, b) => b.length - a.length);
+  for (const clave of clavesOrdenadas) {
+    if (clasifTxt.includes(clave)) {
+      return { valor: _ESCALA_ORDINAL_RIESGO[clave], etiqueta: registro.clasificacion, escala: 'ordinal_riesgo_1_4' };
+    }
   }
   const estad = registro.estadisticas || {};
   for (const clave of Object.keys(estad)) {
@@ -15855,7 +15999,6 @@ async function solicitarInterpretacionHistorial() {
     cont.innerHTML = `<p style="font-size:11.5px;color:#727971;text-align:center;padding:8px">Hace falta al menos 2 snapshots para pedir una interpretación histórica.</p>`;
     return;
   }
-  cont.innerHTML = `<p style="font-size:11.5px;color:#727971;text-align:center;padding:8px">⏳ Consultando IA...</p>`;
 
   // Payload: SOLO datos agregados ya calculados por la app (nunca imágenes
   // sin contexto, nunca cifras inventadas acá) -- mismo espíritu que
@@ -15872,6 +16015,21 @@ async function solicitarInterpretacionHistorial() {
       };
     }
   });
+
+  // FIX: si ningún tipo llegó a tener 2 observaciones numéricas (ej. 2
+  // snapshots pero de tipos distintos, o 1 solo de Vegetación), "indicadores"
+  // queda vacío -- antes esto igual se mandaba al servidor, que respondía con
+  // un error genérico ("No se recibieron indicadores históricos para
+  // interpretar") sin que quede claro qué falta. Ahora se avisa acá mismo,
+  // sin ir al servidor, explicando qué hace falta para poder interpretar.
+  if (Object.keys(indicadores).length === 0) {
+    cont.innerHTML = `<p style="font-size:11.5px;color:#727971;text-align:center;padding:8px">
+      Todavía no hay ningún indicador con 2 observaciones propias (ej. 2 análisis de Vegetación) para que la IA compare.
+      Corré un nuevo análisis del mismo tipo sobre este lote y volvé a intentar.</p>`;
+    return;
+  }
+
+  cont.innerHTML = `<p style="font-size:11.5px;color:#727971;text-align:center;padding:8px">⏳ Consultando IA...</p>`;
 
   const body = {
     lote: { nombre: entrada.nombre },
@@ -16012,9 +16170,15 @@ class ProjectManager {
     });
     lote.layer.addTo(mapa);
 
-    // FIX: mismo caso que en dibujarCampoEnMapa — si la regla ya está
-    // activa, el polígono del lote recién dibujado no debe robar el clic.
-    if (typeof _medidorSatelital !== 'undefined' && _medidorSatelital.estaActivo()) {
+    // FIX: mismo caso que en dibujarCampoEnMapa — si la regla YA está
+    // activa, o si la capa de Aptitud Productiva YA está activa, el
+    // polígono del lote recién dibujado no debe robar el clic (antes solo
+    // se chequeaba la regla, así que con la capa de aptitud prendida el
+    // polígono del lote volvía a quedar clicable en cada redibujo —p.ej.
+    // al cambiar de lote del proyecto— y su cartel "Lote del proyecto"
+    // tapaba la vista en vez de dejar pasar el clic al suelo de abajo).
+    if ((typeof _medidorSatelital !== 'undefined' && _medidorSatelital.estaActivo())
+        || (typeof _aptitudCapaActiva !== 'undefined' && _aptitudCapaActiva)) {
       _setPoligonosClicables(mapa, false);
     }
   }
@@ -19795,6 +19959,7 @@ function toggleCapaAptitud() {
     // capa. Se desactiva su clic mientras la capa está activa, para que el
     // clic pase directo a los polígonos de aptitud que están debajo.
     _setPoligonosClicables(mapa, false);
+    mapa.closePopup(); // FIX: si había quedado abierto el cartel de un lote (ej. "Lote del proyecto"), tapaba la capa recién activada
     mapa.on('moveend', _aptitudActualizarCapaDebounced);
     mapa.on('zoomend', _aptitudActualizarCapaDebounced);
     aptitudActualizarCapa();
