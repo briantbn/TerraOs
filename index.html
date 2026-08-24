@@ -190,6 +190,15 @@
      / Incendios), igual en espíritu al panel de Análisis de la
      versión PC.
      ════════════════════════════════════════════════════════════════ */
+  #btn-toggle-proyecto {
+    flex-shrink: 0; height: 32px; border-radius: 16px; padding: 0 10px;
+    background: rgba(15,20,15,0.92); border: 1.5px solid rgba(255,255,255,0.15);
+    display: flex; align-items: center; gap: 5px; cursor: pointer; transition: all .2s;
+  }
+  #btn-toggle-proyecto:active { transform: scale(0.94); }
+  #btn-toggle-proyecto .material-symbols-outlined { color: #fff; font-size: 16px; }
+  #btn-toggle-proyecto-badge { color: #fff; font-size: 11px; font-weight: 700; }
+
   #btn-abrir-herramientas-mapa {
     flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%;
     background: #1a3b22; border: 1.5px solid #1a3b22;
@@ -691,17 +700,6 @@
   .informe-modal-generico h3 {
     font-size: 18px; font-weight: 800; color: #1a3b22; margin: 0 0 4px;
   }
-  .historial-item {
-    background: #fff; border: 1.5px solid #e2e3de; border-radius: 12px;
-    padding: 10px 12px; margin-bottom: 8px;
-  }
-  .historial-item p { margin: 0; }
-  .historial-item .h-nivel { font-size: 13px; font-weight: 700; color: #1a3b22; }
-  .historial-item .h-fecha { font-size: 10.5px; color: #9ca3af; margin-top: 2px !important; }
-  .historial-tag {
-    display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 7px;
-    border-radius: 8px; margin-right: 6px; vertical-align: middle;
-  }
   #informe-texto {
     white-space: pre-wrap; font-size: 13px; line-height: 1.6; color: #2b2f2a;
     background: #fff; border: 1.5px solid #e2e3de; border-radius: 12px;
@@ -1128,8 +1126,8 @@
 <!-- ══════════════════════════════════════════
      MEDICIÓN DE SUPERFICIE — PANEL
 ═══════════════════════════════════════════ -->
-<div id="medsup-panel" style="display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-  z-index:1602;width:min(92%,300px);max-height:82%;overflow-y:auto;
+<div id="medsup-panel" style="display:none;position:fixed;left:8px;top:140px;
+  z-index:1602;width:min(72%,240px);max-height:calc(100vh - 156px);overflow-y:auto;
   background:rgba(15,20,15,0.94);border:1px solid rgba(255,255,255,0.12);border-radius:14px;
   padding:14px;box-shadow:0 10px 40px rgba(0,0,0,0.4);backdrop-filter:blur(4px);
   font-family:'Inter',sans-serif;">
@@ -1622,6 +1620,16 @@
         <textarea id="campo-nota" oninput="actualizarNotaCampo(this.value)" placeholder="Ej: Destinado a cultivo de cebada, revisar drenaje antes de sembrar..."
           class="w-full box-border resize-y text-xs p-2 rounded-lg" style="min-height:52px;font-family:inherit;border:1.5px solid #bbf7d0;background:#fff;color:#1a1c1a;"></textarea>
         <p class="text-xs mt-1" style="color:#166534;opacity:.75">Se guarda solo en este dispositivo — no se sube a ningún servidor. Se incluye si exportás el campo a KML/GeoJSON.</p>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button onclick="exportarCampoDelimitado('geojson')"
+            style="flex:1;background:#166534;color:#fff;border:none;border-radius:10px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">
+            ⬇ GeoJSON
+          </button>
+          <button onclick="exportarCampoDelimitado('kml')"
+            style="flex:1;background:#166534;color:#fff;border:none;border-radius:10px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">
+            ⬇ KML
+          </button>
+        </div>
       </div>
 
       <!-- Buscador de lugar (estilo Google Earth) -->
@@ -2143,17 +2151,17 @@
     </div>
   </section>
 
-  <!-- ── HISTORIAL DE SESIÓN ───────────────── -->
+  <!-- ── INFORME EXPRESS ──────────────────── -->
   <section class="mb-5">
     <div class="rounded-2xl border p-4" style="background:#fff;border-color:#e2e3de">
       <div class="flex items-center gap-3">
-        <span class="material-symbols-outlined" style="color:#1a3b22;font-size:30px">history</span>
+        <span class="material-symbols-outlined" style="color:#1a3b22;font-size:30px">summarize</span>
         <div class="flex-1">
-          <h3 class="font-bold text-sm" style="color:#1a3b22">🕘 Historial de sesión</h3>
-          <p class="text-xs mt-0.5" style="color:#727971">Análisis de riesgo (incendio, inundación, sequía, suelos) de esta sesión</p>
+          <h3 class="font-bold text-sm" style="color:#1a3b22">📋 Informe Express</h3>
+          <p class="text-xs mt-0.5" style="color:#727971">Focos, clima, riesgos y campo en un resumen para compartir</p>
         </div>
       </div>
-      <button onclick="abrirHistorialSesion()" class="informe-btn informe-btn-primario mt-3">Ver historial</button>
+      <button onclick="abrirInformeExpress()" class="informe-btn informe-btn-primario mt-3">Generar informe</button>
     </div>
   </section>
 
@@ -2168,20 +2176,6 @@
         </div>
       </div>
       <button id="btn-informe-sesion" onclick="generarInformeSesionPDF()" class="informe-btn informe-btn-secundario mt-3">Generar PDF de sesión</button>
-    </div>
-  </section>
-
-  <!-- ── INFORME EXPRESS ──────────────────── -->
-  <section class="mb-5">
-    <div class="rounded-2xl border p-4" style="background:#fff;border-color:#e2e3de">
-      <div class="flex items-center gap-3">
-        <span class="material-symbols-outlined" style="color:#1a3b22;font-size:30px">summarize</span>
-        <div class="flex-1">
-          <h3 class="font-bold text-sm" style="color:#1a3b22">📋 Informe Express</h3>
-          <p class="text-xs mt-0.5" style="color:#727971">Focos, clima, riesgos y campo en un resumen para compartir</p>
-        </div>
-      </div>
-      <button onclick="abrirInformeExpress()" class="informe-btn informe-btn-primario mt-3">Generar informe</button>
     </div>
   </section>
 
@@ -2225,26 +2219,13 @@
          cada bloque (antes cada uno tenía su propio "top" fijo adivinado). -->
     <div id="mapa-overlay">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;">
-        <div id="panel-riesgo-mapa">
-          <!-- Pill: siempre visible -->
-          <div class="riesgo-pill">
-            <div>
-              <p class="text-xs font-bold uppercase tracking-wide" style="color:#727971;margin:0">Riesgo de incendio</p>
-              <p id="mapa-angstrom-txt" class="text-sm font-bold" style="color:#1a1c1a;margin:2px 0 0">—</p>
-            </div>
-            <div class="text-right">
-              <p class="text-xs" style="color:#727971;margin:0">Angström</p>
-              <p id="mapa-angstrom-val" class="text-lg font-bold" style="color:#1a3b22;margin:2px 0 0">--</p>
-            </div>
-          </div>
-          <!-- Detalle: se despliega al hover/touch -->
-          <div class="riesgo-detalle">
-            <div id="mapa-ang-barra" class="h-1.5 rounded-full" style="background:#e2e3de">
-              <div id="mapa-ang-fill" class="h-1.5 rounded-full transition-all" style="width:0%;background:#16a34a"></div>
-            </div>
-            <p id="mapa-regla-txt" class="text-xs mt-1 font-bold" style="color:#727971"></p>
-          </div>
-        </div>
+        <!-- ── Botón compacto: abre/cierra el panel de proyecto sin ocupar
+             pantalla — solo aparece si hay un proyecto multi-lote cargado ── -->
+        <button id="btn-toggle-proyecto" onclick="toggleBarraProyecto()" title="Ver proyecto y progreso del análisis"
+          style="display:none;">
+          <span class="material-symbols-outlined">folder_open</span>
+          <span id="btn-toggle-proyecto-badge">0/0</span>
+        </button>
 
         <!-- ════════════════════════════════════════════════════════
              PANEL DESPLEGABLE "HERRAMIENTAS DEL MAPA"
@@ -2256,36 +2237,41 @@
         </button>
       </div>
 
-      <!-- ── Barra de proyecto (visible solo con un proyecto multi-lote cargado) ── -->
-      <div id="barra-proyecto" style="display:none;margin-bottom:8px;
-        background:rgba(15,20,15,0.92);border-radius:10px;padding:7px 10px;color:#fff;font-family:'Inter',sans-serif;
-        align-items:center;gap:8px;flex-wrap:wrap;">
-        <span id="bp-nombre" style="font-size:11.5px;font-weight:800;">Proyecto</span>
-        <span id="bp-badge" style="font-size:9.5px;color:rgba(255,255,255,.6);">0 capas cargadas</span>
-        <div style="display:flex;align-items:center;gap:4px;margin-left:auto;">
-          <button onclick="proyectoActual.previousLayer()" style="background:rgba(255,255,255,.1);border:none;color:#fff;width:24px;height:24px;border-radius:6px;cursor:pointer;">‹</button>
-          <span id="bp-contador" style="font-size:10.5px;min-width:36px;text-align:center;">0 / 0</span>
-          <button onclick="proyectoActual.nextLayer()" style="background:rgba(255,255,255,.1);border:none;color:#fff;width:24px;height:24px;border-radius:6px;cursor:pointer;">›</button>
+      <!-- ── Panel de proyecto (angosto, no ocupa todo el ancho) — se
+           abre/cierra con btn-toggle-proyecto, nunca se pierde ── -->
+      <div id="barra-proyecto-wrap" style="display:none;width:min(78%,260px);margin-bottom:8px;">
+        <!-- ── Barra de proyecto (visible solo con un proyecto multi-lote cargado) ── -->
+        <div id="barra-proyecto" style="display:none;margin-bottom:6px;
+          background:rgba(15,20,15,0.92);border-radius:10px;padding:7px 10px;color:#fff;font-family:'Inter',sans-serif;
+          align-items:center;gap:6px;flex-wrap:wrap;">
+          <span id="bp-nombre" style="font-size:10.5px;font-weight:800;">Proyecto</span>
+          <span id="bp-badge" style="font-size:8.5px;color:rgba(255,255,255,.6);">0 capas cargadas</span>
+          <div style="display:flex;align-items:center;gap:4px;margin-left:auto;">
+            <button onclick="proyectoActual.previousLayer()" style="background:rgba(255,255,255,.1);border:none;color:#fff;width:22px;height:22px;border-radius:6px;cursor:pointer;">‹</button>
+            <span id="bp-contador" style="font-size:9.5px;min-width:32px;text-align:center;">0 / 0</span>
+            <button onclick="proyectoActual.nextLayer()" style="background:rgba(255,255,255,.1);border:none;color:#fff;width:22px;height:22px;border-radius:6px;cursor:pointer;">›</button>
+          </div>
+          <button onclick="toggleBarraProyecto()" title="Minimizar" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:13px;cursor:pointer;">▾</button>
+          <button onclick="proyectoActual.cerrar()" title="Cerrar proyecto" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:13px;cursor:pointer;">✕</button>
+          <div style="width:100%;display:flex;justify-content:space-between;font-size:8.5px;color:rgba(255,255,255,.6);">
+            <span id="bp-archivo" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;">—</span>
+            <span id="bp-estado">○ Sin analizar</span>
+          </div>
         </div>
-        <button onclick="proyectoActual.cerrar()" title="Cerrar proyecto" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:14px;cursor:pointer;">✕</button>
-        <div style="width:100%;display:flex;justify-content:space-between;font-size:9.5px;color:rgba(255,255,255,.6);">
-          <span id="bp-archivo">—</span>
-          <span id="bp-estado">○ Sin analizar</span>
-        </div>
-      </div>
 
-      <!-- ── Barra de progreso del proyecto (analizar todos los lotes) ── -->
-      <div id="barra-progreso-proyecto" style="display:none;margin-bottom:8px;
-        background:rgba(15,20,15,0.92);border-radius:10px;padding:6px 10px;color:#fff;font-family:'Inter',sans-serif;
-        align-items:center;gap:8px;">
-        <button id="bpp-btn-analizar" onclick="proyectoActual.analyzeCurrent()"
-          style="background:#0d9488;border:none;color:#fff;font-size:9.5px;font-weight:700;padding:5px 8px;border-radius:7px;cursor:pointer;white-space:nowrap;">⚡ Analizar lote</button>
-        <div style="flex:1;height:5px;background:rgba(255,255,255,.15);border-radius:4px;overflow:hidden;">
-          <div id="bpp-fill" style="height:100%;width:0%;background:#0d9488;border-radius:4px;transition:width .3s;"></div>
+        <!-- ── Barra de progreso del proyecto (analizar todos los lotes) ── -->
+        <div id="barra-progreso-proyecto" style="display:none;
+          background:rgba(15,20,15,0.92);border-radius:10px;padding:6px 8px;color:#fff;font-family:'Inter',sans-serif;
+          align-items:center;gap:6px;flex-wrap:wrap;">
+          <button id="bpp-btn-analizar" onclick="proyectoActual.analyzeCurrent()"
+            style="background:#0d9488;border:none;color:#fff;font-size:8.5px;font-weight:700;padding:5px 7px;border-radius:7px;cursor:pointer;white-space:nowrap;">⚡ Analizar</button>
+          <div style="flex:1;min-width:40px;height:5px;background:rgba(255,255,255,.15);border-radius:4px;overflow:hidden;">
+            <div id="bpp-fill" style="height:100%;width:0%;background:#0d9488;border-radius:4px;transition:width .3s;"></div>
+          </div>
+          <span id="bpp-texto" style="font-size:8px;color:rgba(255,255,255,.6);white-space:nowrap;">0/0</span>
+          <button id="bpp-btn-todo" onclick="proyectoActual.analyzeAll()"
+            style="background:rgba(255,255,255,.1);border:none;color:#fff;font-size:8.5px;font-weight:700;padding:5px 7px;border-radius:7px;cursor:pointer;white-space:nowrap;">▶ Todo</button>
         </div>
-        <span id="bpp-texto" style="font-size:9px;color:rgba(255,255,255,.6);white-space:nowrap;">0 / 0</span>
-        <button id="bpp-btn-todo" onclick="proyectoActual.analyzeAll()"
-          style="background:rgba(255,255,255,.1);border:none;color:#fff;font-size:9.5px;font-weight:700;padding:5px 8px;border-radius:7px;cursor:pointer;white-space:nowrap;">▶ Todo</button>
       </div>
 
       <div id="leyenda-mapa" style="display:none"></div>
@@ -2371,9 +2357,9 @@
           <span class="material-symbols-outlined">palette</span>
           <div class="hm-fila-txt"><b>Leyenda de la capa</b><small>Ver escala de colores activa</small></div>
         </button>
-        <button id="btn-capas-io" class="hm-fila" onclick="toggleHerramientasMapa(); toggleCapasIOPanel();">
+        <button id="btn-capas-io" class="hm-fila" onclick="toggleHerramientasMapa(); document.getElementById('input-proyecto-kml').click();">
           <span class="material-symbols-outlined">folder_open</span>
-          <div class="hm-fila-txt"><b>Cargar / exportar</b><small>KML, GeoJSON</small></div>
+          <div class="hm-fila-txt"><b>Proyecto de Lotes</b><small>Cargar varios KML/GeoJSON, navegar, analizar y comparar</small></div>
         </button>
       </div>
 
@@ -2422,51 +2408,6 @@
     <div id="recorrido-stats">
       <span class="rec-dot"></span>
       <span id="recorrido-stats-txt">0 m · 0:00</span>
-    </div>
-
-    <!-- ── PANEL IMPORTAR / EXPORTAR KML · GEOJSON ── -->
-    <div id="capas-io-backdrop" onclick="toggleCapasIOPanel()"
-      style="display:none;position:absolute;inset:0;z-index:1600;background:rgba(0,0,0,0.35);"></div>
-    <div id="capas-io-panel"
-      style="display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-        z-index:1601;background:#fff;border-radius:16px;width:min(92%,380px);
-        max-height:80%;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.3);padding:16px;
-        font-family:Inter,sans-serif;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <h3 style="margin:0;font-size:15px;font-weight:800;color:#1a3b22;">Cargar / Exportar capas</h3>
-        <button onclick="toggleCapasIOPanel()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#6b7280;">✕</button>
-      </div>
-      <p style="font-size:12px;color:#6b7280;margin:0 0 12px;">
-        Compatible con archivos generados por Google Earth Pro, QGIS o LandViewer.
-      </p>
-
-      <label for="input-capas-io"
-        style="display:block;border:2px dashed #c8cdc6;border-radius:12px;padding:16px;
-          text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:#1a3b22;">
-        📂 Elegir archivo .kml / .kmz / .geojson / .json
-      </label>
-      <input id="input-capas-io" type="file" accept=".kml,.kmz,.geojson,.json"
-        style="display:none" onchange="importarCapaArchivo(event)"/>
-
-      <div id="capas-io-estado" style="font-size:12px;margin-top:8px;"></div>
-
-      <div id="capas-io-lista" style="margin-top:14px;display:flex;flex-direction:column;gap:8px;">
-        <p style="font-size:12px;color:#9ca3af;margin:0;">Todavía no cargaste ninguna capa.</p>
-      </div>
-
-      <hr style="margin:16px 0;border:none;border-top:1px solid #eceee9;">
-
-      <p style="font-size:12px;font-weight:800;color:#1a3b22;margin:0 0 8px;">Exportar mi campo delimitado</p>
-      <div style="display:flex;gap:8px;">
-        <button onclick="exportarCampoDelimitado('geojson')"
-          style="flex:1;background:#1a3b22;color:#fff;border:none;border-radius:10px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">
-          ⬇ GeoJSON
-        </button>
-        <button onclick="exportarCampoDelimitado('kml')"
-          style="flex:1;background:#1a3b22;color:#fff;border:none;border-radius:10px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">
-          ⬇ KML
-        </button>
-      </div>
     </div>
 
     <!-- ── PANEL PLANIFICADOR DE ACTIVIDADES (calendario) ── -->
@@ -2829,273 +2770,55 @@
         </button>
 
         <!-- ══ ZONAS INUNDABLES DEM ══ -->
+        <!-- ══ ANÁLISIS DE RIESGO HÍDRICO — solo botones a las herramientas ══ -->
         <div id="dem-panel" style="border-top:1.5px solid #e2e3de;padding-top:14px;margin-top:4px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
             <div style="width:32px;height:32px;border-radius:8px;background:#eff6ff;display:flex;align-items:center;justify-content:center;flex-shrink:0">
               <span class="material-symbols-outlined" style="color:#1e40af;font-size:18px">water</span>
             </div>
             <div>
-              <p style="font-weight:700;font-size:13px;color:#1a1c1a;margin:0">Zonas Inundables DEM</p>
-              <p style="font-size:11px;color:#727971;margin:0">SRTM 30m · GEE Backend</p>
+              <p style="font-weight:700;font-size:13px;color:#1a1c1a;margin:0">Análisis de riesgo hídrico</p>
+              <p style="font-size:11px;color:#727971;margin:0">Herramientas hidrológicas</p>
             </div>
           </div>
 
-          <!-- Selector de tipo de capa -->
-          <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#727971;margin:0 0 6px">Tipo de análisis</p>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:10px" id="dem-tipo-btns">
-            <button onclick="setDemTipo('riesgo')"    class="dem-tipo-btn" data-tipo="riesgo"    style="padding:7px 4px;border-radius:9px;border:1.5px solid #1e40af;background:#1e40af;color:#fff;font-size:11px;font-weight:700;cursor:pointer">🌊 Riesgo</button>
-            <button onclick="setDemTipo('elevacion')" class="dem-tipo-btn" data-tipo="elevacion" style="padding:7px 4px;border-radius:9px;border:1.5px solid #bfdbfe;background:#eff6ff;color:#1e40af;font-size:11px;font-weight:700;cursor:pointer">📐 Elevación</button>
-            <button onclick="setDemTipo('pendiente')" class="dem-tipo-btn" data-tipo="pendiente" style="padding:7px 4px;border-radius:9px;border:1.5px solid #bfdbfe;background:#eff6ff;color:#1e40af;font-size:11px;font-weight:700;cursor:pointer">📊 Pendiente</button>
-          </div>
-          <!-- Herramientas hidro-topográficas -->
-          <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#727971;margin:8px 0 6px">Herramientas hidro-topográficas</p>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:10px" id="dem-hidro-btns">
-            <button onclick="setHidroTool('simulador'); simActualizarPanelINA();" class="dem-hidro-btn" data-hidro="simulador"
-              style="padding:8px 4px;border-radius:9px;border:1.5px solid #bfdbfe;background:#eff6ff;color:#1e40af;font-size:10px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;line-height:1.2">
-              <span style="font-size:16px">🌊</span>Simulador<br>inundación
-            </button>
-            <button onclick="setHidroTool('depresiones')" class="dem-hidro-btn" data-hidro="depresiones"
-              style="padding:8px 4px;border-radius:9px;border:1.5px solid #bfdbfe;background:#eff6ff;color:#1e40af;font-size:10px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;line-height:1.2">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
-                <path d="M5 4 C5 13 8 20 12 20 C16 20 19 13 19 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-                <path d="M8.5 11 C9.7 12.6 14.3 12.6 15.5 11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-dasharray="2 1.6"/>
-                <circle cx="12" cy="11.3" r="1.6" fill="#22c55e"/>
-              </svg>
-              Detectar<br>depresiones
-            </button>
-            <button onclick="setHidroTool('escurrimiento')" class="dem-hidro-btn" data-hidro="escurrimiento"
-              style="padding:8px 4px;border-radius:9px;border:1.5px solid #bfdbfe;background:#eff6ff;color:#1e40af;font-size:10px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;line-height:1.2">
-              <span style="font-size:16px">💧</span>Dirección<br>escurrimiento
-            </button>
-          </div>
-
-          <!-- Panel: Simulador de inundación -->
-          <div id="hidro-panel-simulador" style="display:none;background:#eff6ff;border-radius:10px;padding:10px 11px;margin-bottom:10px;border:1.5px solid #bfdbfe">
-            <p style="font-size:11px;font-weight:700;color:#1e40af;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em">🌊 Simulador de inundación</p>
-
-            <!-- ══ Nivel base INA (condición inicial real de la simulación) ══ -->
-            <div id="sim-ina-panel" style="background:#dbeafe;border:1px solid #93c5fd;border-radius:10px;padding:8px 10px;margin-bottom:10px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#1e40af;margin:0">Nivel base INA</p>
-                <span id="sim-ina-badge" style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;background:#bfdbfe;color:#1e40af">Consultando…</span>
-              </div>
-              <p id="sim-ina-nivel" style="font-size:18px;font-weight:800;color:#1e3a8a;margin:0">—</p>
-              <p id="sim-ina-estacion" style="font-size:9px;color:#3b5b91;margin:2px 0 0">Estación hidrométrica: —</p>
-              <p id="sim-ina-fecha" style="font-size:9px;color:#3b5b91;margin:1px 0 0">Fecha y hora del dato: —</p>
-            </div>
-
-            <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#1e40af;margin:0 0 4px">Altura del río (escala hidrométrica, en metros)</p>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-              <span style="font-size:10px;color:#3b82f6;white-space:nowrap">0 m</span>
-              <input id="sim-nivel-slider" type="range" min="0" max="12" value="3" step="0.01"
-                style="flex:1;accent-color:#1e40af"
-                oninput="actualizarSimulador(this.value)"/>
-              <span style="font-size:10px;color:#3b82f6;white-space:nowrap">12 m</span>
-              <span id="sim-nivel-val" style="font-size:11px;font-weight:800;color:#1e40af;min-width:52px;text-align:right">3.00 m</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-              <span style="font-size:9px;color:#3b5b91">o ingresar valor exacto:</span>
-              <input id="sim-nivel-input" type="number" min="0" max="20" step="0.01" value="3.00"
-                style="width:70px;font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid #93c5fd;text-align:right"
-                oninput="actualizarSimulador(this.value)"/>
-              <span style="font-size:9px;color:#3b5b91">m</span>
-            </div>
-
-            <!-- ══ Escenarios de crecidas históricas (Corrientes) ══ -->
-            <p style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#3b5b91;margin:0 0 4px">Escenarios de referencia</p>
-            <div id="sim-escenarios-wrap" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">
-              <button type="button" onclick="simSeleccionarEscenario('actual')" data-escenario="actual"
-                class="sim-escenario-btn" style="font-size:9.5px;padding:5px 8px;border-radius:7px;border:1.5px solid #93c5fd;background:#fff;color:#1e40af;font-weight:700;cursor:pointer">Nivel actual (INA)</button>
-              <button type="button" onclick="simSeleccionarEscenario('crecida_historica_1998')" data-escenario="crecida_historica_1998"
-                class="sim-escenario-btn" style="font-size:9.5px;padding:5px 8px;border-radius:7px;border:1.5px solid #93c5fd;background:#fff;color:#1e40af;font-weight:700;cursor:pointer">Crecida 1998 (8,39 m)</button>
-              <button type="button" onclick="simSeleccionarEscenario('crecida_historica_1992')" data-escenario="crecida_historica_1992"
-                class="sim-escenario-btn" style="font-size:9.5px;padding:5px 8px;border-radius:7px;border:1.5px solid #93c5fd;background:#fff;color:#1e40af;font-weight:700;cursor:pointer">Crecida 1992 (8,63 m)</button>
-              <button type="button" onclick="simSeleccionarEscenario('crecida_historica_1983')" data-escenario="crecida_historica_1983"
-                class="sim-escenario-btn" style="font-size:9.5px;padding:5px 8px;border-radius:7px;border:1.5px solid #93c5fd;background:#fff;color:#1e40af;font-weight:700;cursor:pointer">Crecida 1983 (9,03 m)</button>
-            </div>
-            <p style="font-size:8px;color:#94a3b8;margin:-6px 0 10px;line-height:1.3">Valores históricos de la escala hidrométrica de Corrientes (fuente: registros IGN / INA). Pueden variar levemente según la fuente consultada; ajustá el valor exacto si contás con otro dato de referencia.</p>
-
-            <!-- ══ Resumen del escenario de simulación ══ -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">
-              <div style="background:#dbeafe;border-radius:8px;padding:6px;text-align:center">
-                <p style="font-size:8.5px;color:#1e40af;margin:0 0 2px">Nivel actual INA</p>
-                <p id="sim-resumen-base" style="font-size:12px;font-weight:800;color:#1e40af;margin:0">—</p>
-              </div>
-              <div style="background:#dbeafe;border-radius:8px;padding:6px;text-align:center">
-                <p style="font-size:8.5px;color:#1e40af;margin:0 0 2px">Diferencia vs. actual</p>
-                <p id="sim-resumen-incremento" style="font-size:12px;font-weight:800;color:#1e40af;margin:0">—</p>
-              </div>
-              <div style="background:#bfdbfe;border-radius:8px;padding:6px;text-align:center">
-                <p style="font-size:8.5px;color:#1e3a8a;margin:0 0 2px">Altura simulada</p>
-                <p id="sim-resumen-total" style="font-size:12px;font-weight:800;color:#1e3a8a;margin:0">3.00 m</p>
-              </div>
-            </div>
-
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">
-              <div style="background:#fff;border-radius:8px;padding:6px;text-align:center;border:1px solid #bfdbfe">
-                <p style="font-size:9px;color:#727971;margin:0;text-transform:uppercase">Área inundada</p>
-                <p id="sim-area" style="font-size:13px;font-weight:800;color:#1e40af;margin:2px 0 0">--</p>
-              </div>
-              <div style="background:#fff;border-radius:8px;padding:6px;text-align:center;border:1px solid #bfdbfe">
-                <p style="font-size:9px;color:#727971;margin:0;text-transform:uppercase">% del área</p>
-                <p id="sim-pct" style="font-size:13px;font-weight:800;color:#1e40af;margin:2px 0 0">--</p>
-              </div>
-              <div style="background:#fff;border-radius:8px;padding:6px;text-align:center;border:1px solid #bfdbfe">
-                <p style="font-size:9px;color:#727971;margin:0;text-transform:uppercase">Volumen</p>
-                <p id="sim-vol" style="font-size:13px;font-weight:800;color:#1e40af;margin:2px 0 0">--</p>
-              </div>
-            </div>
-            <div style="display:flex;gap:6px">
-              <button onclick="reiniciarSimulador()" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid #bfdbfe;background:#fff;color:#1e40af;font-size:11px;font-weight:700;cursor:pointer">Reiniciar</button>
-              <button onclick="aplicarSimuladorInundacion()" style="flex:2;padding:7px;border-radius:8px;border:none;background:#1e40af;color:#fff;font-size:11px;font-weight:700;cursor:pointer">Aplicar</button>
-            </div>
-
-            <!-- ══ Animación de expansión ══ -->
-            <div style="margin-top:10px;padding-top:10px;border-top:1px solid #bfdbfe">
-              <button onclick="simCargarAnimacion()" id="sim-anim-btn"
-                style="width:100%;padding:8px;border-radius:9px;background:#0e7490;color:#fff;font-weight:700;font-size:11px;border:none;cursor:pointer">▶ Animar expansión</button>
-              <div id="sim-anim-player" style="display:none;margin-top:8px">
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-                  <button onclick="simAnimTogglePlay()" id="sim-anim-playpause"
-                    style="padding:6px 10px;border-radius:8px;border:1.5px solid #a5f3fc;background:#fff;color:#0e7490;font-weight:700;cursor:pointer">▶</button>
-                  <input id="sim-anim-slider" type="range" min="0" max="9" value="0" step="1"
-                    style="flex:1;accent-color:#0e7490" oninput="simAnimIrAFrame(this.value)"/>
-                  <select id="sim-anim-velocidad" onchange="simAnimSetVelocidad(this.value)"
-                    style="font-size:10px;border-radius:6px;border:1px solid #a5f3fc;padding:3px 4px;background:#fff;color:#0e7490">
-                    <option value="1500">0.5x</option>
-                    <option value="700" selected>1x</option>
-                    <option value="350">2x</option>
-                  </select>
-                </div>
-                <p id="sim-anim-info" style="font-size:10px;color:#0e7490;margin:0 0 6px;text-align:center;font-weight:600">—</p>
-                <div style="display:flex;align-items:center;gap:5px;justify-content:center">
-                  <label style="font-size:9px;color:#64748b">Velocidad de avance (estimación tuya):</label>
-                  <input id="sim-anim-velocidad-avance" type="number" value="500" min="10" step="10"
-                    style="width:56px;font-size:10px;border-radius:6px;border:1px solid #cbd5e1;padding:2px 4px"
-                    oninput="simAnimActualizarInfo()"/>
-                  <span style="font-size:9px;color:#64748b">m/h</span>
-                </div>
-              </div>
-              <p style="font-size:9px;color:#64748b;line-height:1.3;margin:6px 0 0">
-                La animación muestra el <b>orden</b> en que se inundarían las zonas (más cerca del río, primero), calculado por distancia real de conectividad — no es una predicción con tiempo real. Las horas mostradas dependen de la velocidad de avance que vos cargues arriba.
-              </p>
-            </div>
-
-            <!-- ══ Velocidad de flujo aproximada ══ -->
-            <div style="margin-top:10px;padding-top:10px;border-top:1px solid #bfdbfe">
-              <p style="font-size:10px;font-weight:700;color:#b91c1c;margin:0 0 6px">💨 Velocidad de flujo (sobre la simulación aplicada)</p>
-              <div style="display:flex;align-items:center;gap:5px;margin-bottom:8px">
-                <label style="font-size:9px;color:#64748b;white-space:nowrap">Rugosidad de Manning (n):</label>
-                <input id="sim-manning-n" type="number" value="0.035" min="0.01" max="0.15" step="0.005"
-                  style="width:56px;font-size:10px;border-radius:6px;border:1px solid #cbd5e1;padding:2px 4px"/>
-                <span style="font-size:9px;color:#94a3b8">(0.02 canal liso — 0.10 vegetación densa)</span>
-              </div>
-              <button onclick="simVerVelocidadFlujo()" id="sim-vel-btn"
-                style="width:100%;padding:8px;border-radius:9px;background:#b91c1c;color:#fff;font-weight:700;font-size:11px;border:none;cursor:pointer">💨 Ver velocidad de flujo</button>
-              <p style="font-size:9px;color:#64748b;line-height:1.3;margin:6px 0 0">
-                Requiere haber apretado "Aplicar" arriba primero. Aproxima la velocidad con la ecuación de Manning (profundidad simulada + pendiente del terreno) — es una estimación de ingeniería, no un modelo hidráulico 2D completo.
-              </p>
-            </div>
-
-            <!-- ══ Aviso técnico ══ -->
-            <p style="font-size:9px;color:#64748b;line-height:1.4;margin:10px 0 0;padding-top:8px;border-top:1px solid #bfdbfe">
-              La simulación marca como zona anegada toda superficie cuya elevación (Modelo Digital de Elevación NASA SRTM) sea igual o menor a la altura de río ingresada, expresada en la escala hidrométrica local (mismo criterio que usan las estaciones de aforo del INA/Prefectura). El nivel actual del río se obtiene de la API del Instituto Nacional del Agua (INA). Esta herramienta representa un escenario hipotético y no constituye un pronóstico oficial de inundaciones.
-            </p>
-          </div>
-
-          <!-- Panel: Detectar depresiones -->
-          <div id="hidro-panel-depresiones" style="display:none;background:#eff6ff;border-radius:10px;padding:10px 11px;margin-bottom:10px;border:1.5px solid #bfdbfe">
-            <p style="font-size:11px;font-weight:700;color:#1e40af;margin:0 0 6px;text-transform:uppercase;letter-spacing:.04em">🫧 Detectar depresiones</p>
-            <p style="font-size:11px;color:#374151;margin:0 0 8px;line-height:1.4">Resalta automáticamente las zonas bajas o depresiones del terreno donde el agua se acumula.</p>
-            <div style="margin-bottom:8px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                <p style="font-size:11px;font-weight:700;color:#727971;margin:0;text-transform:uppercase">Sensibilidad</p>
-                <span id="dep-sens-val" style="font-size:11px;font-weight:700;color:#1e40af">Media</span>
-              </div>
-              <input id="dep-sensibilidad" type="range" min="1" max="3" value="2" step="1"
-                style="width:100%;accent-color:#1e40af"
-                oninput="const l=['Baja','Media','Alta'];document.getElementById('dep-sens-val').textContent=l[this.value-1]"/>
-            </div>
-            <button onclick="aplicarDetectarDepresiones()" style="width:100%;padding:8px;border-radius:8px;border:none;background:#1e40af;color:#fff;font-size:11px;font-weight:700;cursor:pointer">Detectar depresiones</button>
-          </div>
-
-          <!-- Panel: Dirección de escurrimiento -->
-          <div id="hidro-panel-escurrimiento" style="display:none;background:#eff6ff;border-radius:10px;padding:10px 11px;margin-bottom:10px;border:1.5px solid #bfdbfe">
-            <p style="font-size:11px;font-weight:700;color:#1e40af;margin:0 0 6px;text-transform:uppercase;letter-spacing:.04em">💧 Dirección de escurrimiento</p>
-            <p style="font-size:11px;color:#374151;margin:0 0 8px;line-height:1.4">Calcula y muestra vectores (flechas) sobre el mapa indicando hacia dónde escurre el agua según la topografía.</p>
-            <div style="margin-bottom:8px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                <p style="font-size:11px;font-weight:700;color:#727971;margin:0;text-transform:uppercase">Densidad de vectores</p>
-                <span id="esc-dens-val" style="font-size:11px;font-weight:700;color:#1e40af">Normal</span>
-              </div>
-              <input id="esc-densidad" type="range" min="1" max="3" value="2" step="1"
-                style="width:100%;accent-color:#1e40af"
-                oninput="const l=['Baja','Normal','Alta'];document.getElementById('esc-dens-val').textContent=l[this.value-1]"/>
-            </div>
-            <button onclick="aplicarEscurrimiento()" style="width:100%;padding:8px;border-radius:8px;border:none;background:#1e40af;color:#fff;font-size:11px;font-weight:700;cursor:pointer">Ver dirección de flujo</button>
-          </div>
-
-          <div style="display:none" id="dem-tipo-btns-placeholder">
-          </div>
-
-          <!-- Umbral personalizado (solo para ciertos tipos) -->
-          <div id="dem-umbral-wrap" style="margin-bottom:10px;display:none">
-            <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#727971;margin:0 0 6px">Simulación — umbral de elevación</p>
-            <div style="display:flex;gap:6px;align-items:center">
-              <input id="dem-umbral-input" type="number" min="1" max="500" step="1" placeholder="Ej: 45"
-                style="flex:1;padding:7px 10px;border-radius:8px;border:1.5px solid #bfdbfe;font-size:13px;font-weight:700;color:#1e40af;text-align:center"/>
-              <span style="font-size:12px;color:#727971">m s.n.m.</span>
-            </div>
-            <p id="dem-umbral-label" style="font-size:11px;color:#3b82f6;margin:5px 0 0;text-align:center">Zonas ≤ <b>--</b> m sobre el nivel del mar serán marcadas</p>
-          </div>
-
-          <!-- Radio de búsqueda -->
-          <div style="margin-bottom:10px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-              <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#727971;margin:0">Radio mínimo</p>
-              <span id="dem-radio-val" style="font-size:12px;font-weight:700;color:#1e40af">800 km</span>
-            </div>
-            <input id="dem-radio" type="range" min="50" max="800" value="800" step="50"
-              style="width:100%;accent-color:#1e40af"
-              oninput="document.getElementById('dem-radio-val').textContent=this.value+' km'"/>
-            <p style="font-size:10px;color:#9ca3af;margin:4px 0 0">La capa siempre cubre toda la pantalla visible; este valor solo la agranda si querés más contexto alrededor.</p>
-          </div>
-
-          <!-- Opacidad -->
-          <div style="margin-bottom:10px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-              <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#727971;margin:0">Opacidad</p>
-              <span id="dem-opacidad-val" style="font-size:12px;font-weight:700;color:#1e40af">65%</span>
-            </div>
-            <input id="dem-opacidad" type="range" min="10" max="100" value="65"
-              style="width:100%;accent-color:#1e40af"
-              oninput="document.getElementById('dem-opacidad-val').textContent=this.value+'%'; if(capaInundable) capaInundable.setOpacity(this.value/100)"/>
-          </div>
-
-          <!-- Botones -->
-          <button id="dem-btn-aplicar" onclick="aplicarZonasInundables()"
-            class="w-full py-3 rounded-xl font-bold text-white active:scale-[0.98] transition-all"
-            style="background:#1e40af;border:none;cursor:pointer;margin-bottom:6px;font-size:13px">
-            🌊 Ver capa DEM
-          </button>
-          <button id="dem-btn-punto" onclick="activarInspectorPunto()"
-            class="w-full py-2 rounded-xl font-bold border-2 active:scale-[0.98] transition-all"
-            style="border-color:#1e40af;color:#1e40af;background:#eff6ff;cursor:pointer;display:none;font-size:12px;margin-bottom:6px">
-            🖱️ Inspector de punto
-          </button>
-          <button id="dem-btn-quitar" onclick="quitarZonasInundables()"
-            class="w-full py-2 rounded-xl font-bold border-2 active:scale-[0.98] transition-all"
-            style="border-color:#e2e3de;color:#6b7280;background:#fff;cursor:pointer;display:none;font-size:12px">
-            Quitar capa DEM
+          <button onclick="toggleGeeSheet(); toggleAguasSuperficialesHidro();"
+            class="w-full py-2.5 rounded-xl font-bold border-2 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mb-2"
+            style="border-color:#0369a1;color:#0369a1;background:#fff;font-size:12.5px">
+            <span class="material-symbols-outlined" style="font-size:17px">water_drop</span>
+            Cuerpos de agua (ríos, lagunas, esteros)
           </button>
 
-          <!-- Info -->
-          <div style="background:#eff6ff;border-radius:10px;padding:9px 11px;margin-top:8px;font-size:11px;color:#1e40af">
-            Riesgo = elevación (40%) + pendiente (30%) + humedad suelo (30%)<br>
-            Fuente: <b>NASA SRTM 30m</b> · GEE Backend
-          </div>
-          <p id="dem-mensaje" style="font-size:11px;text-align:center;color:#727971;margin-top:8px"></p>
+          <button onclick="toggleGeeSheet(); abrirSimuladorHidro();"
+            class="w-full py-2.5 rounded-xl font-bold border-2 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mb-2"
+            style="border-color:#1e40af;color:#1e40af;background:#fff;font-size:12.5px">
+            <span class="material-symbols-outlined" style="font-size:17px">tsunami</span>
+            Simulador de inundación
+          </button>
+
+          <button onclick="toggleGeeSheet(); irAAnalisisHidrologico();"
+            class="w-full py-2.5 rounded-xl font-bold border-2 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mb-2"
+            style="border-color:#0e7490;color:#0e7490;background:#fff;font-size:12.5px">
+            <span class="material-symbols-outlined" style="font-size:17px">grain</span>
+            Riesgo hidrológico del suelo
+          </button>
+
+          <button onclick="toggleGeeSheet(); irA('mapa'); MedicionSuperficie.abrirPanel();"
+            class="w-full py-2.5 rounded-xl font-bold border-2 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mb-2"
+            style="border-color:#7c3aed;color:#7c3aed;background:#fff;font-size:12.5px">
+            <span class="material-symbols-outlined" style="font-size:17px">straighten</span>
+            Medición de superficie
+          </button>
+
+          <button onclick="toggleGeeSheet(); IIPDIInspector.toggleModal();"
+            class="w-full py-2.5 rounded-xl font-bold border-2 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            style="border-color:#dc2626;color:#dc2626;background:#fff;font-size:12.5px">
+            <span class="material-symbols-outlined" style="font-size:17px">travel_explore</span>
+            Inspector de Riesgo Hidrológico
+          </button>
         </div>
+        <!-- ══ FIN ANÁLISIS DE RIESGO HÍDRICO ══ -->
+
         <!-- ══ FIN ZONAS INUNDABLES ══ -->
 
         <!-- Mensaje / leyenda -->
@@ -3193,21 +2916,12 @@
     <input id="input-proyecto-kml" type="file" accept=".kml,.kmz,.geojson,.json" multiple
       style="display:none" onchange="onCargarProyecto(event)"/>
     <button onclick="irA('mapa'); document.getElementById('input-proyecto-kml').click();" class="informe-btn informe-btn-primario mt-3">Cargar proyecto</button>
+    <div id="capas-io-estado" style="font-size:12px;margin-top:8px;"></div>
+    <div id="capas-io-lista" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+      <p style="font-size:12px;color:#9ca3af;margin:0;">Todavía no cargaste ninguna capa.</p>
+    </div>
   </div>
 </div><!-- /pantalla-hidrologia -->
-
-<!-- ════════════════════════════════════════════
-     HISTORIAL DE SESIÓN — OVERLAY + MODAL
-═════════════════════════════════════════════ -->
-<div id="historial-overlay" class="informe-overlay-generico">
-  <div id="historial-modal" class="informe-modal-generico">
-    <h3>🕘 Historial de sesión</h3>
-    <p style="font-size:12px;color:#727971;margin:0 0 4px">Análisis de riesgo hechos en esta sesión (se guardan en este dispositivo)</p>
-    <div id="historial-lista" style="margin:12px 0;"></div>
-    <button class="informe-btn informe-btn-secundario" onclick="historialLimpiar()">🗑️ Borrar historial</button>
-    <button class="informe-btn informe-btn-secundario" onclick="cerrarHistorialSesion()">Cerrar</button>
-  </div>
-</div>
 
 <!-- ════════════════════════════════════════════
      INFORME EXPRESS — OVERLAY + MODAL
@@ -3242,11 +2956,11 @@
 
 // ── HELPER SEGURO: evita crashes si el elemento no existe en el DOM ──
 // ════════════════════════════════════════════════════════════════
-//  HISTORIAL DE SESIÓN — registro liviano de cada análisis de riesgo
-//  que corre la app (incendio, inundación, sequía, vegetación,
-//  suelos), guardado en localStorage. No requiere backend ni
-//  conexión: sirve para que el productor pueda repasar qué se
-//  detectó en la sesión, aunque cierre y vuelva a abrir la app.
+//  HISTORIAL DE SESIÓN — localStorage como buffer interno temporal
+//  Registra cada análisis de riesgo (incendio, inundación, sequía,
+//  vegetación, suelos) que corre la app durante la sesión. No tiene
+//  interfaz propia: es el mismo buffer liviano que usa la versión
+//  PC, no se le agregó ningún visor adicional para mantener paridad.
 // ════════════════════════════════════════════════════════════════
 const HISTORIAL_KEY = 'geosentinel_historial_sesion';
 
@@ -3262,7 +2976,6 @@ function historialGuardar(entrada) {
     // en sesiones muy largas.
     if (lista.length > 200) lista.splice(0, lista.length - 200);
     localStorage.setItem(HISTORIAL_KEY, JSON.stringify(lista));
-    _refrescarHistorialUI();
   } catch(e) {
     console.warn('[Historial] Error al guardar:', e.message);
   }
@@ -3276,53 +2989,8 @@ function historialLeer() {
 
 function historialLimpiar() {
   localStorage.removeItem(HISTORIAL_KEY);
-  _refrescarHistorialUI();
 }
 // ════════════════════════════════════════════════════════════════
-
-// ── Íconos y colores por tipo de análisis, para la lista del historial ──
-const HISTORIAL_TIPO_INFO = {
-  incendio:    { icono: '🔥', color: '#dc2626', bg: '#fee2e2', label: 'Incendio' },
-  inundacion:  { icono: '🌊', color: '#1e40af', bg: '#eff6ff', label: 'Inundación' },
-  sequia:      { icono: '🌾', color: '#92400e', bg: '#fffbeb', label: 'Sequía' },
-  vegetacion:  { icono: '🌱', color: '#166534', bg: '#f0fdf4', label: 'Vegetación' },
-  suelos:      { icono: '🌍', color: '#78350f', bg: '#fef3c7', label: 'Suelos INTA' },
-  aptitud_suelo: { icono: '🌾', color: '#166534', bg: '#f0fdf4', label: 'Aptitud productiva' },
-};
-
-function abrirHistorialSesion() {
-  _refrescarHistorialUI();
-  const overlay = $el('historial-overlay');
-  if (overlay) overlay.classList.add('activo');
-}
-function cerrarHistorialSesion() {
-  const overlay = $el('historial-overlay');
-  if (overlay) overlay.classList.remove('activo');
-}
-
-function _refrescarHistorialUI() {
-  const cont = $el('historial-lista');
-  if (!cont) return; // el modal todavía no está montado en esta pantalla
-
-  const lista = historialLeer().slice().reverse(); // más reciente primero
-  if (!lista.length) {
-    cont.innerHTML = `<p style="font-size:12px;color:#9ca3af;text-align:center;padding:20px 0;">Todavía no hay análisis registrados en esta sesión.<br>Corré una herramienta de riesgo (incendio, inundación, sequía, suelos) y va a aparecer acá.</p>`;
-    return;
-  }
-
-  cont.innerHTML = lista.map(item => {
-    const info = HISTORIAL_TIPO_INFO[item.tipo] || { icono: '📊', color: '#41453f', bg: '#f5f5f0', label: item.tipo };
-    const coords = (item.lat != null && item.lon != null)
-      ? `${parseFloat(item.lat).toFixed(4)}, ${parseFloat(item.lon).toFixed(4)}`
-      : '';
-    return `
-      <div class="historial-item">
-        <span class="historial-tag" style="background:${info.bg};color:${info.color}">${info.icono} ${info.label}</span>
-        <p class="h-nivel" style="color:${info.color}">${item.nivelTexto || ''}</p>
-        <p class="h-fecha">${item.fecha || ''}${coords ? ' · ' + coords : ''}</p>
-      </div>`;
-  }).join('');
-}
 
 function $el(id) {
   const e = document.getElementById(id);
@@ -3376,18 +3044,41 @@ function iniciarGPS() {
     return;
   }
   navigator.geolocation.watchPosition(pos => {
-    gpsLat  = pos.coords.latitude.toFixed(6);
-    gpsLon  = pos.coords.longitude.toFixed(6);
-    const prec = Math.round(pos.coords.accuracy);
-    gpsListo = true;
+    // ── FIX: mientras se está viendo un lote de un proyecto cargado, la
+    // "ubicación activa" (gpsLat/gpsLon) es el centro de ESE lote, no la
+    // posición real del dispositivo — así lo dejó showCurrentLayer(). Si el
+    // GPS real llega en ese momento (watchPosition sigue corriendo siempre
+    // en segundo plano), no debe pisarla: sino los focos, el clima y el
+    // Ángström se recalculan sobre la ubicación real del celular en vez del
+    // lote que se está analizando (ej: viendo un lote en África con el
+    // celular físicamente en Argentina, los focos volvían a salir de acá).
+    const proyectoAbierto = typeof proyectoActual !== 'undefined' && proyectoActual && proyectoActual.files.length > 0;
 
+    const prec = Math.round(pos.coords.accuracy);
     setText('gps-txt', `✅ GPS listo · ±${prec}m`);
-    setText('gps-coords', `${gpsLat}, ${gpsLon}`);
+    setText('gps-coords', `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`);
     setStyle('gps-box','background','#f0fdf4');
     setStyle('gps-box','borderColor','#86efac');
     $el('gps-icon').classList.remove('spin');
     $el('gps-icon').style.color = '#16a34a';
     $el('gps-icon').textContent = 'location_on';
+
+    if (proyectoAbierto) {
+      // Guardamos la posición real fresca para restaurarla tal cual al
+      // cerrar el proyecto (proyectoActual.cerrar() la usa), pero SIN
+      // tocar gpsLat/gpsLon ni volver a pedir focos/clima ahora.
+      proyectoActual._gpsRealBackup = { lat: pos.coords.latitude.toFixed(6), lon: pos.coords.longitude.toFixed(6), listo: true };
+      // El recorrido caminando registra el movimiento real del dispositivo,
+      // sin importar qué lote del proyecto se esté viendo en pantalla.
+      if (typeof _registrarPuntoRecorrido === 'function') {
+        _registrarPuntoRecorrido(pos.coords.latitude, pos.coords.longitude, Date.now());
+      }
+      return;
+    }
+
+    gpsLat  = pos.coords.latitude.toFixed(6);
+    gpsLon  = pos.coords.longitude.toFixed(6);
+    gpsListo = true;
 
     cargarDatos();
     iniciarModuloHidrico();
@@ -4195,10 +3886,6 @@ const CAPA_ETIQUETAS_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services
 let capaEtiquetas = null;
 let etiquetasVisibles = true; // el usuario puede togglear con toggleEtiquetasBtn()
 
-// ── DEM auto-refresh al mover el mapa ──
-let _demMoveDebounce   = null;  // timer de debounce
-let _demCentroAplicado = null;  // { lat, lon } del último request DEM exitoso
-
 // ── LÍNEAS TÁCTICAS AUTOMÁTICAS ─────────────────
 let fireConnectionsLayer = null;  // LayerGroup para líneas + etiquetas permanentes
 let lineasTacticas       = [];    // referencias internas para limpieza
@@ -4242,22 +3929,6 @@ function iniciarMapa() {
     attributionControl: true
   });
 
-  // Redibuja los vectores de escurrimiento al cambiar el zoom, sin volver
-  // a consultar el backend GEE (usa la última grilla ya recibida).
-  mapa.on('zoomend', () => {
-    if (typeof hidroToolActiva !== 'undefined' && hidroToolActiva === 'escurrimiento' &&
-        typeof puntosEscurrimientoActual !== 'undefined' && puntosEscurrimientoActual) {
-      dibujarVectoresEscurrimiento();
-    }
-  });
-
-  // Si hay una herramienta hidro (simulador/depresiones/escurrimiento) con
-  // una capa ya aplicada y el usuario mueve el mapa a otra zona, se vuelve
-  // a calcular automáticamente en el nuevo centro. Se ignoran movimientos
-  // chicos (para no golpear el backend GEE en cada pequeño arrastre) y se
-  // usa un pequeño debounce para agrupar movimientos sucesivos rápidos.
-  mapa.on('moveend', reaplicarHidroSegunFoco);
-
   // Capa base inicial: satélite
   capaLeaflet = crearCapaBase(capasBase[0]).addTo(mapa);
 
@@ -4283,32 +3954,6 @@ function iniciarMapa() {
   // Listener global de click: maneja inspector DEM y modo delimitar campo
   mapa.on('click', onMapaClick);
   if (typeof IIPDIInspector !== 'undefined') IIPDIInspector.iniciar();
-
-  // ── Auto-refresh capa DEM al mover el mapa ──────────────────────────────
-  // Cuando el usuario navega a otra zona mientras hay capa DEM activa,
-  // re-aplicamos automáticamente después de 1.5 s sin movimiento.
-  // Si hay campo guardado, la lógica interna de aplicarZonasInundables
-  // seguirá usando el centroide del campo; si no, usará el nuevo centro del mapa.
-  mapa.on('moveend', () => {
-    if (!capaInundable) return;
-    clearTimeout(_demMoveDebounce);
-    mostrarBtnDemRefresh(true);
-    _demMoveDebounce = setTimeout(async () => {
-      const centro = mapa.getCenter();
-      if (_demCentroAplicado) {
-        const distKm = haversine(
-          _demCentroAplicado.lat, _demCentroAplicado.lon,
-          centro.lat, centro.lng
-        );
-        if (distKm < 3) { mostrarBtnDemRefresh(false); return; }
-      }
-      await aplicarZonasInundables();
-      mostrarBtnDemRefresh(false);
-    }, 1500);
-  });
-
-  // Inicializar botones de tipo DEM (el primero activo)
-  setDemTipo('riesgo');
 }
 
 function actualizarMapa() {
@@ -6241,6 +5886,10 @@ class ProjectManager {
     mostrarMsgProyecto(msg, errores.length ? '#78350f' : '#2F855A', errores.length ? '#fffbeb' : '#EAF4ED');
 
     _renderBarraProyecto();
+    if (totalPrevio === 0) {
+      const wrap = $el('barra-proyecto-wrap');
+      if (wrap) wrap.style.display = 'block'; // primera vez: se muestra abierto una vez
+    }
     try { if (typeof rhActualizarPersianaProyecto === 'function') rhActualizarPersianaProyecto(); } catch (e) {}
     // Si es el primer lote del proyecto, lo activa (dibuja campo+buffer, centra el mapa)
     // SOLO si el usuario no tenía ya un campo/análisis en curso (ej. incendio, hidrología).
@@ -6502,6 +6151,10 @@ class ProjectManager {
     this._campoRealBackup = null;
     this._gpsRealBackup = null;
 
+    const wrap = $el('barra-proyecto-wrap');
+    if (wrap) wrap.style.display = 'none';
+    const btnToggle = $el('btn-toggle-proyecto');
+    if (btnToggle) btnToggle.style.display = 'none';
     const barra = $el('barra-proyecto');
     if (barra) barra.style.display = 'none';
     const progreso = $el('barra-progreso-proyecto');
@@ -6533,19 +6186,38 @@ async function onCargarProyecto(evento) {
   await proyectoActual.loadFiles(archivos);
   evento.target.value = '';
 }
+// ── Abre/cierra el panel de proyecto (nunca se pierde: el botón
+//    compacto btn-toggle-proyecto queda siempre visible para reabrirlo) ──
+function toggleBarraProyecto() {
+  const wrap = $el('barra-proyecto-wrap');
+  if (!wrap) return;
+  const abierto = wrap.style.display !== 'none';
+  wrap.style.display = abierto ? 'none' : 'block';
+}
+
 function _renderBarraProyecto() {
+  const wrap = $el('barra-proyecto-wrap');
   const barra = $el('barra-proyecto');
   const progreso = $el('barra-progreso-proyecto');
+  const btnToggle = $el('btn-toggle-proyecto');
   if (!barra) return;
 
   const total = proyectoActual.files.length;
   if (total === 0) {
+    if (wrap) wrap.style.display = 'none';
+    if (btnToggle) btnToggle.style.display = 'none';
     barra.style.display = 'none';
     if (progreso) progreso.style.display = 'none';
     return;
   }
+
+  // El botón compacto (izquierda) siempre visible mientras haya proyecto.
+  if (btnToggle) btnToggle.style.display = 'flex';
   barra.style.display = 'flex';
   if (progreso) progreso.style.display = 'flex';
+  // Si el panel ya estaba minimizado por el usuario, se mantiene así —
+  // solo se abre solo la primera vez que aparece un proyecto nuevo
+  // (_abrirBarraProyectoUnaVez la fuerza a 'block' en loadFiles()).
 
   const lote = proyectoActual.loteActual;
   const idx  = proyectoActual.currentIndex + 1;
@@ -6554,6 +6226,7 @@ function _renderBarraProyecto() {
   setText('bp-badge', `${total} capa${total > 1 ? 's' : ''} cargada${total > 1 ? 's' : ''}`);
   setText('bp-contador', `${idx} / ${total}`);
   setText('bp-archivo', lote ? lote.nombre : '—');
+  setText('btn-toggle-proyecto-badge', `${idx}/${total}`);
 
   const estadoEl = $el('bp-estado');
   if (estadoEl) {
@@ -6606,7 +6279,7 @@ function _renderizarListaLotesProyecto() {
         <span style="font-size:11px;">${estado}</span>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button onclick="proyectoActual.goTo(${i}).catch(e=>console.error('[Ver lote]', e)).finally(()=>cerrarCapasIOPanel())" style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid #E2E8F0;background:${activo ? '#EAF4ED' : '#fff'};cursor:pointer;">${activo ? '● Activo' : '👁 Ver'}</button>
+        <button onclick="proyectoActual.goTo(${i}).catch(e=>console.error('[Ver lote]', e))" style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid #E2E8F0;background:${activo ? '#EAF4ED' : '#fff'};cursor:pointer;">${activo ? '● Activo' : '👁 Ver'}</button>
         <button onclick="proyectoActual.toggleVisibilidadLote(${i})" style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid #E2E8F0;background:#fff;cursor:pointer;">${oculto ? '⚪ Mostrar' : '🟢 Ocultar'}</button>
         <button onclick="proyectoActual.goTo(${i}).then(()=>proyectoActual.analyzeCurrent())" style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid #E2E8F0;background:#fff;cursor:pointer;">⚡ Analizar</button>
         <button onclick="irAAnalisisHidrologico(${i})" title="Enviar este lote al Análisis Hidrológico" style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;cursor:pointer;">🌊 Hidrología</button>
@@ -13422,268 +13095,6 @@ async function aplicarRiesgoIncendio() {
   btn.disabled = false;
 }
 
-// ════════════════════════════════════════════════
-//  ZONAS INUNDABLES — Motor DEM via GEE Backend
-//  Tipos: riesgo | elevacion | pendiente | zona_baja | zona_media
-// ════════════════════════════════════════════════
-let capaInundable  = null;
-let demTipoActivo  = 'riesgo';
-let inspectorActivo = false;
-
-function setDemTipo(tipo) {
-  demTipoActivo = tipo;
-  document.querySelectorAll('.dem-tipo-btn').forEach(b => {
-    const sel = b.dataset.tipo === tipo;
-    b.style.background    = sel ? '#1e40af' : '#eff6ff';
-    b.style.color         = sel ? '#fff'    : '#1e40af';
-    b.style.borderColor   = sel ? '#1e40af' : '#bfdbfe';
-  });
-  // Mostrar input de umbral personalizado solo para tipos que usan elevación absoluta
-  const tiposConUmbral = ['zona_baja', 'zona_media', 'elevacion'];
-  const wrap  = $el('dem-umbral-wrap');
-  const label = $el('dem-umbral-label');
-  if (wrap) wrap.style.display = tiposConUmbral.includes(tipo) ? 'block' : 'none';
-  if (label) {
-    const inputVal = $el('dem-umbral-input');
-    const v = inputVal ? inputVal.value : '--';
-    label.innerHTML = `Zonas ≤ <b>${v || '--'}</b> m sobre el nivel del mar serán marcadas`;
-    if (inputVal) {
-      inputVal.oninput = () => {
-        label.innerHTML = `Zonas ≤ <b>${inputVal.value || '--'}</b> m sobre el nivel del mar serán marcadas`;
-      };
-    }
-  }
-}
-
-async function aplicarZonasInundables() {
-  const btn      = $el('dem-btn-aplicar');
-  const msg      = $el('dem-mensaje');
-  const opacidad = parseInt($el('dem-opacidad').value, 10) / 100;
-  const radio    = radioEfectivo();
-
-  btn.textContent = 'Procesando DEM...';
-  btn.disabled = true;
-  msg.textContent = '';
-
-  try {
-    if (capaInundable) { mapa.removeLayer(capaInundable); capaInundable = null; }
-
-    // Siempre usar el centro visible del mapa para que la capa DEM
-    // siga al foco actual (hotspot, búsqueda, etc.) y no quede anclada
-    // al campo guardado. El campo se analiza por separado en aplicarDEMAlCampo().
-    const centroPrincipal = mapa.getCenter();
-    const centro = { lat: centroPrincipal.lat, lon: centroPrincipal.lng };
-
-    const tiposConUmbral = ['zona_baja', 'zona_media', 'elevacion'];
-    const umbralInput = $el('dem-umbral-input');
-    const umbralVal   = umbralInput ? parseFloat(umbralInput.value) : NaN;
-    const umbralCustom = tiposConUmbral.includes(demTipoActivo) && !isNaN(umbralVal) && umbralVal > 0
-      ? umbralVal : null;
-
-    const params = new URLSearchParams({
-      tipo      : demTipoActivo,
-      lat       : centro.lat,
-      lon       : centro.lon,
-      radius_km : radio,
-    });
-    if (umbralCustom !== null) params.set('umbral_m', umbralCustom);
-
-    const res = await fetch(`${GEE_SERVER}/zonas_inundables?${params}`);
-    if (!res.ok) {
-      let errMsg = `Error ${res.status}`;
-      try { const ej = await res.json(); errMsg = ej.error || errMsg; } catch(_) {}
-      throw new Error(errMsg);
-    }
-    const j = await res.json();
-
-    if (j.tile_url) {
-      capaInundable = L.tileLayer(j.tile_url, {
-        opacity: opacidad, maxZoom: 14,
-        attribution: 'DEM SRTM 30m · GEE'
-      }).addTo(mapa);
-
-      // Guardar el centro del request exitoso para detectar desplazamientos posteriores
-      _demCentroAplicado = { lat: centro.lat, lon: centro.lon };
-
-      $el('dem-btn-quitar').style.display = 'block';
-      $el('dem-btn-punto').style.display  = 'block';
-
-      const labels = {
-        riesgo    : '🌊 Índice de Riesgo',
-        elevacion : '📐 Elevación SRTM 30m',
-        pendiente : '📊 Pendiente Topográfica',
-        zona_baja : '🔵 Zona Baja (<20m)',
-        zona_media: '🟡 Zona Media (20-90m)',
-      };
-      const sufijo = umbralCustom !== null ? ` (umbral ${umbralCustom}m)` : '';
-      msg.textContent = `✅ ${labels[demTipoActivo] || demTipoActivo} aplicada${sufijo}`;
-      msg.style.color = '#16a34a';
-
-      // ── Mostrar leyenda DEM en el panel flotante ──
-      const clavesDem = {
-        riesgo    : 'dem_riesgo',
-        elevacion : 'dem_elevacion',
-        pendiente : 'dem_pendiente',
-        zona_baja : 'dem_zona_baja',
-        zona_media: 'dem_zona_media',
-      };
-      const claveLey = clavesDem[demTipoActivo];
-      if (claveLey) {
-        if (umbralCustom !== null && (demTipoActivo === 'zona_baja' || demTipoActivo === 'elevacion')) {
-          const leyBase = JSON.parse(JSON.stringify(GEE_LEYENDAS[claveLey]));
-          leyBase.titulo = `DEM · Elevación ≤ ${umbralCustom} m (simulación)`;
-          leyBase.filas[0].desc = `Zonas ≤ ${umbralCustom} m — mayor riesgo`;
-          leyBase.nota = `Umbral personalizado: ${umbralCustom} m · NASA SRTM 30m`;
-          mostrarLeyendaGEEConDatos(leyBase);
-        } else {
-          mostrarLeyendaGEE(claveLey);
-        }
-      }
-
-      // Cerrar sheet para ver el mapa
-      setTimeout(() => cerrarGeeSheet(), 700);
-
-      // ── Aplicar al campo si está guardado ──
-      if (campoGuardado && campoGuardado.puntos && campoGuardado.puntos.length >= 3) {
-        aplicarDEMAlCampo(j);
-      }
-      return j;
-    } else {
-      throw new Error(j.error || 'Sin tile_url en respuesta');
-    }
-  } catch(e) {
-    console.error('[DEM GEE]', e);
-    msg.textContent = `⚠️ ${e.message || 'Error al obtener capa DEM. Verificá la conexión.'}`;
-    msg.style.color = '#dc2626';
-    return null;
-  } finally {
-    btn.textContent = '🌊 Ver capa DEM';
-    btn.disabled = false;
-  }
-}
-
-// ── Aplica resultado DEM sobre el polígono del campo guardado ──
-function aplicarDEMAlCampo(demData) {
-  if (!campoBuffer && !campoPoligono) return;
-  try {
-    // Si el backend devuelve score_campo o nivel_campo, mostrarlo en el mensaje
-    const msg = $el('dem-mensaje');
-    if (demData.score_campo !== undefined) {
-      const score = Math.round(demData.score_campo);
-      const nivel = score >= 70 ? '🔴 ALTO' : score >= 40 ? '🟠 MODERADO' : '🟢 BAJO';
-      const extra = `\n📍 Tu campo: ${nivel} riesgo (score ${score}/100)`;
-      msg.textContent += extra;
-    }
-    // Resaltar el buffer del campo con color de alerta
-    if (campoBuffer) {
-      const riesgoColor = (demData.score_campo || 0) >= 70 ? '#dc2626'
-        : (demData.score_campo || 0) >= 40 ? '#ea580c' : '#16a34a';
-      campoBuffer.setStyle({ color: riesgoColor, weight: 3, dashArray: '6,4' });
-    }
-  } catch(e) { console.warn('[DEM campo]', e); }
-}
-
-// ── Inspector de punto: click en mapa consulta elevación/riesgo ──
-function activarInspectorPunto() {
-  // Si no estamos en el mapa, navegar primero
-  const yaestaEnMapa = pantallaActual === 'mapa';
-  if (!yaestaEnMapa) irA('mapa');
-  inspectorActivo = true;
-  // Dar tiempo a que el mapa sea visible si acabamos de navegar
-  setTimeout(() => {
-    if (!mapa) return;
-    mapa.getContainer().style.cursor = 'crosshair';
-    const btn = $el('dem-btn-punto');
-    if (btn) { btn.textContent = '🖱️ Tocá en el mapa...'; btn.style.background = '#dbeafe'; }
-    cerrarGeeSheet(); // cerrar el panel GEE para ver el mapa libre
-  }, yaestaEnMapa ? 0 : 150);
-}
-
-// Se llama desde onMapaClick cuando inspectorActivo === true
-async function inspeccionarPuntoInundacion(lat, lon) {
-  if (!inspectorActivo) return;
-  inspectorActivo = false;
-  mapa.getContainer().style.cursor = '';
-  const btn = $el('dem-btn-punto');
-  if (btn) { btn.textContent = '📍 Inspector de punto'; btn.style.background = '#fff'; }
-
-  try {
-    const r = await fetch(`${GEE_SERVER}/inundacion_punto?lat=${lat}&lon=${lon}`);
-    const j = await r.json();
-
-    if (!r.ok || !j.ok) throw new Error(j.error || 'Sin datos');
-
-    const colorNivel = j.nivel.includes('ALTO') ? '#dc2626'
-                     : j.nivel.includes('MEDIO') ? '#ca8a04' : '#16a34a';
-
-    L.popup({ maxWidth: 260 })
-      .setLatLng([lat, lon])
-      .setContent(`
-        <div style="font-family:Inter,sans-serif">
-          <p style="font-weight:800;font-size:14px;color:${colorNivel};margin:0 0 6px">${j.nivel}</p>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:12px;color:#424841">
-            <div><span style="color:#727971">Elevación</span><br><b>${j.elevacion ?? '—'} m</b></div>
-            <div><span style="color:#727971">Pendiente</span><br><b>${j.pendiente ?? '—'}°</b></div>
-            <div><span style="color:#727971">Score</span><br><b>${j.riesgo ?? '—'}/100</b></div>
-            <div><span style="color:#727971">Zona topo.</span><br><b>${j.topo}</b></div>
-          </div>
-          <p style="font-size:10px;color:#9ca3af;margin:6px 0 0">GEE · SRTM 30m + SMAP</p>
-        </div>`)
-      .openOn(mapa);
-
-  } catch(e) {
-    L.popup().setLatLng([lat, lon])
-      .setContent(`<p style="color:#dc2626;font-size:12px">⚠️ ${e.message}</p>`)
-      .openOn(mapa);
-  }
-}
-
-// registrarClickInspectorDEM: el listener real está en onMapaClick (ver abajo)
-function registrarClickInspectorDEM() { /* no-op: manejado en onMapaClick */ }
-
-function quitarZonasInundables() {
-  if (capaInundable) { mapa.removeLayer(capaInundable); capaInundable = null; }
-  _demCentroAplicado = null;
-  clearTimeout(_demMoveDebounce);
-  $el('dem-btn-quitar').style.display = 'none';
-  $el('dem-btn-punto').style.display  = 'none';
-  $el('dem-mensaje').textContent = '';
-  mostrarBtnDemRefresh(false);
-  ocultarLeyendaGEE();
-  // Restaurar estilo del buffer del campo
-  if (campoBuffer) campoBuffer.setStyle({ color: '#1a3b22', weight: 2, dashArray: '6,4' });
-  inspectorActivo = false;
-  if (mapa) mapa.getContainer().style.cursor = '';
-}
-
-// ── Botón flotante "Actualizando DEM…" visible mientras el mapa se mueve ──
-function mostrarBtnDemRefresh(visible) {
-  let btn = document.getElementById('btn-dem-refresh');
-  if (!btn) {
-    btn = document.createElement('button');
-    btn.id = 'btn-dem-refresh';
-    btn.title = 'Re-aplicar capa DEM al área visible';
-    btn.onclick = () => {
-      clearTimeout(_demMoveDebounce);
-      mostrarBtnDemRefresh(false);
-      aplicarZonasInundables();
-    };
-    btn.style.cssText = `
-      position:absolute; bottom:188px; right:12px; z-index:1000;
-      background:#1e40af; border:none;
-      border-radius:20px; padding:0 14px; height:34px;
-      display:none; align-items:center; justify-content:center; gap:6px;
-      box-shadow:0 2px 10px rgba(0,0,0,0.28); cursor:pointer;
-      color:white; font-size:12px; font-weight:700;
-      font-family:Inter,sans-serif; white-space:nowrap;
-      transition:opacity .2s;
-    `;
-    btn.innerHTML = `<span style="font-size:15px">🔄</span> Actualizando DEM…`;
-    const container = document.getElementById('mapa-container');
-    if (container) container.appendChild(btn);
-  }
-  btn.style.display = visible ? 'flex' : 'none';
-}
 
 // ════════════════════════════════════════════════
 //  LEYENDAS DEM
@@ -13989,12 +13400,6 @@ function cancelarDelimitar() {
   if (toolbar) toolbar.style.display = 'none';
 }
 
-// ══════════════════════════════════════════════════════════════════════
-// IMPORTAR / EXPORTAR CAPAS KML Y GEOJSON
-// Compatible con archivos generados por Google Earth Pro, QGIS o LandViewer.
-// ══════════════════════════════════════════════════════════════════════
-let capasImportadasIO = []; // { id, nombre, layer, geojson, color, visible }
-
 // ════════════════════════════════════════════════════════════════
 //  PANEL "HERRAMIENTAS DEL MAPA" — abrir/cerrar + acordeón de secciones
 // ════════════════════════════════════════════════════════════════
@@ -14010,174 +13415,8 @@ function toggleHmSeccion(headerEl) {
   headerEl.classList.toggle('abierta', abierta);
 }
 
-function toggleCapasIOPanel() {
-  const panel    = $el('capas-io-panel');
-  const backdrop = $el('capas-io-backdrop');
-  if (!panel || !backdrop) return;
-  const abrir = panel.style.display === 'none' || !panel.style.display;
-  panel.style.display    = abrir ? 'block' : 'none';
-  backdrop.style.display = abrir ? 'block' : 'none';
-}
-
 function _nombreCortoArchivo(nombre) {
   return nombre.length > 28 ? nombre.slice(0, 25) + '…' : nombre;
-}
-
-function importarCapaArchivo(evento) {
-  const archivo = evento.target.files[0];
-  if (!archivo) return;
-  const estadoEl = $el('capas-io-estado');
-  const ext = archivo.name.split('.').pop().toLowerCase();
-
-  if (!['kml', 'kmz', 'geojson', 'json'].includes(ext)) {
-    if (estadoEl) estadoEl.innerHTML = '<span style="color:#b91c1c">Formato no soportado. Usá .kml, .kmz, .geojson o .json.</span>';
-    evento.target.value = '';
-    return;
-  }
-
-  if (estadoEl) { estadoEl.style.color = '#6b7280'; estadoEl.textContent = 'Leyendo archivo…'; }
-
-  // Termina de procesar un texto KML (ya sea de un .kml directo o extraído de un .kmz)
-  function _procesarTextoKML(textoKML) {
-    if (typeof toGeoJSON === 'undefined') {
-      throw new Error('No se pudo cargar el conversor de KML (revisá tu conexión a internet).');
-    }
-    const xml = new DOMParser().parseFromString(textoKML, 'text/xml');
-    if (xml.querySelector('parsererror')) throw new Error('El archivo KML está mal formado.');
-    return toGeoJSON.kml(xml);
-  }
-
-  function _finalizarImportacion(geojson) {
-    if (!geojson || !geojson.type || (geojson.type === 'FeatureCollection' && (!geojson.features || geojson.features.length === 0))) {
-      throw new Error('El archivo no tiene datos geoespaciales válidos.');
-    }
-    _agregarCapaImportada(archivo.name, geojson);
-    if (estadoEl) { estadoEl.style.color = '#166534'; estadoEl.innerHTML = `✓ "${_nombreCortoArchivo(archivo.name)}" cargado en el mapa.`; }
-  }
-
-  if (ext === 'kmz') {
-    // .kmz es un .kml comprimido en ZIP (así lo exporta Google Earth Pro por
-    // defecto). Hay que descomprimirlo en el navegador antes de parsearlo.
-    if (typeof JSZip === 'undefined') {
-      if (estadoEl) { estadoEl.style.color = '#b91c1c'; estadoEl.textContent = 'No se pudo cargar el descompresor de KMZ (revisá tu conexión a internet).'; }
-      evento.target.value = '';
-      return;
-    }
-    archivo.arrayBuffer()
-      .then(buffer => JSZip.loadAsync(buffer))
-      .then(zip => {
-        const nombreKml = Object.keys(zip.files).find(n => n.toLowerCase().endsWith('.kml'));
-        if (!nombreKml) throw new Error('El .kmz no contiene ningún archivo .kml adentro.');
-        return zip.files[nombreKml].async('string');
-      })
-      .then(textoKML => {
-        _finalizarImportacion(_procesarTextoKML(textoKML));
-      })
-      .catch(err => {
-        console.error('Error al importar KMZ:', err);
-        if (estadoEl) { estadoEl.style.color = '#b91c1c'; estadoEl.textContent = 'Error: ' + err.message; }
-      })
-      .finally(() => { evento.target.value = ''; });
-    return;
-  }
-
-  const lector = new FileReader();
-  lector.onload = function (e) {
-    try {
-      const geojson = (ext === 'kml') ? _procesarTextoKML(e.target.result) : JSON.parse(e.target.result);
-      _finalizarImportacion(geojson);
-    } catch (err) {
-      console.error('Error al importar capa:', err);
-      if (estadoEl) { estadoEl.style.color = '#b91c1c'; estadoEl.textContent = 'Error: ' + err.message; }
-    }
-    evento.target.value = ''; // permite volver a elegir el mismo archivo
-  };
-  lector.onerror = function () {
-    if (estadoEl) { estadoEl.style.color = '#b91c1c'; estadoEl.textContent = 'No se pudo leer el archivo.'; }
-  };
-  lector.readAsText(archivo);
-}
-
-function _colorCapaIO() {
-  const paleta = ['#2563eb', '#dc2626', '#ea580c', '#7c3aed', '#0891b2', '#16a34a', '#c026d3'];
-  return paleta[capasImportadasIO.length % paleta.length];
-}
-
-function _agregarCapaImportada(nombreArchivo, geojson) {
-  if (!mapa) return;
-  const color = _colorCapaIO();
-  const layer = L.geoJSON(geojson, {
-    style: { color: color, weight: 3, fillOpacity: 0.15 },
-    pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
-      radius: 6, color: color, fillColor: color, fillOpacity: 0.7, weight: 2,
-    }),
-    onEachFeature: (feature, capaHija) => {
-      if (feature.properties) {
-        const filas = Object.entries(feature.properties)
-          .filter(([k, v]) => v !== null && v !== undefined && String(v).trim() !== '')
-          .map(([k, v]) => `<b>${k}:</b> ${v}`).join('<br>');
-        if (filas) capaHija.bindPopup(filas);
-      }
-    },
-  }).addTo(mapa);
-
-  try { mapa.fitBounds(layer.getBounds(), { padding: [40, 40] }); } catch (e) { /* geometría sin bounds válidos */ }
-
-  capasImportadasIO.push({
-    id: Date.now() + '_' + Math.random().toString(36).slice(2),
-    nombre: nombreArchivo, layer, geojson, color, visible: true,
-  });
-  _renderizarListaCapasIO();
-}
-
-function _renderizarListaCapasIO() {
-  const cont = $el('capas-io-lista');
-  if (!cont) return;
-  if (capasImportadasIO.length === 0) {
-    cont.innerHTML = '<p style="font-size:12px;color:#9ca3af;margin:0;">Todavía no cargaste ninguna capa.</p>';
-    return;
-  }
-  cont.innerHTML = capasImportadasIO.map(c => `
-    <div style="border:1px solid #eceee9;border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="width:10px;height:10px;border-radius:50%;background:${c.color};flex-shrink:0;"></span>
-        <span style="font-size:12px;font-weight:700;color:#1a1c1a;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_nombreCortoArchivo(c.nombre)}</span>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button onclick="_toggleVisibilidadCapaIO('${c.id}')" style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid #e2e3de;background:#fff;cursor:pointer;">${c.visible ? '👁 Ocultar' : '🚫 Mostrar'}</button>
-        <button onclick="_zoomCapaIO('${c.id}')" style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid #e2e3de;background:#fff;cursor:pointer;">🔍 Centrar</button>
-        <button onclick="_exportarCapaIO('${c.id}','geojson')" style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid #e2e3de;background:#fff;cursor:pointer;">⬇ GeoJSON</button>
-        <button onclick="_exportarCapaIO('${c.id}','kml')" style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid #e2e3de;background:#fff;cursor:pointer;">⬇ KML</button>
-        <button onclick="_quitarCapaIO('${c.id}')" style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid #fecaca;background:#fff;color:#b91c1c;cursor:pointer;">🗑 Quitar</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-function _buscarCapaIO(id) {
-  return capasImportadasIO.find(c => String(c.id) === String(id));
-}
-
-function _toggleVisibilidadCapaIO(id) {
-  const c = _buscarCapaIO(id);
-  if (!c || !mapa) return;
-  c.visible = !c.visible;
-  if (c.visible) c.layer.addTo(mapa); else mapa.removeLayer(c.layer);
-  _renderizarListaCapasIO();
-}
-
-function _zoomCapaIO(id) {
-  const c = _buscarCapaIO(id);
-  if (!c || !mapa) return;
-  try { mapa.fitBounds(c.layer.getBounds(), { padding: [40, 40] }); } catch (e) {}
-}
-
-function _quitarCapaIO(id) {
-  const c = _buscarCapaIO(id);
-  if (!c) return;
-  if (mapa) mapa.removeLayer(c.layer);
-  capasImportadasIO = capasImportadasIO.filter(x => x.id !== c.id);
-  _renderizarListaCapasIO();
 }
 
 function _descargarTexto(nombre, contenido, tipoMime) {
@@ -14187,18 +13426,6 @@ function _descargarTexto(nombre, contenido, tipoMime) {
   a.href = url; a.download = nombre;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-}
-
-function _exportarCapaIO(id, formato) {
-  const c = _buscarCapaIO(id);
-  if (!c) return;
-  const nombreBase = c.nombre.replace(/\.(kml|geojson|json)$/i, '');
-  if (formato === 'geojson') {
-    _descargarTexto(`${nombreBase}.geojson`, JSON.stringify(c.geojson, null, 2), 'application/geo+json');
-  } else {
-    if (typeof tokml === 'undefined') { alert('No se pudo cargar el conversor a KML (revisá tu conexión a internet).'); return; }
-    _descargarTexto(`${nombreBase}.kml`, tokml(c.geojson), 'application/vnd.google-earth.kml+xml');
-  }
 }
 
 // Exporta el campo que el usuario delimitó con "Delimitar" (ver campoPoligono).
@@ -14288,11 +13515,6 @@ function onMapaClick(e) {
   // Inspector de suelos INTA (mayor prioridad)
   if (_inspectorSuelosActivo) {
     inspeccionarSuelosINTA(e.latlng.lat, e.latlng.lng);
-    return;
-  }
-  // Inspector de punto de inundación (tiene prioridad sobre modo delimitar)
-  if (inspectorActivo) {
-    inspeccionarPuntoInundacion(e.latlng.lat, e.latlng.lng);
     return;
   }
   if (!modoDelimitar) return;
@@ -16907,7 +16129,7 @@ async function inspeccionarSuelosINTA(lat, lon) {
     function taxonomiaBloque(orden, ggrup, sgrup) {
       const items = [
         { label: 'Orden', val: orden },
-        { label: 'Gran Grupo', val: ggrup },
+        { label: 'Serie', val: ggrup },
         { label: 'Subgrupo', val: sgrup },
       ].filter(i => i.val && String(i.val).trim() !== '' && String(i.val).toUpperCase() !== 'NULL');
       if (items.length === 0) return;
@@ -17061,709 +16283,6 @@ async function inspeccionarSuelosINTA(lat, lon) {
 }
 // ════════════════════════════════════════════════════════════════
 
-
-// ════════════════════════════════════════════════════════════════
-//  HERRAMIENTAS HIDRO-TOPOGRÁFICAS
-//  Simulador de inundación · Detectar depresiones · Dirección de escurrimiento
-// ════════════════════════════════════════════════════════════════
-let hidroToolActiva  = null;
-let capaHidro        = null;
-let capasEscurrimiento = [];
-let hidroUltimoCentro = null;   // {lat, lon} donde se aplicó la última capa hidro
-let hidroFocoTimer    = null;   // debounce para no golpear GEE en cada pixel de arrastre
-
-// Distancia aproximada en km entre dos puntos lat/lon (haversine).
-function distanciaKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2)**2 +
-            Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-
-// Radio (km) necesario para que un círculo centrado en el mapa cubra toda
-// la porción visible de la pantalla (hasta la esquina más lejana), con un
-// margen extra para que no queden bordes sin cubrir al mover el mapa.
-function calcularRadioPantalla(margen = 1.15) {
-  try {
-    const bounds  = mapa.getBounds();
-    const centro  = mapa.getCenter();
-    const esquina = bounds.getNorthEast();
-    const distKm  = distanciaKm(centro.lat, centro.lng, esquina.lat, esquina.lng);
-    return Math.max(Math.ceil(distKm * margen), 5);
-  } catch (e) {
-    return 200;
-  }
-}
-
-// Radio a usar en los pedidos a GEE: el mayor entre el valor manual del
-// slider y el necesario para cubrir toda la pantalla visible. Así las capas
-// DEM siempre abarcan todo lo que se ve en el mapa, en vez de quedar
-// limitadas a un círculo chico en el centro cuando se aleja el zoom.
-function radioEfectivo() {
-  const manual = parseInt((document.getElementById('dem-radio') || {value:800}).value, 10);
-  return Math.max(manual, calcularRadioPantalla());
-}
-
-// Se llama en cada 'moveend' del mapa. Si hay una herramienta hidro con
-// capa ya aplicada y el usuario movió el foco a una zona suficientemente
-// distinta, recalcula automáticamente sobre el nuevo centro.
-function reaplicarHidroSegunFoco() {
-  if (!['simulador', 'depresiones', 'escurrimiento'].includes(hidroToolActiva)) return;
-  const hayCapaAplicada = capaHidro || (hidroToolActiva === 'escurrimiento' && puntosEscurrimientoActual);
-  if (!hayCapaAplicada || !hidroUltimoCentro) return;
-
-  const c = mapa.getCenter();
-  const radio = radioEfectivo();
-  // Umbral: 20% del radio configurado (mínimo 3 km) — evita recalcular
-  // por arrastres pequeños que no cambian sustancialmente el área.
-  const umbralKm = Math.max(radio * 0.2, 3);
-  const movido = distanciaKm(hidroUltimoCentro.lat, hidroUltimoCentro.lon, c.lat, c.lng);
-  if (movido < umbralKm) return;
-
-  clearTimeout(hidroFocoTimer);
-  hidroFocoTimer = setTimeout(() => {
-    if (hidroToolActiva === 'simulador')        aplicarSimuladorInundacion(true);
-    else if (hidroToolActiva === 'depresiones') aplicarDetectarDepresiones(true);
-    else if (hidroToolActiva === 'escurrimiento') aplicarEscurrimiento(true);
-  }, 500);
-}
-
-function setHidroTool(tool) {
-  if (hidroToolActiva === tool) {
-    hidroToolActiva = null;
-    ['simulador','depresiones','escurrimiento'].forEach(t => {
-      const p = document.getElementById('hidro-panel-' + t);
-      if (p) p.style.display = 'none';
-    });
-    document.querySelectorAll('.dem-hidro-btn').forEach(b => {
-      b.style.background  = '#eff6ff';
-      b.style.color       = '#1e40af';
-      b.style.borderColor = '#bfdbfe';
-    });
-    return;
-  }
-  hidroToolActiva = tool;
-  document.querySelectorAll('.dem-hidro-btn').forEach(b => {
-    const sel = b.dataset.hidro === tool;
-    b.style.background  = sel ? '#1e40af' : '#eff6ff';
-    b.style.color       = sel ? '#fff'    : '#1e40af';
-    b.style.borderColor = sel ? '#1e40af' : '#bfdbfe';
-  });
-  ['simulador','depresiones','escurrimiento'].forEach(t => {
-    const p = document.getElementById('hidro-panel-' + t);
-    if (p) p.style.display = (t === tool) ? 'block' : 'none';
-  });
-}
-
-// ── SIMULADOR — Integración hidrológica INA ───────────────────────
-// El simulador trabaja con la ALTURA ABSOLUTA del río, en la misma escala
-// hidrométrica que usan las estaciones de aforo (INA / Prefectura Naval /
-// IGN), no con un incremento relativo. Esto permite cargar escenarios de
-// crecidas históricas documentadas (ej.: 1983 = 9,03 m en Corrientes) y
-// compararlos contra el Modelo Digital de Elevación (SRTM), también en metros.
-let simInaBase = {
-  nivel: null, estacion: null, fecha: null, percentil: null, cargando: false,
-  // offsetDEM = elevación_SRTM_en_la_estación - nivel_hidrométrico_actual.
-  // Se calcula en vivo contra Earth Engine (ver simCalibrarOffsetDEM): cada
-  // estación INA tiene su propio "cero de escala" arbitrario, que NO
-  // coincide con el nivel del mar.
-  estacionLat: null, estacionLon: null, offsetDEM: null, calibrando: false,
-};
-
-// Escenarios de referencia. Valores históricos de la escala hidrométrica de
-// Corrientes (fuente: IGN / INA / Prefectura Naval Argentina); pueden variar
-// levemente según la fuente consultada.
-const ESCENARIOS_SIMULADOR_INUNDACION = {
-  actual                 : { etiqueta: 'Nivel actual (INA)',      implementado: true,  alturaM: null }, // se completa dinámicamente con simInaBase.nivel
-  crecida_historica_1998 : { etiqueta: 'Crecida histórica 1998',  implementado: true,  alturaM: 8.39 },
-  crecida_historica_1992 : { etiqueta: 'Crecida histórica 1992',  implementado: true,  alturaM: 8.63 },
-  crecida_historica_1983 : { etiqueta: 'Crecida histórica 1983',  implementado: true,  alturaM: 9.03 },
-};
-let simEscenarioActivo = 'actual';
-
-// Selecciona un escenario predefinido: fija el valor absoluto de altura en
-// el slider/input y resalta visualmente el botón activo.
-function simSeleccionarEscenario(nombre) {
-  const escenario = ESCENARIOS_SIMULADOR_INUNDACION[nombre];
-  if (!escenario || !escenario.implementado) return;
-
-  const altura = (nombre === 'actual') ? simInaBase.nivel : escenario.alturaM;
-  if (altura == null) {
-    simActualizarPanelINA();
-    return;
-  }
-
-  simEscenarioActivo = nombre;
-  const slider = $el('sim-nivel-slider');
-  const input  = $el('sim-nivel-input');
-  if (slider) slider.value = altura;
-  if (input)  input.value  = altura.toFixed(2);
-  actualizarSimulador(altura);
-
-  document.querySelectorAll('.sim-escenario-btn').forEach(btn => {
-    const activo = btn.dataset.escenario === nombre;
-    btn.style.background  = activo ? '#1e40af' : '#fff';
-    btn.style.color       = activo ? '#fff'    : '#1e40af';
-  });
-}
-
-// Consulta el nivel base del río (reutiliza el fetch INA ya usado por el
-// Índice de Riesgo Hídrico — misma fuente, sin duplicar lógica de red).
-async function simActualizarPanelINA() {
-  const badge = $el('sim-ina-badge');
-  if (!mapa) return;
-  if (badge) { badge.textContent = 'Consultando…'; badge.style.background = '#bfdbfe'; badge.style.color = '#1e40af'; }
-  simInaBase.cargando = true;
-  const centro = mapa.getCenter();
-  try {
-    const datos = await hFetchINA(centro.lat, centro.lng);
-    if (datos && datos.nivelRio != null) {
-      simInaBase.nivel       = datos.nivelRio;
-      simInaBase.estacion    = datos.estacionRio;
-      simInaBase.fecha       = datos.fechaRio;
-      simInaBase.percentil   = datos.percentilRio;
-      simInaBase.estacionLat = datos.estacionLat ?? null;
-      simInaBase.estacionLon = datos.estacionLon ?? null;
-      if (badge) { badge.textContent = 'INA en línea'; badge.style.background = '#bbf7d0'; badge.style.color = '#166534'; }
-      simCalibrarOffsetDEM();
-    } else {
-      simInaBase.nivel = null;
-      if (badge) { badge.textContent = 'Sin estación cercana'; badge.style.background = '#fee2e2'; badge.style.color = '#991b1b'; }
-    }
-  } catch (e) {
-    simInaBase.nivel = null;
-    if (badge) { badge.textContent = 'INA no disponible'; badge.style.background = '#fee2e2'; badge.style.color = '#991b1b'; }
-  }
-  simInaBase.cargando = false;
-  simActualizarUIBase();
-  const valorActual = (simEscenarioActivo === 'actual' && simInaBase.nivel != null)
-    ? simInaBase.nivel
-    : (parseFloat($el('sim-nivel-slider')?.value) || 3);
-  actualizarSimulador(valorActual);
-}
-
-// ── Calibración escala hidrométrica → elevación SRTM ─────────────────────
-// La "altura del río" ingresada está en la escala hidrométrica de la
-// estación INA/Prefectura, cuyo "0" NO es el nivel del mar. La elevación
-// del DEM SRTM sí está referida al nivel del mar. Se calcula en vivo:
-//   offset = elevación_SRTM_en_la_estación − nivel_hidrométrico_actual
-// y con ese offset cualquier altura hidrométrica se convierte a una
-// elevación DEM comparable: elevación = altura + offset.
-async function simCalibrarOffsetDEM() {
-  if (simInaBase.estacionLat == null || simInaBase.estacionLon == null || simInaBase.nivel == null) {
-    simInaBase.offsetDEM = null;
-    return;
-  }
-  simInaBase.calibrando = true;
-  try {
-    const r = await fetch(`${GEE_SERVER}/inundacion_punto?lat=${simInaBase.estacionLat}&lon=${simInaBase.estacionLon}`);
-    const j = await r.json();
-    if (r.ok && j.ok && j.elevacion != null) {
-      simInaBase.offsetDEM = j.elevacion - simInaBase.nivel;
-    } else {
-      simInaBase.offsetDEM = null;
-    }
-  } catch (e) {
-    simInaBase.offsetDEM = null;
-  }
-  simInaBase.calibrando = false;
-}
-
-function simActualizarUIBase() {
-  const nivelEl    = $el('sim-ina-nivel');
-  const estacionEl = $el('sim-ina-estacion');
-  const fechaEl    = $el('sim-ina-fecha');
-  if (simInaBase.nivel != null) {
-    if (nivelEl)    nivelEl.textContent    = simInaBase.nivel.toFixed(2) + ' m';
-    if (estacionEl) estacionEl.textContent = `Estación hidrométrica: ${simInaBase.estacion || '—'}`;
-    if (fechaEl)    fechaEl.textContent    = `Fecha y hora del dato: ${simInaBase.fecha || '—'}`;
-  } else {
-    if (nivelEl)    nivelEl.textContent    = 'Sin datos INA';
-    if (estacionEl) estacionEl.textContent = 'Estación hidrométrica: no disponible en esta zona';
-    if (fechaEl)    fechaEl.textContent    = 'Fecha y hora del dato: —';
-  }
-}
-
-// val = altura ABSOLUTA del río en metros (escala hidrométrica local), no un
-// incremento. Se compara contra la elevación del DEM (SRTM) recién al aplicar.
-function actualizarSimulador(val) {
-  const alturaM = Math.max(0, parseFloat(val) || 0);
-
-  const slider = $el('sim-nivel-slider');
-  const input  = $el('sim-nivel-input');
-  if (slider && parseFloat(slider.value) !== alturaM && document.activeElement !== slider) slider.value = Math.min(alturaM, 12);
-  if (input  && document.activeElement !== input) input.value = alturaM.toFixed(2);
-  const valEl = $el('sim-nivel-val');
-  if (valEl) valEl.textContent = alturaM.toFixed(2) + ' m';
-
-  // Si el usuario mueve el control manualmente, ya no corresponde a un botón de escenario predefinido
-  if (document.activeElement === slider || document.activeElement === input) {
-    simEscenarioActivo = null;
-    document.querySelectorAll('.sim-escenario-btn').forEach(btn => {
-      btn.style.background = '#fff';
-      btn.style.color      = '#1e40af';
-    });
-  }
-
-  const diferenciaM = (simInaBase.nivel != null) ? (alturaM - simInaBase.nivel) : null;
-
-  // Estimaciones visuales rápidas (se recalculan con datos reales del DEM al
-  // presionar "Aplicar"). Se basan en cuánto supera la altura simulada al
-  // nivel actual del río.
-  const excesoCm = diferenciaM != null ? Math.max(0, diferenciaM * 100) : Math.max(0, alturaM * 20);
-  const areaCm = (excesoCm * 0.12).toFixed(1);
-  const pct = Math.min((excesoCm / 3).toFixed(1), 100);
-  const vol = Math.round(excesoCm * excesoCm * 19.5);
-  const ae = $el('sim-area');
-  const pe = $el('sim-pct');
-  const ve = $el('sim-vol');
-  if (ae) ae.textContent = areaCm + ' ha';
-  if (pe) pe.textContent = pct + ' %';
-  if (ve) ve.textContent = vol.toLocaleString('es-AR') + ' m³';
-
-  // ── Resumen hidrológico: nivel actual INA, diferencia y altura simulada ──
-  const baseEl  = $el('sim-resumen-base');
-  const incrEl  = $el('sim-resumen-incremento');
-  const totalEl = $el('sim-resumen-total');
-  if (totalEl) totalEl.textContent = alturaM.toFixed(2) + ' m';
-  if (simInaBase.nivel != null) {
-    if (baseEl) baseEl.textContent = simInaBase.nivel.toFixed(2) + ' m';
-    if (incrEl) {
-      const signo = diferenciaM >= 0 ? '+' : '';
-      incrEl.textContent = signo + diferenciaM.toFixed(2) + ' m';
-    }
-  } else {
-    if (baseEl) baseEl.textContent = 'Sin datos INA';
-    if (incrEl) incrEl.textContent = '—';
-  }
-}
-
-function reiniciarSimulador() {
-  if (simInaBase.nivel != null) {
-    simSeleccionarEscenario('actual');
-  } else {
-    const slider = $el('sim-nivel-slider');
-    const input  = $el('sim-nivel-input');
-    if (slider) slider.value = 3;
-    if (input)  input.value  = '3.00';
-    actualizarSimulador(3);
-  }
-  const ae = $el('sim-area'); if (ae) ae.textContent = '--';
-  const pe = $el('sim-pct');  if (pe) pe.textContent  = '--';
-  const ve = $el('sim-vol');  if (ve) ve.textContent  = '--';
-  quitarCapaHidro();
-  const msg = $el('dem-mensaje');
-  if (msg) msg.textContent = '';
-  ocultarLeyendaGEE();
-  simAnimDetener();
-  if (capaVelocidadFlujo) { try { mapa.removeLayer(capaVelocidadFlujo); } catch(_){} capaVelocidadFlujo = null; }
-  _simUltimoUmbralM = null;
-}
-
-let _simUltimoUmbralM = null;
-
-async function aplicarSimuladorInundacion(auto = false) {
-  const msg = $el('dem-mensaje');
-
-  // Asegurar que exista un nivel base INA antes de aplicar el escenario
-  if (simInaBase.nivel == null && !simInaBase.cargando) {
-    await simActualizarPanelINA();
-  }
-  // Si la calibración quedó corriendo en paralelo, darle un margen corto.
-  if (simInaBase.calibrando) {
-    for (let i = 0; i < 20 && simInaBase.calibrando; i++) {
-      await new Promise(res => setTimeout(res, 150));
-    }
-  }
-
-  // La altura ingresada es un valor ABSOLUTO en la escala hidrométrica de la
-  // estación INA/Prefectura — se convierte a elevación DEM sumando el offset
-  // calibrado en vivo (ver simCalibrarOffsetDEM).
-  const inputExacto = $el('sim-nivel-input');
-  const alturaM = Math.max(0.1, parseFloat(inputExacto?.value ?? $el('sim-nivel-slider')?.value ?? 3) || 3);
-
-  let umbralM = null;
-  let calibradoOk = false;
-  if (simInaBase.offsetDEM != null) {
-    umbralM = Math.round((alturaM + simInaBase.offsetDEM) * 100) / 100;
-    calibradoOk = true;
-  }
-
-  const radio = radioEfectivo();
-  const opac  = parseInt((document.getElementById('dem-opacidad') || {value:65}).value, 10) / 100;
-  if (msg) { msg.textContent = auto ? '↻ Actualizando simulación a la nueva posición...' : '⏳ Calculando simulación...'; msg.style.color = '#1e40af'; }
-  quitarCapaHidro();
-  try {
-    const c = mapa.getCenter();
-    const paramsObj = { tipo: 'zona_baja', lat: c.lat, lon: c.lng, radius_km: radio };
-    if (umbralM != null) paramsObj.umbral_m = umbralM;
-    const p = new URLSearchParams(paramsObj);
-    const res = await fetch(GEE_SERVER + '/zonas_inundables?' + p);
-    if (!res.ok) throw new Error('Error ' + res.status);
-    const j = await res.json();
-    if (!j.tile_url) throw new Error(j.error || 'Sin tile_url');
-    capaHidro = L.tileLayer(j.tile_url, { opacity:opac, maxZoom:14, attribution:'Simulación inundación · SRTM 30m · GEE' }).addTo(mapa);
-    hidroUltimoCentro = { lat: c.lat, lon: c.lng };
-    _simUltimoUmbralM = umbralM != null ? umbralM : (j.umbral_m ?? null);
-    mostrarLeyendaGEE('dem_simulador');
-
-    const etiquetaEscenario = simEscenarioActivo && ESCENARIOS_SIMULADOR_INUNDACION[simEscenarioActivo]
-      ? ` — Escenario: ${ESCENARIOS_SIMULADOR_INUNDACION[simEscenarioActivo].etiqueta}`
-      : '';
-    if (msg) {
-      if (!calibradoOk) {
-        const umbralUsado = j?.umbral_m;
-        const esRelativo = j?.umbral_metodo === 'percentil_regional_10';
-        const detalleUmbral = umbralUsado != null
-          ? (esRelativo
-              ? `zona baja relativa de esta región (≈ ${umbralUsado.toFixed(1)} m, percentil 10 local)`
-              : `${umbralUsado.toFixed(1)} m`)
-          : 'la zona baja por defecto del servidor';
-        msg.textContent = `⚠️ No se pudo calibrar la conversión escala-hidrométrica → elevación DEM (sin estación INA cercana). Se muestra ${detalleUmbral}, NO ajustada a los ${alturaM.toFixed(2)} m ingresados${etiquetaEscenario}.`;
-        msg.style.color = '#ca8a04';
-      } else if (simInaBase.nivel != null) {
-        const diferenciaM = alturaM - simInaBase.nivel;
-        const signo = diferenciaM >= 0 ? '+' : '';
-        msg.textContent = `✅ Simulación aplicada — Altura del río: ${alturaM.toFixed(2)} m hidrométricos → ${umbralM.toFixed(2)} m DEM (offset calibrado: ${simInaBase.offsetDEM >= 0 ? '+' : ''}${simInaBase.offsetDEM.toFixed(2)} m · nivel actual INA: ${simInaBase.nivel.toFixed(2)} m, diferencia ${signo}${diferenciaM.toFixed(2)} m)${etiquetaEscenario}`;
-        msg.style.color = '#16a34a';
-      } else {
-        msg.textContent = `✅ Simulación aplicada — ${alturaM.toFixed(2)} m hidrométricos → ${umbralM.toFixed(2)} m DEM (offset calibrado: ${simInaBase.offsetDEM >= 0 ? '+' : ''}${simInaBase.offsetDEM.toFixed(2)} m)${etiquetaEscenario}`;
-        msg.style.color = '#16a34a';
-      }
-    }
-    if (!auto) setTimeout(() => cerrarGeeSheet(), 700);
-  } catch(e) {
-    console.error('[SimInundación]', e);
-    if (msg) { msg.textContent = '⚠️ ' + e.message; msg.style.color = '#dc2626'; }
-  }
-}
-
-// ── Animación de expansión ─────────────────────────────────────────
-// Los "fotogramas" son órdenes de llegada por distancia de conectividad
-// (NO tiempo real).
-let simAnimFotogramas   = [];
-let simAnimIndex        = 0;
-let simAnimPlaying      = false;
-let simAnimTimer        = null;
-let simAnimIntervaloMs  = 700;
-let simAnimLayer        = null;
-
-async function simCargarAnimacion() {
-  if (!mapa) return;
-  const btn = $el('sim-anim-btn');
-  const textoOriginal = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = '⏳ Generando fotogramas (puede tardar ~20-30s)...';
-  try {
-    const centro = mapa.getCenter();
-    const radio  = radioEfectivo();
-    // Prioridad: el umbral REAL de la última simulación aplicada. Si no hay
-    // ninguna aplicada todavía, dejamos que el backend calcule su propio
-    // umbral inteligente para esta zona (percentil regional).
-    const umbralInput = $el('dem-umbral-input');
-    const umbralM = _simUltimoUmbralM
-      ?? (umbralInput && umbralInput.value ? parseFloat(umbralInput.value) : null);
-    const paramsObj = {
-      lat: centro.lat.toFixed(6), lon: centro.lng.toFixed(6),
-      radius_km: radio, frames: 10,
-    };
-    if (umbralM != null) paramsObj.umbral_m = umbralM;
-    const params = new URLSearchParams(paramsObj);
-    const r = await fetch(`${GEE_SERVER}/inundacion_animacion?${params}`);
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
-    if (!j.fotogramas || !j.fotogramas.length) throw new Error('El servidor no devolvió fotogramas.');
-
-    simAnimDetener();
-    simAnimFotogramas = j.fotogramas;
-    const slider = $el('sim-anim-slider');
-    slider.max = simAnimFotogramas.length - 1;
-    $el('sim-anim-player').style.display = 'block';
-    simAnimIrAFrame(0);
-    btn.textContent = '🔄 Regenerar animación';
-
-    const msg = $el('dem-mensaje');
-    if (msg) {
-      const esRelativo = j.umbral_metodo === 'percentil_regional_10';
-      msg.textContent = esRelativo
-        ? `✅ Animación generada — sin calibración disponible para esta zona, se usó un umbral relativo (≈ ${j.umbral_m.toFixed(1)} m, percentil 10 local).`
-        : `✅ Animación generada sobre umbral ${j.umbral_m.toFixed(2)} m.`;
-      msg.style.color = esRelativo ? '#ca8a04' : '#0e7490';
-    }
-  } catch (e) {
-    const msg = $el('dem-mensaje');
-    if (msg) { msg.textContent = `❌ No se pudo generar la animación: ${e.message}`; msg.style.color = '#dc2626'; }
-    btn.textContent = textoOriginal;
-  }
-  btn.disabled = false;
-}
-
-function simAnimIrAFrame(idx) {
-  idx = parseInt(idx, 10);
-  if (!simAnimFotogramas.length) return;
-  simAnimIndex = Math.max(0, Math.min(simAnimFotogramas.length - 1, idx));
-  const slider = $el('sim-anim-slider');
-  if (slider) slider.value = simAnimIndex;
-  const frame = simAnimFotogramas[simAnimIndex];
-  if (!frame || !mapa) return;
-  if (simAnimLayer) mapa.removeLayer(simAnimLayer);
-  simAnimLayer = L.tileLayer(frame.tile_url, { opacity: 0.75, maxZoom: 18, crossOrigin: true }).addTo(mapa);
-  simAnimActualizarInfo();
-}
-
-function simAnimActualizarInfo() {
-  const frame = simAnimFotogramas[simAnimIndex];
-  const info = $el('sim-anim-info');
-  if (!frame || !info) return;
-  const velAvance = Math.max(1, parseFloat($el('sim-anim-velocidad-avance')?.value) || 500);
-  const horasEstimadas = frame.distancia_m / velAvance;
-  info.textContent = `Fotograma ${frame.orden}/${simAnimFotogramas.length} — ${frame.porcentaje}% del alcance · ${frame.distancia_m.toFixed(0)} m desde el río · ≈ ${horasEstimadas.toFixed(1)} h (estimado por vos)`;
-}
-
-function simAnimTogglePlay() {
-  if (!simAnimFotogramas.length) return;
-  simAnimPlaying = !simAnimPlaying;
-  const btn = $el('sim-anim-playpause');
-  if (btn) btn.textContent = simAnimPlaying ? '⏸' : '▶';
-  clearInterval(simAnimTimer);
-  if (simAnimPlaying) {
-    simAnimTimer = setInterval(() => {
-      const siguiente = simAnimIndex + 1 >= simAnimFotogramas.length ? 0 : simAnimIndex + 1;
-      simAnimIrAFrame(siguiente);
-    }, simAnimIntervaloMs);
-  }
-}
-
-function simAnimSetVelocidad(ms) {
-  simAnimIntervaloMs = parseInt(ms, 10) || 700;
-  if (simAnimPlaying) { simAnimTogglePlay(); simAnimTogglePlay(); } // reinicia el interval con la nueva velocidad
-}
-
-function simAnimDetener() {
-  clearInterval(simAnimTimer);
-  simAnimPlaying = false;
-  simAnimFotogramas = [];
-  simAnimIndex = 0;
-  if (simAnimLayer && mapa) { mapa.removeLayer(simAnimLayer); simAnimLayer = null; }
-  const playBtn = $el('sim-anim-playpause');
-  if (playBtn) playBtn.textContent = '▶';
-  const player = $el('sim-anim-player');
-  if (player) player.style.display = 'none';
-  const btn = $el('sim-anim-btn');
-  if (btn) btn.textContent = '▶ Animar expansión';
-}
-
-// ── Velocidad de flujo aproximada ─────────────────────────────────
-let capaVelocidadFlujo = null;
-
-async function simVerVelocidadFlujo() {
-  if (!mapa) return;
-  if (_simUltimoUmbralM == null) {
-    const msg = $el('dem-mensaje');
-    if (msg) { msg.textContent = '⚠️ Primero apretá "Aplicar" en el simulador para tener una simulación de base.'; msg.style.color = '#ca8a04'; }
-    return;
-  }
-  const btn = $el('sim-vel-btn');
-  const textoOriginal = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = '⏳ Calculando...';
-  try {
-    const centro = mapa.getCenter();
-    const radio  = radioEfectivo();
-    const manningN = parseFloat($el('sim-manning-n')?.value) || 0.035;
-    const params = new URLSearchParams({
-      tipo: 'velocidad_flujo',
-      lat: centro.lat.toFixed(6), lon: centro.lng.toFixed(6),
-      radius_km: radio, umbral_m: _simUltimoUmbralM, manning_n: manningN,
-    });
-    const r = await fetch(`${GEE_SERVER}/inundacion_tiles?${params}`);
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
-
-    if (capaVelocidadFlujo) mapa.removeLayer(capaVelocidadFlujo);
-    capaVelocidadFlujo = L.tileLayer(j.tile_url, { opacity: 0.8, maxZoom: 18, crossOrigin: true }).addTo(mapa);
-    mostrarLeyendaGEE('dem_velocidad_flujo');
-
-    const msg = $el('dem-mensaje');
-    if (msg) {
-      msg.textContent = `✅ Velocidad de flujo calculada (Manning n=${manningN}) sobre la simulación de ${_simUltimoUmbralM.toFixed(2)} m DEM.`;
-      msg.style.color = '#b91c1c';
-    }
-    btn.textContent = '🔄 Recalcular velocidad';
-  } catch (e) {
-    const msg = $el('dem-mensaje');
-    if (msg) { msg.textContent = `❌ No se pudo calcular la velocidad: ${e.message}`; msg.style.color = '#dc2626'; }
-    btn.textContent = textoOriginal;
-  }
-  btn.disabled = false;
-}
-
-// ── DEPRESIONES ──────────────────────────────────────────────────
-async function aplicarDetectarDepresiones(auto = false) {
-  const msg   = document.getElementById('dem-mensaje');
-  const radio = radioEfectivo();
-  const opac  = parseInt((document.getElementById('dem-opacidad') || {value:65}).value, 10) / 100;
-  const sens  = parseInt((document.getElementById('dep-sensibilidad') || {value:2}).value, 10);
-  const umbralM = sens === 1 ? 10 : sens === 2 ? 5 : 2;
-  if (msg) { msg.textContent = auto ? '↻ Actualizando depresiones a la nueva posición...' : '⏳ Detectando depresiones...'; msg.style.color = '#1e40af'; }
-  quitarCapaHidro();
-  try {
-    const c = mapa.getCenter();
-    const p = new URLSearchParams({ tipo:'zona_baja', lat:c.lat, lon:c.lng, radius_km:radio, umbral_m:umbralM });
-    const res = await fetch(GEE_SERVER + '/zonas_inundables?' + p);
-    if (!res.ok) throw new Error('Error ' + res.status);
-    const j = await res.json();
-    if (!j.tile_url) throw new Error(j.error || 'Sin tile_url');
-    capaHidro = L.tileLayer(j.tile_url, { opacity:opac, maxZoom:14, attribution:'Depresiones · SRTM 30m · GEE' }).addTo(mapa);
-    hidroUltimoCentro = { lat: c.lat, lon: c.lng };
-    mostrarLeyendaGEE('dem_depresiones');
-    const sl = ['baja','media','alta'];
-    if (msg) { msg.textContent = '✅ Depresiones detectadas (sensibilidad ' + sl[sens-1] + ')'; msg.style.color = '#16a34a'; }
-    if (!auto) setTimeout(() => cerrarGeeSheet(), 700);
-  } catch(e) {
-    console.error('[Depresiones]', e);
-    if (msg) { msg.textContent = '⚠️ ' + e.message; msg.style.color = '#dc2626'; }
-  }
-}
-
-// ── ESCURRIMIENTO ────────────────────────────────────────────────
-// Vectores de dirección de flujo REALES: se calculan a partir del
-// aspecto de pendiente (ee.Terrain.aspect) que devuelve el endpoint
-// /direccion_flujo del backend GEE — no de una fórmula geométrica fija.
-// Convención de aspecto: 0-360°, 0°=Norte, sentido horario, apuntando
-// siempre hacia la máxima pendiente DESCENDENTE (cuesta abajo).
-let puntosEscurrimientoActual = null;   // última grilla recibida del backend (se reutiliza al hacer zoom)
-
-async function aplicarEscurrimiento(auto = false) {
-  const msg   = document.getElementById('dem-mensaje');
-  const radio = radioEfectivo();
-  const opac  = parseInt((document.getElementById('dem-opacidad') || {value:65}).value, 10) / 100;
-  const dens  = parseInt((document.getElementById('esc-densidad') || {value:2}).value, 10);
-  // Densidad de grilla: más puntos = más vectores, pero acotado para no
-  // saturar el mapa ni la respuesta del backend.
-  const nLado = dens === 1 ? 9 : dens === 2 ? 13 : 18;
-  // El radio de la grilla de vectores se acota respecto al radio de la capa
-  // de pendiente: con radios grandes (ej. 400km) una grilla de vectores del
-  // mismo tamaño quedaría demasiado separada para ser útil visualmente.
-  const radioVectores = Math.min(radio, 80);
-
-  if (msg) { msg.textContent = auto ? '↻ Actualizando dirección de flujo a la nueva posición...' : '⏳ Calculando dirección de flujo (aspecto SRTM)...'; msg.style.color = '#1e40af'; }
-  quitarCapaHidro();
-  try {
-    const c = mapa.getCenter();
-
-    // Capa de pendiente (magnitud) como fondo visual — igual que antes.
-    const pTile = new URLSearchParams({ tipo:'pendiente', lat:c.lat, lon:c.lng, radius_km:radio });
-    const resTile = await fetch(GEE_SERVER + '/zonas_inundables?' + pTile);
-    if (resTile.ok) {
-      const jTile = await resTile.json();
-      if (jTile.tile_url) {
-        capaHidro = L.tileLayer(jTile.tile_url, { opacity:opac * 0.6, maxZoom:14, attribution:'Pendiente · SRTM 30m · GEE' }).addTo(mapa);
-      }
-    }
-    mostrarLeyendaGEE('dem_escurrimiento');
-
-    // Datos reales de dirección de flujo (aspecto + pendiente por punto).
-    const pFlujo = new URLSearchParams({ lat:c.lat, lon:c.lng, radius_km:radioVectores, n:nLado });
-    const resFlujo = await fetch(GEE_SERVER + '/direccion_flujo?' + pFlujo);
-    if (!resFlujo.ok) throw new Error('Error ' + resFlujo.status);
-    const jFlujo = await resFlujo.json();
-    if (!jFlujo.ok || !jFlujo.puntos || !jFlujo.puntos.length) {
-      throw new Error('Sin datos de aspecto para esta zona');
-    }
-
-    puntosEscurrimientoActual = jFlujo.puntos;
-    hidroUltimoCentro = { lat: c.lat, lon: c.lng };
-    dibujarVectoresEscurrimiento();
-
-    if (msg) { msg.textContent = `✅ ${jFlujo.puntos.length} vectores de flujo reales (aspecto SRTM)`; msg.style.color = '#16a34a'; }
-    if (!auto) setTimeout(() => cerrarGeeSheet(), 700);
-  } catch(e) {
-    console.error('[Escurrimiento]', e);
-    if (msg) { msg.textContent = '⚠️ ' + e.message; msg.style.color = '#dc2626'; }
-  }
-}
-
-// Dibuja (o redibuja al cambiar el zoom) los vectores a partir de la
-// última grilla de puntos ya obtenida del backend — no vuelve a pedir
-// datos a GEE, solo recalcula geometría/tamaño en pantalla.
-function dibujarVectoresEscurrimiento() {
-  quitarVectoresEscurrimiento();
-  if (!puntosEscurrimientoActual || !puntosEscurrimientoActual.length) return;
-
-  const zoom = mapa.getZoom();
-  // Longitud del vector en grados, escalada por zoom: acercar -> vectores
-  // más chicos y separados en detalle; alejar -> más grandes para que se
-  // sigan viendo el patrón general sin saturar.
-  // (Aumentado ~80% respecto a la versión anterior para verse bien en
-  // pantallas de celular, donde el dedo/ojo necesita elementos más grandes.)
-  const largoBase = 0.011 * Math.pow(1.55, 11 - zoom);
-  // Umbral de pendiente por debajo del cual se considera terreno plano
-  // (sin dirección de escurrimiento dominante — el agua tiende a acumularse).
-  const UMBRAL_PLANO = 0.4; // grados
-
-  puntosEscurrimientoActual.forEach(pt => {
-    const { lat, lon, aspecto_deg, pendiente_deg } = pt;
-
-    if (pendiente_deg < UMBRAL_PLANO) {
-      // Terreno plano: punto en vez de flecha — no inventamos dirección.
-      capasEscurrimiento.push(
-        L.circleMarker([lat, lon], {
-          radius: 4.5, color:'#fff', fillColor:'#22d3ee', fillOpacity:0.95, weight:1.5, opacity:1
-        }).addTo(mapa)
-      );
-      return;
-    }
-
-    // Conversión de rumbo (0°=Norte, sentido horario) a desplazamiento lat/lon.
-    // Corrección por latitud en la componente Este-Oeste, para que el
-    // vector apunte visualmente en la dirección correcta en el mapa.
-    const rad = aspecto_deg * Math.PI / 180;
-    const corrLon = Math.cos(lat * Math.PI / 180) || 1;
-    const largo = largoBase * (0.7 + Math.min(pendiente_deg, 6) / 6 * 0.6); // más pendiente -> vector algo más largo
-    const dLat = Math.cos(rad) * largo;
-    const dLon = (Math.sin(rad) * largo) / corrLon;
-    const laB = lat + dLat, loB = lon + dLon;
-
-    // Grosor/opacidad proporcional a la pendiente: resalta levemente el
-    // drenaje más marcado sin convertirlo en un mapa de ríos.
-    // Color y grosor base subidos para mayor contraste en pantalla chica.
-    const pesoRel = Math.min(pendiente_deg / 5, 1);
-    const opts = {
-      color: '#0369a1',
-      weight: 2.4 + pesoRel * 2.2,
-      opacity: 0.75 + pesoRel * 0.25,
-    };
-
-    capasEscurrimiento.push(L.polyline([[lat, lon], [laB, loB]], opts).addTo(mapa));
-
-    // Punta de flecha más grande y abierta, para leerse bien de lejos.
-    const a1 = rad + Math.PI * 0.78, a2 = rad - Math.PI * 0.78, ld = largo * 0.5;
-    const p1lat = laB + Math.cos(a1) * ld, p1lon = loB + (Math.sin(a1) * ld) / corrLon;
-    const p2lat = laB + Math.cos(a2) * ld, p2lon = loB + (Math.sin(a2) * ld) / corrLon;
-    capasEscurrimiento.push(
-      L.polyline([[p1lat, p1lon], [laB, loB], [p2lat, p2lon]], opts).addTo(mapa)
-    );
-  });
-}
-
-// (El listener de zoomend para redibujar vectores se registra en
-// iniciarMapa(), una vez que el objeto `mapa` ya existe — ver más abajo.)
-
-function quitarVectoresEscurrimiento() {
-  capasEscurrimiento.forEach(c => { try { mapa.removeLayer(c); } catch(_){} });
-  capasEscurrimiento = [];
-}
-
-function quitarCapaHidro() {
-  if (capaHidro) { try { mapa.removeLayer(capaHidro); } catch(_){} capaHidro = null; }
-  quitarVectoresEscurrimiento();
-  puntosEscurrimientoActual = null;
-}
-
-document.addEventListener('DOMContentLoaded', () => actualizarSimulador(3));
 
 </script>
 </body>
