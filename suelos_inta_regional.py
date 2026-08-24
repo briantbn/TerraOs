@@ -67,172 +67,136 @@ SUELO_CAPAS = [
     },
     # Santa Fe 1:50.000 -- ANTES era un solo archivo de 366MB (53.046
     # polígonos), que directamente reventaba la memoria del dyno de Render
-    # con solo intentar descargarlo/parsearlo una vez. Partido en 20 tiles
-    # balanceados por cantidad de features (grilla adaptativa 4x5, no por
-    # grados fijos, para que ningún tile quede desproporcionadamente más
-    # pesado que otro), y pre-simplificado a la misma tolerancia que ya
-    # se usaba (~30m). Los tiles de borde se superponen levemente a
-    # propósito -- normal, consultar_mejor_capa() ya prueba todos los que
-    # puedan cubrir el punto en orden y devuelve el primero que matchea.
+    # con solo intentar descargarlo/parsearlo una vez. Partido en 15 tiles
+    # balanceados por PESO de coordenadas (proxy de tamaño real de archivo,
+    # no por cantidad de polígonos), en una grilla espacial de ~5 columnas
+    # (longitud) x 3 filas (latitud) -- ver index_tiles.json subido junto
+    # a los archivos en el dataset de Hugging Face para el detalle de cada
+    # bbox. A diferencia de Córdoba/Buenos Aires, estos tiles NO vienen
+    # pre-simplificados -- por eso 'simplificar_grados' va en 0.0005 (igual
+    # que las demás cartas de detalle que se simplifican al cargar).
+    # Los tiles vecinos pueden solaparse levemente en el borde -- normal,
+    # consultar_mejor_capa() prueba todos los que puedan cubrir el punto
+    # en orden y devuelve el primero que matchea.
     {
-        'nombre': 'Santa Fe (c0f0)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c0f0.geojson?download=true',
+        'nombre': 'Santa Fe (tile01)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile01.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-62.9039, -34.4075, -61.4169, -33.415),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-62.8663, -34.3855, -61.7443, -33.7235),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     {
-        'nombre': 'Santa Fe (c0f1)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c0f1.geojson?download=true',
+        'nombre': 'Santa Fe (tile02)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile02.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-62.2367, -33.6835, -61.5057, -32.0525),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-62.3415, -33.7234, -61.7448, -32.2454),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     {
-        'nombre': 'Santa Fe (c0f2)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c0f2.geojson?download=true',
+        'nombre': 'Santa Fe (tile03)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile03.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-62.2608, -32.1925, -61.4152, -30.6462),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-62.2279, -32.2448, -61.7442, -28.4396),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     {
-        'nombre': 'Santa Fe (c0f3)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c0f3.geojson?download=true',
+        'nombre': 'Santa Fe (tile04)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile04.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-62.185, -30.7884, -61.4702, -29.7864),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-61.7442, -34.3789, -61.4143, -32.8158),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     {
-        'nombre': 'Santa Fe (c0f4)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c0f4.geojson?download=true',
+        'nombre': 'Santa Fe (tile05)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile05.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-62.0513, -29.9133, -61.4035, -28.0936),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-61.7442, -32.8146, -61.4143, -30.8146),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     {
-        'nombre': 'Santa Fe (c1f0)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c1f0.geojson?download=true',
+        'nombre': 'Santa Fe (tile06)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile06.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-61.7836, -34.4062, -61.1265, -32.7614),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-61.7441, -30.8140, -61.4143, -28.1344),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     {
-        'nombre': 'Santa Fe (c1f1)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c1f1.geojson?download=true',
+        'nombre': 'Santa Fe (tile07)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile07.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-61.8083, -32.9337, -61.0946, -31.3875),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-61.4139, -34.0827, -61.0387, -32.7129),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     {
-        'nombre': 'Santa Fe (c1f2)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c1f2.geojson?download=true',
+        'nombre': 'Santa Fe (tile08)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile08.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-61.7058, -31.533, -60.9853, -30.5909),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-61.4143, -32.7125, -61.0387, -30.9831),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     {
-        'nombre': 'Santa Fe (c1f3)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c1f3.geojson?download=true',
+        'nombre': 'Santa Fe (tile09)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile09.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-61.8651, -30.7126, -60.8531, -29.8313),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-61.4143, -30.9828, -61.0387, -28.1747),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     {
-        'nombre': 'Santa Fe (c1f4)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c1f4.geojson?download=true',
+        'nombre': 'Santa Fe (tile10)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile10.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-61.7191, -29.9812, -61.0397, -28.1198),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-61.0386, -33.7339, -60.5001, -31.5015),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     {
-        'nombre': 'Santa Fe (c2f0)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c2f0.geojson?download=true',
+        'nombre': 'Santa Fe (tile11)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile11.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-61.3004, -33.9022, -60.4432, -32.6758),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-61.0386, -31.5015, -60.5000, -30.7748),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     {
-        'nombre': 'Santa Fe (c2f1)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c2f1.geojson?download=true',
+        'nombre': 'Santa Fe (tile12)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile12.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-61.8148, -33.1141, -60.7042, -31.7244),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-61.0386, -30.7744, -60.4998, -28.6514),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     {
-        'nombre': 'Santa Fe (c2f2)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c2f2.geojson?download=true',
+        'nombre': 'Santa Fe (tile13)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile13.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-61.3995, -31.9464, -60.7117, -31.04),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-60.4997, -33.6321, -59.8852, -30.0145),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     {
-        'nombre': 'Santa Fe (c2f3)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c2f3.geojson?download=true',
+        'nombre': 'Santa Fe (tile14)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile14.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-61.436, -31.3117, -60.6858, -30.5324),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-60.4979, -30.0145, -59.6390, -29.2113),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     {
-        'nombre': 'Santa Fe (c2f4)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c2f4.geojson?download=true',
+        'nombre': 'Santa Fe (tile15)',
+        'url': _HF_BASE + 'Santa_Fe_1_en_50_tile15.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-61.3723, -30.7565, -60.6646, -28.557),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
-    },
-    {
-        'nombre': 'Santa Fe (c3f0)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c3f0.geojson?download=true',
-        'escala': '1:50.000',
-        'confiabilidad': 'alta',
-        'bbox': (-61.5782, -33.6688, -60.0819, -31.0679),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
-    },
-    {
-        'nombre': 'Santa Fe (c3f1)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c3f1.geojson?download=true',
-        'escala': '1:50.000',
-        'confiabilidad': 'alta',
-        'bbox': (-60.8135, -31.5066, -59.9307, -30.5735),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
-    },
-    {
-        'nombre': 'Santa Fe (c3f2)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c3f2.geojson?download=true',
-        'escala': '1:50.000',
-        'confiabilidad': 'alta',
-        'bbox': (-60.9954, -31.7101, -59.8823, -30.1275),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
-    },
-    {
-        'nombre': 'Santa Fe (c3f3)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c3f3.geojson?download=true',
-        'escala': '1:50.000',
-        'confiabilidad': 'alta',
-        'bbox': (-60.8079, -31.3129, -59.7156, -29.4747),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
-    },
-    {
-        'nombre': 'Santa Fe (c3f4)',
-        'url': _HF_BASE + 'santa_fe_1_50000_c3f4.geojson?download=true',
-        'escala': '1:50.000',
-        'confiabilidad': 'alta',
-        'bbox': (-61.7521, -32.6554, -58.8121, -27.9771),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-60.0489, -29.2112, -59.1798, -28.0066),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Córdoba/Buenos Aires)
     },
     # Córdoba 1:50.000 -- ANTES un solo archivo de 242MB (1.505 polígonos
     # pero MUY complejos: hasta 26 columnas por feature y geometrías con
