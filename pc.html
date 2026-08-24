@@ -6147,6 +6147,18 @@ const IIPDIInspector = (() => {
     if (mapaHidrologia) {
       mapaHidrologia.getContainer().style.cursor = activo ? 'crosshair' : '';
     }
+    // FIX: el Inspector solo escuchaba clicks en `mapaHidrologia` (el mini-mapa
+    // propio del panel de resultados). Si el usuario lo activaba estando en
+    // el mapa PRINCIPAL (`mapa`) -- por ejemplo para consultar directo sobre
+    // el KML/lote que ya tiene cargado ahí -- el click nunca llegaba a
+    // onClickMapa, y encima el polígono del lote se comía el click con su
+    // propio popup (el de "Suelo (INTA)"). Ahora también actúa sobre `mapa`,
+    // y mientras está activo, los polígonos de `mapa` dejan pasar el click
+    // (mismo mecanismo que ya usa Medición de superficie).
+    if (typeof mapa !== 'undefined' && mapa) {
+      mapa.getContainer().style.cursor = activo ? 'crosshair' : '';
+      if (typeof _setPoligonosClicables === 'function') _setPoligonosClicables(mapa, !activo);
+    }
     if (activo) {
       // Exclusión mutua con las otras herramientas de click sobre el mapa
       // de hidrología (Aptitud Productiva / Inspector de Suelos INTA /
@@ -6180,6 +6192,10 @@ const IIPDIInspector = (() => {
     const btn = boton();
     if (btn) btn.classList.remove('activo');
     if (mapaHidrologia) mapaHidrologia.getContainer().style.cursor = '';
+    if (typeof mapa !== 'undefined' && mapa) {
+      mapa.getContainer().style.cursor = '';
+      if (typeof _setPoligonosClicables === 'function') _setPoligonosClicables(mapa, true);
+    }
   }
 
   // Botón "Inspector de Riesgo Hidrológico" del panel lateral: ahora sí
@@ -6665,6 +6681,10 @@ const IIPDIInspector = (() => {
 
   function iniciar() {
     if (mapaHidrologia) mapaHidrologia.on('click', onClickMapa);
+    // FIX: antes solo escuchaba en mapaHidrologia (el mini-mapa del panel);
+    // ahora también en `mapa` (el visor principal), para poder consultar
+    // el Riesgo Hidrológico directo sobre el KML/lote cargado ahí.
+    if (typeof mapa !== 'undefined' && mapa) mapa.on('click', onClickMapa);
   }
 
   // Se llama desde el <select id="ipca-elemento-expuesto">: recalcula el
@@ -7651,6 +7671,9 @@ const IIPDIInspector = (() => {
     toggleHumedalAnomalia,
     toggleDegradacionAguada, toggleRiesgoOcultoExtent,
     toggleListaRed,
+    estaActivo: () => activo, // FIX: expuesto para que otros módulos (ej. _dibujarCapaReferencia)
+                               // puedan chequear si el Inspector está activo antes de redibujar
+                               // un lote clicable encima suyo -- ver comentario en ese punto.
   };
 })();
 
@@ -14431,13 +14454,20 @@ function dibujarCampoEnMapa(puntos) {
     $el('mapa-campo-has').textContent    = (campoGuardado?.has || '--') + ' ha';
   }
 
-  // FIX: si la regla o la capa de aptitud ya estaban activas cuando se
-  // dibuja este campo, el polígono recién creado nace "clicable" (roba el
-  // clic) — se deja sin clic también, igual que los que ya estaban en el mapa.
+  // FIX: si la regla, la capa de aptitud, el Inspector de Riesgo Hidrológico
+  // o el Inspector de Suelos ya estaban activos cuando se dibuja este campo,
+  // el polígono recién creado nace "clicable" (roba el clic) — se deja sin
+  // clic también, igual que los que ya estaban en el mapa.
   if (typeof _medidorSatelital !== 'undefined' && _medidorSatelital.estaActivo()) {
     _setPoligonosClicables(mapa, false);
   }
   if (typeof _aptitudCapaActiva !== 'undefined' && _aptitudCapaActiva) {
+    _setPoligonosClicables(mapa, false);
+  }
+  if (typeof IIPDIInspector !== 'undefined' && IIPDIInspector.estaActivo()) {
+    _setPoligonosClicables(mapa, false);
+  }
+  if (typeof _inspectorSuelosActivo !== 'undefined' && _inspectorSuelosActivo) {
     _setPoligonosClicables(mapa, false);
   }
 }
@@ -16218,14 +16248,18 @@ class ProjectManager {
     lote.layer.addTo(mapa);
 
     // FIX: mismo caso que en dibujarCampoEnMapa — si la regla YA está
-    // activa, o si la capa de Aptitud Productiva YA está activa, el
-    // polígono del lote recién dibujado no debe robar el clic (antes solo
-    // se chequeaba la regla, así que con la capa de aptitud prendida el
-    // polígono del lote volvía a quedar clicable en cada redibujo —p.ej.
-    // al cambiar de lote del proyecto— y su cartel "Lote del proyecto"
-    // tapaba la vista en vez de dejar pasar el clic al suelo de abajo).
+    // activa, si la capa de Aptitud Productiva YA está activa, si el
+    // Inspector de Riesgo Hidrológico YA está en modo "click en el mapa", o
+    // si el Inspector de Suelos YA está activo, el polígono del lote recién
+    // dibujado no debe robar el clic (antes solo se chequeaba la regla y la
+    // capa de aptitud, así que con cualquiera de los otros dos herramientas
+    // prendidas el polígono del lote volvía a quedar clicable en cada
+    // redibujo —p.ej. al cambiar de lote del proyecto con "1/3 → 2/3 → 3/3"—
+    // y su cartel "Lote del proyecto" tapaba el cartel real del Inspector).
     if ((typeof _medidorSatelital !== 'undefined' && _medidorSatelital.estaActivo())
-        || (typeof _aptitudCapaActiva !== 'undefined' && _aptitudCapaActiva)) {
+        || (typeof _aptitudCapaActiva !== 'undefined' && _aptitudCapaActiva)
+        || (typeof IIPDIInspector !== 'undefined' && IIPDIInspector.estaActivo())
+        || (typeof _inspectorSuelosActivo !== 'undefined' && _inspectorSuelosActivo)) {
       _setPoligonosClicables(mapa, false);
     }
   }
@@ -18980,6 +19014,15 @@ function activarInspectorSuelos() {
     btn.classList.add('activo');
     if (mapa) mapa.getContainer().style.cursor = 'crosshair';
     if (mapaHidrologia) mapaHidrologia.getContainer().style.cursor = 'crosshair';
+    // FIX: esto faltaba por completo -- a diferencia de Aptitud Productiva y
+    // el Inspector de Riesgo Hidrológico, este toggle nunca desactivaba el
+    // clic de los polígonos, así que el lote del proyecto (o "Mi campo")
+    // seguía comiéndose el clic con su propio cartel "Lote del proyecto" en
+    // vez de dejarlo pasar al Inspector de Suelos.
+    if (typeof _setPoligonosClicables === 'function') {
+      if (mapa) _setPoligonosClicables(mapa, false);
+      if (mapaHidrologia) _setPoligonosClicables(mapaHidrologia, false);
+    }
     // Si no estamos ni en el mapa satelital ni en análisis hidrológico
     // (las dos pantallas donde esta herramienta funciona), navegar al
     // mapa satelital por defecto. Si ya estás en cualquiera de las dos,
@@ -18994,6 +19037,10 @@ function activarInspectorSuelos() {
     btn.classList.remove('activo');
     if (mapa) mapa.getContainer().style.cursor = '';
     if (mapaHidrologia) mapaHidrologia.getContainer().style.cursor = '';
+    if (typeof _setPoligonosClicables === 'function') {
+      if (mapa) _setPoligonosClicables(mapa, true);
+      if (mapaHidrologia) _setPoligonosClicables(mapaHidrologia, true);
+    }
   }
 }
 
@@ -19016,6 +19063,13 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
   btn.classList.remove('activo');
   if (mapa) mapa.getContainer().style.cursor = '';
   if (mapaHidrologia) mapaHidrologia.getContainer().style.cursor = '';
+  // FIX: se auto-apaga después de una consulta (es de "un solo click"), así
+  // que hay que restaurar el clic de los polígonos acá también -- si no,
+  // quedaban bloqueados para siempre después de la primera consulta exitosa.
+  if (typeof _setPoligonosClicables === 'function') {
+    if (mapa) _setPoligonosClicables(mapa, true);
+    if (mapaHidrologia) _setPoligonosClicables(mapaHidrologia, true);
+  }
 
   // Marcador en el punto clickeado (en el mapa donde se hizo click)
   if (_marcadorSuelos && _mapaObjetivoSuelos) _mapaObjetivoSuelos.removeLayer(_marcadorSuelos);
@@ -19056,7 +19110,27 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
     // así no hace falta tocar esa lógica — 'propiedades_crudas' trae el
     // esquema real de la fuente que respondió (nacional o regional).
     if (!json.encontrado) return { features: [], _fuente: null };
-    return { features: [{ properties: json.propiedades_crudas || {} }], _fuente: json.fuente };
+    // FIX: el backend (_normalizar() en suelos_inta_regional.py) YA traduce
+    // el esquema real de cada carta (ej. Corrientes: cu_s1/ip_s1/anegables/
+    // inundables/encharcabl) a clase/subclase/capacidad_uso/indice_prod/
+    // limitante/drenaje/anegabilidad -- pero acá se descartaban por completo
+    // y solo se usaban las propiedades crudas. Para esquemas cuyos nombres
+    // de campo no coinciden con lo que 'fila()' ya sabe leer (Corrientes en
+    // particular: docenas de columnas de aptitud por cultivo, sin textura/
+    // drenaje/clase reconocibles), esto hacía que no se mostrara NADA útil.
+    // Se combinan ahora bajo los mismos nombres de campo que 'fila()' de
+    // más abajo ya busca (clase, capacidad_uso, ind_prod, limit_ppal,
+    // drenaje_s1, anegab_s1) -- sin pisar un campo crudo que ya traiga un
+    // valor real (ej. el esquema nacional, donde 'ind_prod' ya existe tal
+    // cual en las propiedades crudas).
+    const props = { ...(json.propiedades_crudas || {}) };
+    if ((props.clase ?? null) == null && json.clase != null) props.clase = json.clase;
+    if ((props.capacidad_uso ?? null) == null && json.capacidad_uso != null) props.capacidad_uso = json.capacidad_uso;
+    if ((props.ind_prod ?? null) == null && json.indice_prod != null) props.ind_prod = json.indice_prod;
+    if ((props.limit_ppal ?? null) == null && json.limitante != null) props.limit_ppal = json.limitante;
+    if ((props.drenaje_s1 ?? null) == null && json.drenaje != null) props.drenaje_s1 = json.drenaje;
+    if ((props.anegab_s1 ?? null) == null && json.anegabilidad != null) props.anegab_s1 = json.anegabilidad;
+    return { features: [{ properties: props }], _fuente: json.fuente };
   }
 
   // ── Esquema REGIONAL (comp1-6, ej. Santa Fe/Córdoba/Buenos Aires) ──
@@ -19142,7 +19216,9 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
       filasEl.innerHTML += _suelosComponenteCard(nombre, g(`comp${i}_porc`), g(`comp${i}_gat`), g(`comp${i}_iat`));
     }
     if (!huboComponentes) {
-      filasEl.innerHTML += `<p style="font-size:12px;color:#9ca3af;padding:4px 0">Sin componentes detallados para esta unidad.</p>`;
+      // FIX: mismo caso que en mostrarResultado() -- la carta correcta se
+      // encontró, pero esta unidad puntual no trae componentes cargados.
+      filasEl.innerHTML += `<p style="font-size:12px;color:#9ca3af;padding:4px 0">Se encontró la carta de suelo de esta zona, pero esta unidad puntual no tiene componentes cargados en la fuente de INTA. Probá consultar un punto un poco distinto dentro del mismo campo.</p>`;
     }
 
     const textoFuente = (typeof fuente === 'string' && fuente)
@@ -19188,8 +19264,15 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
     const g = (k) => props[k] ?? props[k.toUpperCase()] ?? props[k.toLowerCase()] ?? null;
 
     // Helper para agregar una fila
+    let _seccionPendiente = null; // FIX: título de sección en espera -- se imprime recién
+                                   // cuando la primera fila/bloque real de esa sección
+                                   // aparece, así nunca queda un título "General" o
+                                   // "Unidad de suelo 1" colgado sin nada abajo (pasaba
+                                   // con esquemas WFS cuyos campos no coinciden con
+                                   // ninguno de los conocidos, ver fallback más abajo)
     function fila(label, val, campo) {
       if (val === null || val === undefined || val === '' || String(val).toUpperCase() === 'NULL' || val === '-') return;
+      if (_seccionPendiente) { filasEl.innerHTML += _seccionPendiente; _seccionPendiente = null; }
       const display = String(val).trim();
       const colores = suelosTagColor(campo || '', display);
       filasEl.innerHTML += `
@@ -19205,7 +19288,7 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
 
     // Helper para separador de sección
     function seccion(titulo) {
-      filasEl.innerHTML += `<div style="font-size:10px;font-weight:700;color:#81a685;text-transform:uppercase;letter-spacing:.08em;padding:10px 0 4px;border-top:1.5px solid #e8ebe5;margin-top:4px">${titulo}</div>`;
+      _seccionPendiente = `<div style="font-size:10px;font-weight:700;color:#81a685;text-transform:uppercase;letter-spacing:.08em;padding:10px 0 4px;border-top:1.5px solid #e8ebe5;margin-top:4px">${titulo}</div>`;
     }
 
     // Bloque de taxonomía visual (Orden → Gran Grupo → Subgrupo)
@@ -19216,6 +19299,7 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
         { label: 'Subgrupo', val: sgrup },
       ].filter(i => i.val && String(i.val).trim() !== '' && String(i.val).toUpperCase() !== 'NULL');
       if (items.length === 0) return;
+      if (_seccionPendiente) { filasEl.innerHTML += _seccionPendiente; _seccionPendiente = null; }
       let html = `<div style="margin:6px 0 4px;background:#EAF4ED;border:1.5px solid #C7E3C0;border-radius:10px;padding:8px 12px;">`;
       html += `<p style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#2F855A;margin:0 0 6px;">Clasificación taxonómica — Soil Taxonomy INTA</p>`;
       html += `<div style="display:flex;flex-direction:column;gap:3px;">`;
@@ -19237,6 +19321,8 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
     // — General —
     seccion('General');
     fila('Provincia',               g('provincia'),  'provincia');
+    fila('Clase de suelo',          g('clase'),         'clase');
+    fila('Capacidad de uso',        g('capacidad_uso'), 'capacidad_uso');
     fila('Símbolo cartográfico',    g('simbc'),      'simbc');
     fila('Tipo de unidad',          g('tipo_uc'),    'tipo_uc');
     fila('N° Carta',                g('new_ncart'),  'new_ncart');
@@ -19244,6 +19330,58 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
     fila('Limitante principal',     g('limit_ppal'), 'limit_ppal');
     fila('Limitante secundaria',    g('limit_secu'), 'limit_secu');
     fila('Limitante terciaria',     g('limit_terc'), 'limit_terc');
+
+    // Campos de otro esquema WFS provincial (ej. Entre Ríos) que a veces
+    // vienen sueltos en 'props' según la hoja consultada -- mismo patrón que
+    // arriba: código interno → etiqueta en español simple.
+    fila('Departamento',                        g('depart'),    'depart');
+    fila('Índice productivo (IPC)',              g('ipc'),       'ipc');
+    fila('Índice productivo potencial (IPCP)',   g('ipcp'),      'ipcp');
+    fila('Erosión actual',                      g('eros_act'),  'eros_act');
+    fila('Erosión potencial',                   g('eros_pot'),  'eros_pot');
+    fila('Fase de erosión',                     g('fase_1'),    'fase_1');
+
+    // ── Composición por componentes (ej. Corrientes: suelo_N + taxonom_sN +
+    // porcent_sN + subpai_sN + cu_sN) -- distinto del esquema REGIONAL
+    // (comp1-6/GAT/IAT de Santa Fe, ver mostrarResultadoRegional más abajo)
+    // y del esquema nacional de "Unidad de suelo 1/2/3" (posi_sue1/
+    // orden_sue1/... más abajo). Confirmado con una consulta real: 'suelo_1'
+    // (nombre de serie, ej. "AGUAY RINCON I"), 'taxonom_s1' (clasificación
+    // taxonómica, ej. "Hapludertes típicos") y 'porcent_s1' (% de la unidad)
+    // SÍ vienen en las propiedades crudas de Corrientes -- antes nada los
+    // mostraba, la unidad se veía "sin datos" pese a tener composición real.
+    const _corrHayComponentes = g('suelo_1') || g('taxonom_s1');
+    if (_corrHayComponentes) {
+      seccion('Composición de la unidad (INTA · Corrientes)');
+      let _corrTaxonomiaRota = false;
+      for (let i = 1; i <= 4; i++) {
+        const serie = g(`suelo_${i}`);
+        const taxo  = g(`taxonom_s${i}`);
+        const porc  = g(`porcent_s${i}`);
+        const subp  = g(`subpai_s${i}`);
+        const cu    = g(`cu_s${i}`);
+        const lim   = g(`limit_s${i}`);
+        if (!serie && !taxo) continue;
+        if (taxo && /\ufffd/.test(String(taxo))) _corrTaxonomiaRota = true;
+        if (_seccionPendiente) { filasEl.innerHTML += _seccionPendiente; _seccionPendiente = null; }
+        filasEl.innerHTML += `
+          <div class="suelos-unidad-card" style="border-left-color:#8BAE8B;margin-bottom:8px;">
+            <div class="suelos-unidad-header">
+              <span class="suelos-unidad-nombre">${serie || `Componente ${i}`}</span>
+              ${porc !== null && porc !== undefined && porc !== '' ? `<span class="suelos-unidad-porc">${parseFloat(porc).toFixed(0)}% de la unidad</span>` : ''}
+            </div>
+            ${taxo ? `<div style="font-size:12px;color:#57605a;font-style:italic;margin-top:2px;">${taxo}</div>` : ''}
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+              ${subp ? `<span class="suelos-tag" style="background:#eceee9;color:#57605a;">${subp}</span>` : ''}
+              ${cu ? `<span class="suelos-tag" style="background:#dbeafe;color:#1e40af;">Clase ${cu}</span>` : ''}
+              ${lim ? `<span class="suelos-tag" style="background:#fee2e2;color:#991b1b;">${lim}</span>` : ''}
+            </div>
+          </div>`;
+      }
+      if (_corrTaxonomiaRota) {
+        filasEl.innerHTML += `<p style="font-size:10.5px;color:#9ca3af;padding:2px 0 6px;">⚠️ Algunos nombres taxonómicos vienen con acentos rotos desde la fuente de datos — es un problema de codificación en el origen del archivo, no de esta pantalla.</p>`;
+      }
+    }
 
     // — Unidad de suelo 1 —
     const pct1 = g('porc_sue1');
@@ -19282,12 +19420,37 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
       // Suelo 3: solo tiene pos, orden, gran grupo y subgrupo según el schema WFS
     }
 
-    // Fallback: si no hay ninguna fila todavía, volcar todo lo que venga
+    // Fallback: si ningún campo conocido matcheó (esquema WFS todavía no
+    // mapeado), volcar lo que venga -- pero traduciendo el código técnico a
+    // palabras simples (en vez del nombre interno crudo, ej. "border_col"),
+    // y sin mostrar campos que son metadatos de CÓMO DIBUJAR el polígono
+    // (color/estilo/ancho de borde, relleno, si está cerrado) o IDs internos
+    // de base de datos -- no son información del suelo.
+    const CAMPOS_IRRELEVANTES = new Set([
+      'border_col', 'border_sty', 'border_wid', 'fill_style', 'fill_col', 'closed',
+      'id_0', 'id', 'objectid', 'gid', 'fid', 'shape_area', 'shape_leng', 'shape_length',
+      'shape__area', 'shape__length', 'area', 'perimeter', 'perimetro',
+    ]);
+    function _humanizarCampo(k) {
+      return k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
     if (filasEl.querySelectorAll('.suelos-fila').length === 0) {
       Object.entries(props).slice(0, 20).forEach(([k, v]) => {
         if (!v && v !== 0) return;
-        filasEl.innerHTML += `<div class="suelos-fila"><span class="suelos-label">${k}</span><span class="suelos-valor">${v}</span></div>`;
+        if (CAMPOS_IRRELEVANTES.has(k.toLowerCase())) return;
+        filasEl.innerHTML += `<div class="suelos-fila"><span class="suelos-label">${_humanizarCampo(k)}</span><span class="suelos-valor">${v}</span></div>`;
       });
+    }
+
+    // FIX: si la carta de suelo correcta SÍ se encontró (hay fuente/escala)
+    // pero la unidad puntual que cae en este punto no trae ningún atributo
+    // cargado (props vacío o todo null) -- pasa en algunas unidades reales
+    // de INTA, ej. zonas límite o sin relevamiento detallado -- antes el
+    // panel quedaba completamente en blanco entre el badge y la fuente, sin
+    // avisar nada, y parecía que la app estaba rota. Ahora se explica.
+    if (filasEl.querySelectorAll('.suelos-fila').length === 0) {
+      filasEl.innerHTML += `<p style="font-size:12px;color:#727971;padding:8px 0;line-height:1.5">
+        Se encontró la carta de suelo de esta zona, pero la unidad que cae exactamente en este punto no tiene atributos cargados en la fuente de INTA (pasa en algunas unidades puntuales del relevamiento). Probá consultar un punto un poco distinto dentro del mismo campo.</p>`;
     }
 
     const fuente = data._fuente;
@@ -19340,6 +19503,27 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
     const data = await fetchINTA();
     mostrarResultadoYGuardar(data);
   } catch (err1) {
+    // FIX: el plan gratis de Render "duerme" el backend tras un rato sin uso
+    // y el primer pedido después de eso puede fallar con un error de red
+    // genérico ("Failed to fetch") mientras el servidor recién está
+    // arrancando -- no es un error real de datos, solo hay que esperar un
+    // toque y reintentar. Se detecta por el tipo/mensaje del error (fetch
+    // fallido a nivel red, no un error explícito que vino en el JSON) y se
+    // reintenta UNA vez con aviso, en vez de mostrar el error de una.
+    const pareceServidorDormido = err1 instanceof TypeError || /fetch/i.test(err1?.message || '');
+    if (pareceServidorDormido) {
+      const loadingEl = $el('suelos-loading');
+      if (loadingEl) loadingEl.innerHTML = '⏳ El servidor tardó en responder (puede estar despertando tras estar inactivo) — reintentando en unos segundos...';
+      await new Promise(r => setTimeout(r, 6000));
+      try {
+        const data2 = await fetchINTA();
+        mostrarResultadoYGuardar(data2);
+        return;
+      } catch (err2) {
+        mostrarError(err2.message || 'El servidor sigue sin responder. Esperá unos segundos y probá de nuevo.', false);
+        return;
+      }
+    }
     mostrarError(err1.message || 'No se pudo consultar el suelo en el backend.', false);
   }
 }
