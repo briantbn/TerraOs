@@ -20,11 +20,13 @@ Orden de prioridad (mejor escala primero) — ver SUELO_CAPAS más abajo:
   2) Córdoba     — carta de detalle 1:50.000
   3) Buenos Aires— carta de detalle 1:50.000
   4) NOA         — aptitud regional (zonas grandes, informativo)
-  5) Nacional, partido por provincia — 1:1.000.000 (último recurso, 23
+  5) Nacional, partido por provincia — 1:500.000 (último recurso, 23
      archivos -- ver SUELO_CAPAS_NACIONAL). Antes era UN solo archivo de
      ~80MB que cubría todo el país; partirlo por provincia hace que cada
      consulta solo baje y cargue el tile de la provincia correspondiente
-     (unos cientos de KB) en vez del país entero.
+     (unos cientos de KB a ~15MB para Buenos Aires) en vez del país entero.
+     Reemplaza la carta nacional 1:1.000.000 anterior (mismo particionado
+     por provincia, mejor detalle de origen).
 
 Para agregar más provincias/escalas de detalle a futuro (1:100.000,
 1:250.000, 1:500.000, etc.): alcanza con sumar una entrada a SUELO_CAPAS
@@ -1098,7 +1100,7 @@ SUELO_CAPAS = [
 ]
 
 # ──────────────────────────────────────────────────────────────────────────
-# NACIONAL, PARTIDO POR PROVINCIA (1:1.000.000, último recurso)
+# NACIONAL, PARTIDO POR PROVINCIA (1:500.000, último recurso)
 # ──────────────────────────────────────────────────────────────────────────
 # Antes esto era UNA sola entrada 'Nacional' con bbox=None que cubría todo
 # el país en un solo archivo de ~80MB (7783 polígonos). Cargar eso una sola
@@ -1121,186 +1123,186 @@ SUELO_CAPAS = [
 SUELO_CAPAS_NACIONAL = [
     {
         'nombre': 'Nacional — Buenos Aires',
-        'url': _HF_BASE + 'nacional_1_1000000_buenos_aires.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_buenos_aires.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-63.4424, -41.0937, -56.6184, -33.2322),
+        'bbox': (-63.4425, -41.0971, -56.6181, -33.2293),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Catamarca',
-        'url': _HF_BASE + 'nacional_1_1000000_catamarca.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_catamarca.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-69.1462, -30.1588, -64.733, -25.1144),
+        'bbox': (-69.1494, -30.1588, -64.733, -25.1144),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Chaco',
-        'url': _HF_BASE + 'nacional_1_1000000_chaco.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_chaco.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-63.4755, -28.0729, -57.5169, -22.4012),
+        'bbox': (-63.4755, -28.0748, -57.5169, -22.4012),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Chubut',
-        'url': _HF_BASE + 'nacional_1_1000000_chubut.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_chubut.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-72.2372, -46.0573, -63.5313, -41.9462),
+        'bbox': (-72.2372, -46.0573, -63.5306, -41.9462),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Cordoba',
-        'url': _HF_BASE + 'nacional_1_1000000_cordoba.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_cordoba.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-65.8325, -35.0535, -61.7264, -29.457),
+        'bbox': (-65.8325, -35.0535, -61.7258, -29.457),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Corrientes',
-        'url': _HF_BASE + 'nacional_1_1000000_corrientes.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_corrientes.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-59.7218, -30.7706, -55.574, -27.2147),
+        'bbox': (-59.7218, -30.7721, -55.574, -27.2147),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Entre Rios',
-        'url': _HF_BASE + 'nacional_1_1000000_entre_rios.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_entre_rios.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
         'bbox': (-60.8267, -34.0747, -57.7514, -30.1091),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Formosa',
-        'url': _HF_BASE + 'nacional_1_1000000_formosa.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_formosa.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
         'bbox': (-62.4015, -26.9175, -57.5238, -22.4069),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Jujuy',
-        'url': _HF_BASE + 'nacional_1_1000000_jujuy.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_jujuy.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-67.2681, -24.6803, -64.1165, -21.7344),
+        'bbox': (-67.2739, -24.6803, -64.1165, -21.7344),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — La Pampa',
-        'url': _HF_BASE + 'nacional_1_1000000_la_pampa.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_la_pampa.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-68.3507, -39.3748, -63.3285, -34.948),
+        'bbox': (-68.3507, -39.3748, -63.3284, -34.948),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — La Rioja',
-        'url': _HF_BASE + 'nacional_1_1000000_la_rioja.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_la_rioja.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
         'bbox': (-69.6988, -32.0282, -65.3664, -27.6309),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Mendoza',
-        'url': _HF_BASE + 'nacional_1_1000000_mendoza.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_mendoza.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-70.6315, -37.627, -66.4291, -31.9568),
+        'bbox': (-70.6315, -37.627, -66.4291, -31.9498),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Misiones',
-        'url': _HF_BASE + 'nacional_1_1000000_misiones.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_misiones.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-56.1049, -28.2108, -53.5903, -25.4503),
+        'bbox': (-56.1082, -28.2116, -53.59, -25.4473),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Neuquen',
-        'url': _HF_BASE + 'nacional_1_1000000_neuquen.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_neuquen.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-71.9919, -41.1677, -67.9793, -36.0592),
+        'bbox': (-71.9919, -41.1677, -67.9781, -36.0592),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Rio Negro',
-        'url': _HF_BASE + 'nacional_1_1000000_rio_negro.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_rio_negro.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-71.9815, -42.0569, -62.7346, -37.5172),
+        'bbox': (-71.9815, -42.0569, -62.734, -37.5172),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Salta',
-        'url': _HF_BASE + 'nacional_1_1000000_salta.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_salta.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-68.6095, -26.4365, -62.2877, -21.947),
+        'bbox': (-68.6129, -26.4368, -62.2877, -21.947),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — San Juan',
-        'url': _HF_BASE + 'nacional_1_1000000_san_juan.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_san_juan.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-70.6492, -32.6707, -66.614, -28.3575),
+        'bbox': (-70.6492, -32.6773, -66.614, -28.3554),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — San Luis',
-        'url': _HF_BASE + 'nacional_1_1000000_san_luis.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_san_luis.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-67.5338, -36.0544, -64.8261, -31.797),
+        'bbox': (-67.5338, -36.0544, -64.8261, -31.7898),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Santa Cruz',
-        'url': _HF_BASE + 'nacional_1_1000000_santa_cruz.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_santa_cruz.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
         'bbox': (-73.6102, -52.4334, -65.6799, -45.9461),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Santa Fe',
-        'url': _HF_BASE + 'nacional_1_1000000_santa_fe.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_santa_fe.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
         'bbox': (-62.9309, -34.4359, -57.9898, -27.9472),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Santiago Del Estero',
-        'url': _HF_BASE + 'nacional_1_1000000_santiago_del_estero.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_santiago_del_estero.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-65.2263, -30.5286, -61.6584, -25.6008),
+        'bbox': (-65.2268, -30.5286, -61.6584, -25.6008),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Tierra Del Fuego E Islas Malvinas',
-        'url': _HF_BASE + 'nacional_1_1000000_tierra_del_fuego_e_islas_malvinas.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_tierra_del_fuego_e_islas_malvinas.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-68.6726, -59.1479, -27.2037, -50.9754),
+        'bbox': (-68.6726, -59.148, -27.2006, -50.9729),
         'simplificar_grados': None,
     },
     {
         'nombre': 'Nacional — Tucuman',
-        'url': _HF_BASE + 'nacional_1_1000000_tucuman.geojson?download=true',
-        'escala': '1:1.000.000',
+        'url': _HF_BASE + 'nacional_1_500000_tucuman.geojson?download=true',
+        'escala': '1:500.000',
         'confiabilidad': 'baja',
-        'bbox': (-66.2116, -28.0547, -64.421, -26.0155),
+        'bbox': (-66.2117, -28.0547, -64.421, -26.0149),
         'simplificar_grados': None,
     },
 ]
@@ -1855,7 +1857,7 @@ def consultar_mejor_capa(lat, lon):
 # a diferencia de Santa Fe (mosaico denso, un polígono por campo). Cuando
 # la vista del mapa cae en una zona que la carta de detalle apenas
 # cubre, en vez de mostrar un área enorme vacía sin colorear, se
-# complementa con el tile Nacional (1:1.000.000) de esa misma provincia,
+# complementa con el tile Nacional (1:500.000) de esa misma provincia,
 # dibujado DETRÁS de los polígonos de detalle (para no toparlos ni
 # perder precisión donde sí hay dato fino).
 #
@@ -2021,7 +2023,7 @@ def capa_visual_bbox(bbox):
                         fuente_txt = f"{capa['nombre']} + relleno {capa_nacional['nombre']} ({cobertura:.0%} cobertura de detalle)"
                         advertencia = (
                             f'Esta vista combina la carta de detalle de {provincia} (más precisa, '
-                            f'cubre ~{cobertura:.0%} del área) con la carta Nacional 1:1.000.000 '
+                            f'cubre ~{cobertura:.0%} del área) con la carta Nacional 1:500.000 '
                             f'para el resto — el resto tiene menor precisión.'
                         )
                         print(
