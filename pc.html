@@ -5207,6 +5207,7 @@ async function obtenerHotspotsUn(bbox, sat) {
 // opciones configurables.
 
 let ultimaJurisdiccionInfo = null; // {pais, jurisdiccion, nivel, encontrados, descartados} — estado interno, sin UI
+let hotspotsDescartadosPorBajaConfianza = 0; // último conteo de focos descartados por FOCOS_CONFIANZA_MINIMA_PCT
 const _jurisdiccionCache = {}; // clave "lat,lon" redondeada -> respuesta del backend (evita repetir consultas a GEE)
 
 /** getAdministrativeBoundary(): consulta al backend (Earth Engine + FAO GAUL) la
@@ -5244,14 +5245,30 @@ function filterHotspotsByJurisdiction(hotspots, geometry) {
 // Radio de influencia alrededor del polígono del campo, cuando hay uno
 // delimitado (KML/GeoJSON). Reemplaza al filtro por jurisdicción
 // administrativa en ese caso: ver aplicarFiltroJurisdiccion().
-const FOCOS_BUFFER_CAMPO_KM = 30;
+//
+// FOCOS_BUFFER_PORCENTAJE: usa el MISMO polígono "buffer 30%" que ya se
+// dibuja en el mapa (ver expandirPoligono() / campoBuffer más abajo en el
+// archivo — es una función declarada, así que está disponible acá aunque
+// se defina después en el archivo) — NO un buffer de distancia fija en km.
+// Un foco "toca" la zona de vigilancia si cae dentro del lote agrandado un
+// 30% desde su centro, tal cual se ve dibujado en naranja en el mapa.
+const FOCOS_BUFFER_PORCENTAJE = 1.30;   // 1.30 = +30% (mismo factor que campoBuffer)
+
+// Confianza mínima (0-100, ya convertida por confianzaAPct/estimación GOES)
+// para que un foco se muestre. VIIRS: l=30, n=60, h=90. MODIS: 0-100 directo.
+// GOES-19: estimado por temperatura de pixel, acotado 40-95.
+// 60 = descarta solo confianza "baja" (l); subí a 90 para quedarte solo con
+// "alta"; bajá a 0 para no filtrar nada.
+const FOCOS_CONFIANZA_MINIMA_PCT = 60;
 
 /**
  * aplicarFiltroJurisdiccion(): decide qué focos crudos de FIRMS se muestran.
  *
  * Si hay un campo/lote delimitado (campoGuardado) y el punto consultado
- * corresponde a ese campo, filtra por PROXIMIDAD REAL al polígono dibujado
- * (buffer de FOCOS_BUFFER_CAMPO_KM), no por jurisdicción administrativa.
+ * corresponde a ese campo, filtra por PROXIMIDAD REAL al polígono del
+ * campo agrandado un 30% desde su centro (FOCOS_BUFFER_PORCENTAJE — la
+ * misma "Zona buffer 30%" que ya se dibuja en naranja en el mapa), no por
+ * jurisdicción administrativa.
  * Motivo: un campo grande, o uno que cruza un límite de provincia/estado/
  * país, puede tener su centroide dentro de una sola jurisdicción y con eso
  * se descartaban focos reales que están dentro del campo mismo pero del
@@ -5286,7 +5303,16 @@ async function aplicarFiltroJurisdiccion(hotspotsCrudos, lat, lon) {
                            puntoLat >= bbox[1] - margen && puntoLat <= bbox[3] + margen;
 
       if (esEsteCampo) {
-        const zonaInfluencia = turf.buffer(poligonoCampo, FOCOS_BUFFER_CAMPO_KM, { units: 'kilometers' });
+        // Zona de influencia = el polígono del lote agrandado un 30% desde
+        // su centro (misma lógica que dibujarCampoEnMapa/expandirPoligono),
+        // NO un buffer de distancia fija en km — así el filtro coincide
+        // exactamente con la línea naranja "Zona buffer 30%" del mapa.
+        const anilloBuffer = expandirPoligono(campoGuardado.puntos, FOCOS_BUFFER_PORCENTAJE)
+          .map(p => [p.lon, p.lat]);
+        const primeroB = anilloBuffer[0], ultimoB = anilloBuffer[anilloBuffer.length - 1];
+        if (primeroB[0] !== ultimoB[0] || primeroB[1] !== ultimoB[1]) anilloBuffer.push(primeroB);
+        const zonaInfluencia = turf.polygon([anilloBuffer]);
+
         const filtrados = hotspotsCrudos.filter(h => {
           const flat = parseFloat(h.latitude), flon = parseFloat(h.longitude);
           if (isNaN(flat) || isNaN(flon)) return false;
@@ -5295,10 +5321,11 @@ async function aplicarFiltroJurisdiccion(hotspotsCrudos, lat, lon) {
         });
         ultimaJurisdiccionInfo = {
           pais: null,
-          jurisdiccion: `Campo delimitado (±${FOCOS_BUFFER_CAMPO_KM} km)`,
-          nivel: 'Proximidad al polígono',
+          jurisdiccion: `Campo delimitado (buffer +${Math.round((FOCOS_BUFFER_PORCENTAJE - 1) * 100)}%)`,
+          nivel: 'Dentro de la zona buffer del lote',
           encontrados: filtrados.length,
           descartados: totalCrudo - filtrados.length,
+          descartadosPorBajaConfianza: hotspotsDescartadosPorBajaConfianza,
         };
         return filtrados;
       }
@@ -5325,6 +5352,7 @@ async function aplicarFiltroJurisdiccion(hotspotsCrudos, lat, lon) {
     nivel: jur.nivel,
     encontrados: filtrados.length,
     descartados: totalCrudo - filtrados.length,
+    descartadosPorBajaConfianza: hotspotsDescartadosPorBajaConfianza,
   };
   return filtrados;
 }
@@ -5364,11 +5392,17 @@ async function obtenerHotspots(lat, lon) {
       }
     }
 
+    // Filtro de confianza mínima (FOCOS_CONFIANZA_MINIMA_PCT): descarta
+    // detecciones de baja confianza (ruido de sensor, quemas muy chicas,
+    // reflejos solares) ANTES del filtro geográfico.
+    const combinadosConfiables = combinados.filter(h => h.confidence >= FOCOS_CONFIANZA_MINIMA_PCT);
+    hotspotsDescartadosPorBajaConfianza = combinados.length - combinadosConfiables.length;
+
     // Filtro por jurisdicción administrativa + zona de influencia (ver bloque
     // "FILTRO POR JURISDICCIÓN ADMINISTRATIVA" más arriba). Esto NO toca el
     // algoritmo de propagación, la animación, los colores ni el cálculo de
     // dirección: solo decide qué focos de la respuesta cruda de FIRMS se usan.
-    const filtrados = await aplicarFiltroJurisdiccion(combinados, lat, lon);
+    const filtrados = await aplicarFiltroJurisdiccion(combinadosConfiables, lat, lon);
 
     // FIX: si mientras esperábamos esta respuesta ya se disparó un pedido de
     // focos más nuevo (otro lote/ubicación), esta respuesta quedó vieja: se
@@ -8521,6 +8555,28 @@ const Planificador = (() => {
     return validos.length ? validos.reduce((a, b) => a + b, 0) / validos.length : null;
   }
 
+  // ── Pronóstico de viento (ráfaga máxima del día, km/h) para una fecha
+  // puntual — mismo patrón que pronosticoLluviaFecha(). Solo tiene sentido
+  // dentro de la ventana de pronóstico real de Open-Meteo (~16 días); fuera
+  // de eso no se consulta (no existe climatología de viento en este módulo,
+  // a diferencia de la lluvia, porque el viento es mucho más errático día
+  // a día y una climatología no sería representativa para avisar de una
+  // actividad puntual). ──
+  async function pronosticoVientoFecha(lat, lon, fechaISO) {
+    try {
+      const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=wind_speed_10m_max,wind_gusts_10m_max&wind_speed_unit=kmh&timezone=auto&start_date=${fechaISO}&end_date=${fechaISO}`,
+        { signal: AbortSignal.timeout(15000) });
+      const j = await r.json();
+      const vel = j?.daily?.wind_speed_10m_max?.[0];
+      const rafaga = j?.daily?.wind_gusts_10m_max?.[0];
+      if (vel === undefined && rafaga === undefined) return null;
+      return {
+        velocidad: (vel === undefined || vel === null) ? null : vel,
+        rafaga: (rafaga === undefined || rafaga === null) ? null : rafaga,
+      };
+    } catch (e) { return null; }
+  }
+
   // ── IPHH: Índice de Presión Hidrológica Histórica (memoria del paisaje) ──
   // Combina los 6 indicadores JRC ya integrados. NO reemplaza el IIPDI
   // (que es sobre el estado ACTUAL) — este representa cuánto "acostumbrado"
@@ -8631,12 +8687,22 @@ const Planificador = (() => {
     };
   }
 
-  // ---- Motor 3: meteorológico (lluvia + ENSO) ----
-  function motorMeteorologico(lluviaMm, esPronosticoReal, ensoRes) {
+  // ---- Motor 3: meteorológico (lluvia + viento + ENSO) ----
+  // vientoInfo es el objeto que devuelve pronosticoVientoFecha(): {velocidad,
+  // rafaga} en km/h, o null si no se consultó/no hay dato. Umbrales de
+  // viento pensados para actividades de campo en general (no solo
+  // pulverización, que es más sensible: ahí la deriva ya es un problema
+  // bastante antes de estos valores) -- se prioriza la ráfaga cuando está
+  // disponible porque es lo que más golpea en el momento (equipos, personal,
+  // aplicaciones), con la velocidad sostenida como respaldo si no hay dato
+  // de ráfaga.
+  function motorMeteorologico(lluviaMm, esPronosticoReal, ensoRes, vientoInfo) {
     const fase = ensoRes?.ok ? ensoRes.fase : null;
     const intensidad = ensoRes?.ok ? ensoRes.intensidad : null;
+    const vientoKmh = vientoInfo?.rafaga ?? vientoInfo?.velocidad ?? null;
+    const esRafaga = vientoInfo?.rafaga !== null && vientoInfo?.rafaga !== undefined;
     return {
-      disponible: lluviaMm !== null || !!fase,
+      disponible: lluviaMm !== null || !!fase || vientoKmh !== null,
       lluviaMm, esPronosticoReal,
       lluviaExtrema: lluviaMm !== null && lluviaMm >= 150,
       lluviaIntensa: lluviaMm !== null && lluviaMm >= 80 && lluviaMm < 150,
@@ -8646,6 +8712,11 @@ const Planificador = (() => {
       ensoNinoFuerte: fase === 'El Niño' && ['fuerte', 'muy fuerte'].includes(intensidad),
       ensoNina: fase === 'La Niña',
       fase, intensidad,
+      vientoKmh, esRafaga,
+      vientoVelocidadKmh: vientoInfo?.velocidad ?? null,
+      vientoRafagaKmh: vientoInfo?.rafaga ?? null,
+      vientoFuerte: vientoKmh !== null && vientoKmh >= 60,
+      vientoModerado: vientoKmh !== null && vientoKmh >= 40 && vientoKmh < 60,
     };
   }
 
@@ -8786,6 +8857,32 @@ const Planificador = (() => {
       }
     }
 
+    // 4) Viento fuerte pronosticado -- independiente de los otros 3 (no es
+    // riesgo hidrológico), pero relevante para decidir si conviene mover la
+    // actividad de fecha: afecta pulverización (deriva), trabajo con
+    // maquinaria/estructuras y manejo de hacienda.
+    if (meteo.disponible && meteo.vientoKmh !== null) {
+      let severidad = 'minimo';
+      const razones = [];
+      const etiquetaViento = meteo.esRafaga ? 'ráfagas de' : 'viento sostenido de';
+      if (meteo.vientoFuerte) {
+        severidad = 'alto';
+        razones.push(`se pronostican ${etiquetaViento} ${Math.round(meteo.vientoKmh)} km/h`);
+        razones.push('con este viento no es recomendable pulverizar (alta deriva) ni trabajar con maquinaria/estructuras livianas');
+      } else if (meteo.vientoModerado) {
+        severidad = 'moderado';
+        razones.push(`se pronostican ${etiquetaViento} ${Math.round(meteo.vientoKmh)} km/h`);
+        razones.push('para pulverización ya es un viento a tener en cuenta por la deriva');
+      }
+      if (severidad !== 'minimo') {
+        conclusiones.push({
+          tipo: 'viento', severidad,
+          texto: severidad === 'alto' ? 'Viento fuerte pronosticado para la fecha elegida.' : 'Viento moderado pronosticado para la fecha elegida.',
+          razones,
+        });
+      }
+    }
+
     conclusiones.sort((a, b) => NIVEL_ORDEN[b.severidad] - NIVEL_ORDEN[a.severidad]);
     return conclusiones;
   }
@@ -8814,16 +8911,24 @@ const Planificador = (() => {
       fetch(`${GEE_SERVER}/humedal_punto?lat=${lat}&lon=${lon}`, { signal: AbortSignal.timeout(20000) }).then(r => r.json()).catch(() => null),
     ]);
 
-    let lluviaMm = null;
+    let lluviaMm = null, vientoInfo = null;
     if (diasHasta >= 0) {
-      lluviaMm = esPronosticoReal
-        ? await pronosticoLluviaFecha(lat, lon, fecha)
-        : await climatologiaLluvia(lat, lon, fechaAct.getMonth() + 1, fechaAct.getDate());
+      if (esPronosticoReal) {
+        // El viento solo tiene pronóstico real disponible (no climatología,
+        // ver nota en pronosticoVientoFecha) -- fuera de esa ventana queda
+        // null. En paralelo con la lluvia para no duplicar la espera.
+        [lluviaMm, vientoInfo] = await Promise.all([
+          pronosticoLluviaFecha(lat, lon, fecha),
+          pronosticoVientoFecha(lat, lon, fecha),
+        ]);
+      } else {
+        lluviaMm = await climatologiaLluvia(lat, lon, fechaAct.getMonth() + 1, fechaAct.getDate());
+      }
     }
 
     const hist = motorHistorico(memoriaRes);
     const hidro = motorHidrologico(iipdiRes, terrenoRes, redRes);
-    const meteo = motorMeteorologico(lluviaMm, esPronosticoReal, ensoRes);
+    const meteo = motorMeteorologico(lluviaMm, esPronosticoReal, ensoRes, vientoInfo);
     const edaf = motorEdafico(suelo, humedal);
     const conclusiones = motorDecision(hist, hidro, meteo, edaf);
     return { conclusiones };
@@ -9216,12 +9321,15 @@ const Planificador = (() => {
         fetch(`${GEE_SERVER}/humedal_punto?lat=${lat}&lon=${lon}`, { signal: AbortSignal.timeout(20000) }).then(r => r.json()).catch(() => null),
       ]);
 
-      setProgreso(esPronosticoReal ? 'Consultando pronóstico de lluvia (Open-Meteo)...' : 'Estimando lluvia según clima histórico de esta época...');
-      let lluviaMm = null, fuenteLluvia = '';
+      setProgreso(esPronosticoReal ? 'Consultando pronóstico de lluvia y viento (Open-Meteo)...' : 'Estimando lluvia según clima histórico de esta época...');
+      let lluviaMm = null, fuenteLluvia = '', vientoInfo = null;
       if (diasHasta < 0) {
         fuenteLluvia = 'fecha pasada';
       } else if (esPronosticoReal) {
-        lluviaMm = await pronosticoLluviaFecha(lat, lon, fecha);
+        [lluviaMm, vientoInfo] = await Promise.all([
+          pronosticoLluviaFecha(lat, lon, fecha),
+          pronosticoVientoFecha(lat, lon, fecha),
+        ]);
         fuenteLluvia = 'pronóstico Open-Meteo';
       } else {
         lluviaMm = await climatologiaLluvia(lat, lon, fechaAct.getMonth() + 1, fechaAct.getDate());
@@ -9231,7 +9339,7 @@ const Planificador = (() => {
       // ── Los 4 motores, sobre datos reales (nada de índices inventados) ──
       const hist = motorHistorico(memoriaRes);
       const hidro = motorHidrologico(iipdiRes, terrenoRes, redRes);
-      const meteo = motorMeteorologico(lluviaMm, esPronosticoReal, ensoRes);
+      const meteo = motorMeteorologico(lluviaMm, esPronosticoReal, ensoRes, vientoInfo);
       const edaf = motorEdafico(suelo, humedal);
 
       if (!hist.disponible && !hidro.disponible && !meteo.disponible && !edaf.disponible) {
