@@ -349,15 +349,535 @@ SUELO_CAPAS = [
         'bbox': (-62.2985, -33.1572, -61.7209, -32.2203),
         'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
     },
+    # ── Buenos Aires 1:50.000 -- REEMPLAZA la entrada anterior de un solo
+    # archivo (33MB, recortado a la columna CAP_USO únicamente). Esta versión
+    # nueva es la carta completa sin recortar (SIMBC, Nombre_UC, TIPO,
+    # SERIE1-6/PORC1-6/FASE1-6, PAISAJE, POSIC1-6, CAP_USO, taxo_ppal,
+    # taxo_2rio...), partida en 65 tiles por tamaño (grilla adaptativa
+    # balanceada por peso real de cada polígono, no por cantidad -- igual
+    # criterio que Corrientes/Santa Fe) para que ningún tile pase ~8MB salvo
+    # un caso (tile32, 12MB) con un único polígono gigante que no se puede
+    # partir más sin cortar geometría. NO viene pre-simplificada -- se
+    # simplifica al cargar, igual que Santa Fe/Córdoba.
     {
-        'nombre': 'Buenos Aires',
-        # ANTES 33MB con ~35 columnas por feature de las cuales solo se usa
-        # CAP_USO -- recortado a esa única columna + pre-simplificado.
-        'url': _HF_BASE + 'buenos_aires_1_50000.geojson?download=true',
+        'nombre': 'Buenos Aires (tile01)',
+        'url': _HF_BASE + 'buenos_aires_tile01.geojson?download=true',
         'escala': '1:50.000',
         'confiabilidad': 'alta',
-        'bbox': (-64.1, -41.5, -56.5, -32.5),
-        'simplificar_grados': None,  # ya viene pre-simplificado en el archivo
+        'bbox': (-63.4355, -38.8789, -61.7162, -37.6657),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile02)',
+        'url': _HF_BASE + 'buenos_aires_tile02.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-62.9126, -38.9874, -61.4887, -37.9489),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile03)',
+        'url': _HF_BASE + 'buenos_aires_tile03.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-63.4357, -38.7167, -61.7542, -36.9989),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile04)',
+        'url': _HF_BASE + 'buenos_aires_tile04.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-63.1127, -38.8119, -61.4500, -37.2097),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile05)',
+        'url': _HF_BASE + 'buenos_aires_tile05.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-62.5517, -39.0504, -60.9092, -37.9227),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile06)',
+        'url': _HF_BASE + 'buenos_aires_tile06.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-62.0435, -38.9990, -60.4500, -37.9510),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile07)',
+        'url': _HF_BASE + 'buenos_aires_tile07.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-62.5507, -38.8868, -60.9272, -36.8451),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile08)',
+        'url': _HF_BASE + 'buenos_aires_tile08.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-61.8471, -38.9381, -60.3809, -37.1619),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile09)',
+        'url': _HF_BASE + 'buenos_aires_tile09.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-63.4356, -38.5411, -61.1117, -35.9572),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile10)',
+        'url': _HF_BASE + 'buenos_aires_tile10.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-62.0508, -37.5236, -60.6264, -36.3621),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile11)',
+        'url': _HF_BASE + 'buenos_aires_tile11.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-63.4354, -38.5368, -60.1384, -34.4206),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile12)',
+        'url': _HF_BASE + 'buenos_aires_tile12.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-63.4354, -37.0384, -60.5049, -35.5160),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile13)',
+        'url': _HF_BASE + 'buenos_aires_tile13.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-63.4360, -36.2159, -61.7480, -34.3335),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile14)',
+        'url': _HF_BASE + 'buenos_aires_tile14.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-63.2096, -36.1331, -61.4457, -34.2828),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile15)',
+        'url': _HF_BASE + 'buenos_aires_tile15.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-63.3590, -36.2885, -60.1413, -34.0965),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile16)',
+        'url': _HF_BASE + 'buenos_aires_tile16.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-61.9255, -36.2821, -60.7943, -33.7291),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile17)',
+        'url': _HF_BASE + 'buenos_aires_tile17.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-61.9804, -38.9928, -59.9759, -37.0706),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile18)',
+        'url': _HF_BASE + 'buenos_aires_tile18.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-61.8411, -38.9882, -59.9809, -37.3325),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile19)',
+        'url': _HF_BASE + 'buenos_aires_tile19.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-61.8068, -38.9600, -59.9513, -37.6205),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile20)',
+        'url': _HF_BASE + 'buenos_aires_tile20.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-61.8425, -38.9828, -59.4671, -36.9887),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile21)',
+        'url': _HF_BASE + 'buenos_aires_tile21.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-61.7699, -38.9792, -59.1860, -37.2202),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile22)',
+        'url': _HF_BASE + 'buenos_aires_tile22.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-62.0199, -37.5074, -59.2292, -35.0719),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile23)',
+        'url': _HF_BASE + 'buenos_aires_tile23.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-61.5266, -37.2996, -59.4056, -35.3981),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile24)',
+        'url': _HF_BASE + 'buenos_aires_tile24.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-61.5976, -36.6878, -59.7357, -34.3127),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile25)',
+        'url': _HF_BASE + 'buenos_aires_tile25.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-61.6761, -35.1075, -59.8802, -33.2842),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile26)',
+        'url': _HF_BASE + 'buenos_aires_tile26.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-60.7928, -38.9206, -59.9495, -37.8739),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile27)',
+        'url': _HF_BASE + 'buenos_aires_tile27.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-61.2757, -38.3224, -59.4511, -36.2887),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile28)',
+        'url': _HF_BASE + 'buenos_aires_tile28.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-63.0517, -38.6498, -57.6987, -34.3718),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile29)',
+        'url': _HF_BASE + 'buenos_aires_tile29.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-61.5668, -36.0399, -59.2424, -33.2692),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile30)',
+        'url': _HF_BASE + 'buenos_aires_tile30.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-60.8000, -38.9116, -59.5618, -36.5909),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile31)',
+        'url': _HF_BASE + 'buenos_aires_tile31.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-61.5460, -38.6826, -58.7956, -33.2886),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile32)',
+        'url': _HF_BASE + 'buenos_aires_tile32.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-63.4359, -39.0294, -56.7675, -33.3058),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile33)',
+        'url': _HF_BASE + 'buenos_aires_tile33.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-61.1597, -39.0403, -59.0275, -33.7235),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile34)',
+        'url': _HF_BASE + 'buenos_aires_tile34.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-63.4358, -39.0293, -56.6228, -33.2215),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile35)',
+        'url': _HF_BASE + 'buenos_aires_tile35.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-60.9057, -38.8149, -58.9127, -33.3385),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile36)',
+        'url': _HF_BASE + 'buenos_aires_tile36.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-62.5616, -38.9435, -57.1609, -35.9379),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile37)',
+        'url': _HF_BASE + 'buenos_aires_tile37.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-60.5914, -36.7231, -58.8757, -33.5021),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile38)',
+        'url': _HF_BASE + 'buenos_aires_tile38.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-60.1687, -38.8771, -58.6797, -37.2991),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile39)',
+        'url': _HF_BASE + 'buenos_aires_tile39.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-60.7995, -38.0515, -57.9616, -35.5840),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile40)',
+        'url': _HF_BASE + 'buenos_aires_tile40.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-60.4960, -36.1164, -58.4328, -34.5841),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile41)',
+        'url': _HF_BASE + 'buenos_aires_tile41.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-60.2501, -35.0532, -58.8439, -33.2922),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile42)',
+        'url': _HF_BASE + 'buenos_aires_tile42.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-60.9207, -38.7606, -57.7014, -36.5424),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile43)',
+        'url': _HF_BASE + 'buenos_aires_tile43.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-60.2652, -38.7439, -58.1418, -36.8668),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile44)',
+        'url': _HF_BASE + 'buenos_aires_tile44.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-60.6087, -38.9037, -57.7220, -36.2837),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile45)',
+        'url': _HF_BASE + 'buenos_aires_tile45.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-60.2904, -38.7133, -57.7559, -36.4592),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile46)',
+        'url': _HF_BASE + 'buenos_aires_tile46.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-60.0486, -38.5839, -57.9272, -35.2341),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile47)',
+        'url': _HF_BASE + 'buenos_aires_tile47.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-60.1277, -37.0694, -58.4466, -35.3602),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile48)',
+        'url': _HF_BASE + 'buenos_aires_tile48.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.6386, -36.0497, -58.3867, -34.7112),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile49)',
+        'url': _HF_BASE + 'buenos_aires_tile49.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.8073, -35.2659, -58.4558, -33.7646),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile50)',
+        'url': _HF_BASE + 'buenos_aires_tile50.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.9856, -38.7362, -57.5829, -36.6229),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile51)',
+        'url': _HF_BASE + 'buenos_aires_tile51.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.2255, -38.7164, -57.5818, -36.7742),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile52)',
+        'url': _HF_BASE + 'buenos_aires_tile52.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.0352, -38.5635, -57.4909, -37.3347),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile53)',
+        'url': _HF_BASE + 'buenos_aires_tile53.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.8452, -37.7996, -57.9385, -36.6208),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile54)',
+        'url': _HF_BASE + 'buenos_aires_tile54.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.6465, -38.4070, -57.4508, -36.9508),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile55)',
+        'url': _HF_BASE + 'buenos_aires_tile55.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.0812, -38.3771, -56.8251, -36.9642),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile56)',
+        'url': _HF_BASE + 'buenos_aires_tile56.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.3590, -37.7836, -56.9022, -36.4358),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile57)',
+        'url': _HF_BASE + 'buenos_aires_tile57.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-57.5850, -37.8548, -56.6150, -36.2569),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile58)',
+        'url': _HF_BASE + 'buenos_aires_tile58.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.9690, -37.1310, -57.3165, -34.7456),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile59)',
+        'url': _HF_BASE + 'buenos_aires_tile59.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.1441, -37.3087, -57.6535, -34.7068),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile60)',
+        'url': _HF_BASE + 'buenos_aires_tile60.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.9712, -37.3558, -57.4453, -35.7759),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile61)',
+        'url': _HF_BASE + 'buenos_aires_tile61.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-59.0398, -36.2861, -57.3013, -34.8903),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile62)',
+        'url': _HF_BASE + 'buenos_aires_tile62.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.3182, -37.6996, -56.6185, -35.6878),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile63)',
+        'url': _HF_BASE + 'buenos_aires_tile63.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.5500, -37.1078, -56.6541, -35.7844),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile64)',
+        'url': _HF_BASE + 'buenos_aires_tile64.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.2152, -36.5998, -56.6753, -35.2850),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
+    },
+    {
+        'nombre': 'Buenos Aires (tile65)',
+        'url': _HF_BASE + 'buenos_aires_tile65.geojson?download=true',
+        'escala': '1:50.000',
+        'confiabilidad': 'alta',
+        'bbox': (-58.3224, -35.9101, -57.0833, -34.9492),
+        'simplificar_grados': 0.0005,  # NO viene pre-simplificado -- se simplifica al cargar (igual que Santa Fe/Córdoba)
     },
     # ── Corrientes 1:50.000/1:100.000/1:500.000 -- Instituto de Suelos INTA,
     # cartas provinciales completas (17.847 polígonos), autoalojadas en HF
