@@ -4423,20 +4423,63 @@ def copernicus_info():
 # ──────────────────────────────────────────────────────────────────────────
 
 CONECTIVIDAD_UMBRAL_HAND_M = 15       # HAND por debajo del cual una celda es "candidata"
-CONECTIVIDAD_ESCALA_DIST_M = 3000     # escala de decaimiento de la distancia hidráulica
-CONECTIVIDAD_PESOS = {                # deben sumar 1.0
-    'distancia': 0.5,
-    'pendiente': 0.3,
-    'flujo':     0.2,
-}
+                                       # (gate propio de la app, no parte de la fórmula IC:
+                                       # si no hay camino HAND<=umbral hasta agua conocida,
+                                       # se considera "no conectado" y el índice es 0)
 
+# ──────────────────────────────────────────────────────────────────────────
+# ÍNDICE DE CONECTIVIDAD (IC) — Borselli, Cassi & Torri (2008), "Prolegomena
+# to sediment and flow connectivity in the landscape: a GIS and field
+# numerical assessment", Catena 75(3):268-277. Refinado por Cavalli, M.,
+# Trevisani, S., Comiti, F. & Marchi, L. (2013), "Geomorphometric
+# assessment of spatial sediment connectivity in small Alpine catchments",
+# Geomorphology 188:31-41 (implementación de referencia: SedInConnect).
+#
+#   IC = log10( Dup / Ddn )
+#   Dup = W̄ · S̄ · sqrt(A)                    (componente aguas arriba)
+#   Ddn = Σ_i  d_i / (W_i · S_i)               (componente aguas abajo)
+#
+# Adaptación a este backend (Earth Engine, escala de punto, sin motor de
+# flow-routing D8/D-infinity dedicado):
+#   - A (área de contribución, m²): banda 'upa' de MERIT/Hydro/v1_0_1
+#     (área de drenaje acumulada), ya usada en el resto del módulo.
+#   - S (pendiente, m/m): ee.Terrain.slope(elevacion), convertida de grados
+#     a m/m y acotada a [0.005, 1.0] — el mismo rango que usa Cavalli et
+#     al. (2013) para evitar Ddn infinito en celdas planas.
+#   - W (factor de ponderación): W=1 en toda la región (variante puramente
+#     morfométrica del índice, también publicada y usada cuando no hay una
+#     capa de cobertura/uso de suelo confiable — ver Cavalli et al., 2013).
+#     TODO: si se agrega una capa de cobertura de suelo (ej. ESA WorldCover,
+#     factor C de RUSLE), reemplazar IC_W por esa imagen para la variante
+#     completa del índice.
+#   - S̄ (pendiente media aguas arriba): aproximada con la pendiente media
+#     de las celdas de la región analizada con elevación >= la del punto
+#     (proxy de "área que podría drenar hacia el punto"), ya que este
+#     backend no delinea la cuenca exacta aguas arriba celda por celda.
+#     Esta es una simplificación explícita — la implementación de
+#     referencia (SedInConnect/TauDEM) delinea la cuenca real vía D8/D∞.
+#   - Ddn: se calcula con cumulativeCost() de Earth Engine usando como
+#     "fricción" 1/(W·S) en cada celda y como fuente el agua permanente
+#     (JRC GSW) — el costo acumulado resultante es la suma de d_i/(Wi·Si)
+#     a lo largo del camino de menor fricción hasta el agua, que es la
+#     adaptación estándar de Ddn cuando se usa cost-distance en vez de un
+#     trazado de flujo explícito.
+#   - Normalización a 0-100%: se calcula el IC en cada celda de la región
+#     analizada y se usa el mín/máx de ESA región (no un rango fijo
+#     universal) para la normalización lineal, siguiendo la práctica de
+#     Cavalli et al. (2013) de normalizar IC por cuenca de estudio.
+#
+# IC_COEF_TIPO_AGUA: el ajuste por tipo de cuerpo de agua (río/arroyo/
+# laguna/estero) NO forma parte de la fórmula publicada de Borselli/
+# Cavalli — es un factor propio de esta app que se aplica DESPUÉS de
+# calcular el IC normalizado, y así debe aclararse en cualquier reporte o
+# exposición ("IC de Borselli et al. 2008, ajustado por tipo de cuerpo de
+# agua — ajuste propio de GeoSentinel, no publicado").
+# ──────────────────────────────────────────────────────────────────────────
 
-def _score_exponencial_decreciente(valor, escala):
-    """0-1: 1 cuando valor=0, decae exponencialmente al crecer valor."""
-    try:
-        return math.exp(-valor / escala) if valor is not None else 0.0
-    except (TypeError, ZeroDivisionError):
-        return 0.0
+IC_PENDIENTE_MIN_MM = 0.005   # m/m — piso de pendiente (Cavalli et al., 2013)
+IC_PENDIENTE_MAX_MM = 1.0     # m/m — techo de pendiente (Cavalli et al., 2013)
+IC_W = 1.0                    # factor de ponderación (variante W=1, morfométrica)
 
 
 def _calcular_conectividad_hidraulica_punto(lat, lon, radius_km, devolver_rasters=False):
@@ -4457,8 +4500,8 @@ def _calcular_conectividad_hidraulica_punto(lat, lon, radius_km, devolver_raster
 
     merit = ee.Image('MERIT/Hydro/v1_0_1').clip(region)
     hand = merit.select('hnd')          # altura sobre drenaje más cercano
-    upa = merit.select('upa')           # área de drenaje acumulada (flujo)
-    pendiente = ee.Terrain.slope(elevacion)
+    upa = merit.select('upa')           # área de drenaje acumulada (km²), banda MERIT Hydro
+    pendiente_deg = ee.Terrain.slope(elevacion)
 
     _candidatas, zona_conectada, costo_acumulado, conectividad_ok = (
         _conectividad_hidraulica(hand, agua_fuente, region, radius_km,
@@ -4467,23 +4510,75 @@ def _calcular_conectividad_hidraulica_punto(lat, lon, radius_km, devolver_raster
 
     punto = ee.Geometry.Point([lon, lat])
 
-    valores_punto = ee.Image.cat([
-        hand.rename('hand'),
-        pendiente.rename('pendiente'),
-        upa.rename('upa'),
-        costo_acumulado.rename('distancia_hidraulica'),
-    ]).reduceRegion(
-        reducer=ee.Reducer.first(),
-        geometry=punto,
-        scale=90,
-        bestEffort=True,
-        tileScale=4,
-    ).getInfo()
+    # ── Rasters del Índice de Conectividad (IC) — Borselli et al. (2008) ──
+    S = pendiente_deg.multiply(math.pi / 180).tan().clamp(
+        IC_PENDIENTE_MIN_MM, IC_PENDIENTE_MAX_MM)          # pendiente en m/m
+    A_m2 = upa.multiply(1e6)                                # km² -> m²
+    W = ee.Image.constant(IC_W)
 
-    hand_punto = valores_punto.get('hand')
-    pendiente_punto = valores_punto.get('pendiente')
-    upa_punto = valores_punto.get('upa')
-    distancia_hidraulica_m = valores_punto.get('distancia_hidraulica')
+    elevacion_punto_info = elevacion.reduceRegion(
+        reducer=ee.Reducer.first(), geometry=punto, scale=90,
+        bestEffort=True, tileScale=4,
+    ).getInfo()
+    elevacion_punto = elevacion_punto_info.get('elevation') or elevacion_punto_info.get(list(elevacion_punto_info.keys())[0]) if elevacion_punto_info else None
+
+    # S̄ aguas arriba: promedio de S en celdas de la región con elevación >=
+    # la del punto (proxy del área que podría drenar hacia el punto — ver
+    # nota extendida sobre esta simplificación arriba de esta función).
+    mascara_aguas_arriba = elevacion.gte(elevacion_punto) if elevacion_punto is not None else elevacion.gte(elevacion)
+    S_bar_info = S.updateMask(mascara_aguas_arriba).reduceRegion(
+        reducer=ee.Reducer.mean(), geometry=region, scale=90,
+        bestEffort=True, maxPixels=1e9, tileScale=4,
+    ).getInfo()
+    S_bar = list(S_bar_info.values())[0] if S_bar_info else None
+
+    # Dup puntual = W̄ · S̄ · sqrt(A), con A = upa del propio punto (MERIT ya
+    # da el área de drenaje acumulada real hasta esa celda).
+    upa_punto_info = upa.rename('upa').reduceRegion(
+        reducer=ee.Reducer.first(), geometry=punto, scale=90,
+        bestEffort=True, tileScale=4,
+    ).getInfo()
+    upa_punto = upa_punto_info.get('upa')
+    A_punto_m2 = (upa_punto * 1e6) if upa_punto else None
+    Dup_punto = (IC_W * S_bar * math.sqrt(A_punto_m2)) if (S_bar and A_punto_m2) else None
+
+    # Ddn: cumulativeCost con fricción 1/(W·S), fuente = agua permanente.
+    friccion = W.multiply(S).pow(-1)
+    escala_conectividad = 90
+    max_dist_conectividad = min(radius_km * 1000, 25_000)
+    friccion_90 = friccion.reproject(crs='EPSG:4326', scale=escala_conectividad)
+    fuente_90 = agua_fuente.reproject(crs='EPSG:4326', scale=escala_conectividad)
+    Ddn_img = friccion_90.cumulativeCost(source=fuente_90, maxDistance=max_dist_conectividad)
+
+    Ddn_info = Ddn_img.rename('ddn').reduceRegion(
+        reducer=ee.Reducer.first(), geometry=punto, scale=90,
+        bestEffort=True, tileScale=4,
+    ).getInfo()
+    Ddn_punto = Ddn_info.get('ddn')
+
+    # IC crudo (log-ratio) en el punto, más el rango de IC de toda la región
+    # analizada para poder normalizar a 0-100% por cuenca (Cavalli et al., 2013)
+    ic_punto = None
+    ic_min_region = None
+    ic_max_region = None
+    if Dup_punto and Ddn_punto and Ddn_punto > 0 and Dup_punto > 0:
+        ic_punto = math.log10(Dup_punto / Ddn_punto)
+
+        S_bar_img_aprox = S  # aproximación puntual de S̄ por celda (ver nota)
+        A_img_m2 = upa.multiply(1e6)
+        Dup_img = W.multiply(S_bar_img_aprox).multiply(A_img_m2.sqrt())
+        IC_img = Dup_img.divide(Ddn_img.max(1e-6)).log10()
+        rango_info = IC_img.rename('ic').reduceRegion(
+            reducer=ee.Reducer.minMax(), geometry=region, scale=90,
+            bestEffort=True, maxPixels=1e9, tileScale=4,
+        ).getInfo()
+        ic_min_region = rango_info.get('ic_min')
+        ic_max_region = rango_info.get('ic_max')
+
+    distancia_hidraulica_m = costo_acumulado.rename('d').reduceRegion(
+        reducer=ee.Reducer.first(), geometry=punto, scale=90,
+        bestEffort=True, tileScale=4,
+    ).getInfo().get('d')
 
     punto_conectado = conectividad_ok and distancia_hidraulica_m is not None
 
@@ -4496,23 +4591,32 @@ def _calcular_conectividad_hidraulica_punto(lat, lon, radius_km, devolver_raster
     )
     coeficiente_tipo = cuerpo_agua['coeficiente'] if cuerpo_agua else 1.0
 
-    if not punto_conectado:
-        indice = 0.0
+    if not punto_conectado or ic_punto is None or ic_min_region is None or ic_max_region is None or ic_max_region == ic_min_region:
+        indice_ic_normalizado = 0.0
     else:
-        score_distancia = _score_exponencial_decreciente(
-            distancia_hidraulica_m, CONECTIVIDAD_ESCALA_DIST_M)
-        score_pendiente = _score_exponencial_decreciente(pendiente_punto or 0, 8.0)
-        score_flujo = min((math.log10(upa_punto + 1) / 6.0), 1.0) if upa_punto else 0.0
+        indice_ic_normalizado = 100 * (ic_punto - ic_min_region) / (ic_max_region - ic_min_region)
+        indice_ic_normalizado = min(max(indice_ic_normalizado, 0), 100)
 
-        conectividad_terreno = 100 * (
-            CONECTIVIDAD_PESOS['distancia'] * score_distancia +
-            CONECTIVIDAD_PESOS['pendiente'] * score_pendiente +
-            CONECTIVIDAD_PESOS['flujo'] * score_flujo
-        )
-        indice = round(min(max(conectividad_terreno * coeficiente_tipo, 0), 100), 1)
+    # Ajuste propio de GeoSentinel (NO parte de la fórmula publicada de
+    # Borselli/Cavalli) por tipo de cuerpo de agua — documentar así en
+    # cualquier reporte/exposición.
+    indice = round(min(max(indice_ic_normalizado * coeficiente_tipo, 0), 100), 1)
+
+    hand_punto = hand.rename('hand').reduceRegion(
+        reducer=ee.Reducer.first(), geometry=punto, scale=90,
+        bestEffort=True, tileScale=4,
+    ).getInfo().get('hand')
+    pendiente_punto = pendiente_deg.rename('p').reduceRegion(
+        reducer=ee.Reducer.first(), geometry=punto, scale=90,
+        bestEffort=True, tileScale=4,
+    ).getInfo().get('p')
 
     resultado = {
         'indice_conectividad': indice,
+        'metodo': 'IC (Borselli et al., 2008; Cavalli et al., 2013), W=1, normalizado por cuenca analizada; ajuste final por tipo de cuerpo de agua es propio de GeoSentinel',
+        'ic_bruto': round(ic_punto, 4) if ic_punto is not None else None,
+        'ic_min_region_analizada': round(ic_min_region, 4) if ic_min_region is not None else None,
+        'ic_max_region_analizada': round(ic_max_region, 4) if ic_max_region is not None else None,
         'conectado': bool(punto_conectado),
         'distancia_hidraulica_m': round(distancia_hidraulica_m, 1) if distancia_hidraulica_m is not None else None,
         'hand_m': round(hand_punto, 2) if hand_punto is not None else None,
