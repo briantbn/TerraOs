@@ -15008,6 +15008,24 @@ function cerrarPoligono() {
   try { dibujarCampoEnMapa(verticesCerrados); } catch (e) { console.warn(e); }
   try { actualizarUIMonitorCampo(); } catch (e) { console.warn(e); }
   try { if (typeof rhInvalidarCache === 'function') rhInvalidarCache(); } catch (e) { console.warn(e); }
+  // FIX: al delimitar un campo a mano, la "ubicación activa" de la app
+  // (gpsLat/gpsLon) NUNCA se actualizaba al centro del polígono recién
+  // trazado -- a diferencia de proyectoActual.showCurrentLayer() (al "Ver"
+  // un lote de un KML/GeoJSON cargado), que sí lo hace. Como clima, Ángström
+  // y los focos de incendio de cargarDatos() dependen SOLO de gpsLat/gpsLon,
+  // quedaban pegados en la última ubicación activa (un KML cargado
+  // anteriormente, o tu GPS real) aunque el campo nuevo ya estuviera bien
+  // dibujado en el mapa -- por eso "Analizar" mostraba clima/focos de otro
+  // lugar en vez de la zona recién delimitada.
+  try {
+    const centro = calcularCentroide(verticesCerrados);
+    if (centro) {
+      gpsLat = centro.lat;
+      gpsLon = centro.lon;
+      gpsListo = true;
+      cargarDatos();
+    }
+  } catch (e) { console.warn('No se pudo actualizar la ubicación activa al delimitar el campo:', e); }
   // Además de "Mi campo" (arriba), este polígono queda guardado como un lote
   // más del Proyecto — así se pueden marcar varios sin pisar los anteriores,
   // cada uno con su nombre, su color en el mapa y su propio comentario.
