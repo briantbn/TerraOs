@@ -4427,6 +4427,17 @@ CONECTIVIDAD_UMBRAL_HAND_M = 15       # HAND por debajo del cual una celda es "c
                                        # si no hay camino HAND<=umbral hasta agua conocida,
                                        # se considera "no conectado" y el índice es 0)
 
+# FIX: usada por _score_exponencial_decreciente() en el score de conexión de
+# /iipdi_red_hidraulica (línea ~5052) pero nunca se había definido -- rompía
+# ese endpoint con "name 'CONECTIVIDAD_ESCALA_DIST_M' is not defined" apenas
+# se resolvía el bug de la función de arriba. Constante de decaimiento (m):
+# a esta distancia hidráulica (costo_m, tope real 25 km -- ver
+# _conectividad_hidraulica) el score cae a ~37% (1/e); es coherente con la
+# escala de distancia a la que un cuerpo de agua deja de ser relevante para
+# un campo (más allá de esto, la conexión hidráulica se vuelve poco
+# significativa a los fines de este índice).
+CONECTIVIDAD_ESCALA_DIST_M = 3000
+
 # ──────────────────────────────────────────────────────────────────────────
 # ÍNDICE DE CONECTIVIDAD (IC) — Borselli, Cassi & Torri (2008), "Prolegomena
 # to sediment and flow connectivity in the landscape: a GIS and field
@@ -4699,6 +4710,27 @@ def _nivel_iipdi(valor):
         if valor < umbral:
             return nombre
     return 'Muy Alto'
+
+
+def _score_exponencial_decreciente(valor, escala):
+    """
+    Score 0-1 que decae exponencialmente a medida que `valor` crece:
+    1.0 cuando valor=0, tendiendo a 0 cuanto más grande es `valor`.
+    `escala` es la constante de decaimiento (mismas unidades que `valor`:
+    metros para HAND/distancia hidráulica, grados para pendiente) -- a
+    valor=escala el score cae a ~37% (1/e); a mayor escala, decae más lento.
+    FIX: esta función se usaba en 3 lugares (susceptibilidad geomorfológica
+    -- HAND y pendiente -- y en el score de conectividad hidráulica) pero
+    nunca se había definido, lo que rompía /iipdi_punto e
+    /iipdi_red_hidraulica con "name '_score_exponencial_decreciente' is not
+    defined" apenas se llamaban.
+    """
+    if valor is None:
+        return 0.0
+    try:
+        return math.exp(-max(valor, 0) / escala)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return 0.0
 
 
 def _susceptibilidad_geomorfologica_punto(lat, lon, region, elevacion, radius_km, hand=None):
