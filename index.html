@@ -808,6 +808,16 @@
   </div>
   <div class="flex items-center gap-3">
     <span id="badge-offline" class="hidden text-xs font-bold px-2 py-1 rounded-full" style="background:#fef08a;color:#78350f">SIN SEÑAL</span>
+    <button onclick="activarInspectorSuelos()" id="btn-inspector-suelos"
+      title="Inspector de suelos INTA"
+      style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;
+             background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.15);border-radius:10px;cursor:pointer;transition:all .2s;"
+      aria-label="Inspector de suelos">🌱</button>
+    <button onclick="activarAptitudProductiva()" id="btn-aptitud-productiva"
+      title="Motor Nacional de Aptitud Productiva del Suelo"
+      style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;
+             background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.15);border-radius:10px;cursor:pointer;transition:all .2s;"
+      aria-label="Aptitud productiva del suelo">🌾</button>
     <button onclick="toggleMenuHamburguesa()" id="btn-hamburguesa"
       style="width:40px;height:40px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
              background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.15);border-radius:10px;cursor:pointer;transition:all .2s;"
@@ -1456,11 +1466,6 @@
       style="width:100%;display:flex;align-items:center;gap:14px;padding:13px 20px;background:none;border:none;cursor:pointer;text-align:left;">
       <span class="material-symbols-outlined" style="color:#1a3b22;font-size:22px;">map</span>
       <span style="font-weight:600;color:#1a1c1a;font-size:14px;">Mapa satelital</span>
-    </button>
-    <button onclick="irA('hidrologia');toggleMenuHamburguesa();" class="menu-item-btn"
-      style="width:100%;display:flex;align-items:center;gap:14px;padding:13px 20px;background:none;border:none;cursor:pointer;text-align:left;">
-      <span class="material-symbols-outlined" style="color:#1a3b22;font-size:22px;">water_drop</span>
-      <span style="font-weight:600;color:#1a1c1a;font-size:14px;">Análisis de riesgo hídrico</span>
     </button>
   </div>
 
@@ -2811,11 +2816,24 @@
           </button>
 
           <button onclick="toggleGeeSheet(); IIPDIInspector.toggleModal();"
-            class="w-full py-2.5 rounded-xl font-bold border-2 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            class="w-full py-2.5 rounded-xl font-bold border-2 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mb-2"
             style="border-color:#dc2626;color:#dc2626;background:#fff;font-size:12.5px">
             <span class="material-symbols-outlined" style="font-size:17px">travel_explore</span>
             Inspector de Riesgo Hidrológico
           </button>
+
+          <input id="input-proyecto-kml" type="file" accept=".kml,.kmz,.geojson,.json" multiple
+            style="display:none" onchange="onCargarProyecto(event)"/>
+          <button onclick="toggleGeeSheet(); irA('mapa'); document.getElementById('input-proyecto-kml').click();"
+            class="w-full py-2.5 rounded-xl font-bold border-2 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            style="border-color:#78350f;color:#78350f;background:#fff;font-size:12.5px">
+            <span class="material-symbols-outlined" style="font-size:17px">folder_open</span>
+            Proyecto de Lotes (varios KML/GeoJSON)
+          </button>
+          <div id="capas-io-estado" style="font-size:12px;margin-top:8px;"></div>
+          <div id="capas-io-lista" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+            <p style="font-size:12px;color:#9ca3af;margin:0;">Todavía no cargaste ninguna capa.</p>
+          </div>
         </div>
         <!-- ══ FIN ANÁLISIS DE RIESGO HÍDRICO ══ -->
 
@@ -2828,100 +2846,6 @@
   </div>
 </div><!-- /pantalla-mapa -->
 
-<!-- ════════════════════════════════════════════
-     ANÁLISIS DE RIESGO HÍDRICO — pantalla dedicada
-     (equivalente a la pestaña de PC; agrupa las
-     herramientas hidrológicas fuera del header)
-═════════════════════════════════════════════ -->
-<div id="pantalla-hidrologia" class="pantalla" style="padding:16px 16px 90px;overflow-y:auto;">
-  <div class="mb-5" style="padding-top:6px;">
-    <h2 class="text-2xl font-bold" style="color:#1a1c1a">🌊 Análisis de riesgo hídrico</h2>
-    <p class="text-sm" style="color:#727971">Suelo, red hidráulica, simulador de inundación y proyectos</p>
-  </div>
-
-  <div class="rounded-2xl border p-4 mb-3" style="background:#fff;border-color:#e2e3de">
-    <div class="flex items-center gap-3">
-      <span style="font-size:26px;line-height:1;">🌱</span>
-      <div class="flex-1">
-        <h3 class="font-bold text-sm" style="color:#1a3b22">Inspector de suelos INTA</h3>
-        <p class="text-xs mt-0.5" style="color:#727971">Tocá un punto del mapa y consultá el tipo de suelo</p>
-      </div>
-    </div>
-    <button onclick="activarInspectorSuelos()" class="informe-btn informe-btn-primario mt-3">Activar en el mapa</button>
-  </div>
-
-  <div class="rounded-2xl border p-4 mb-3" style="background:#fff;border-color:#e2e3de">
-    <div class="flex items-center gap-3">
-      <span style="font-size:26px;line-height:1;">🌾</span>
-      <div class="flex-1">
-        <h3 class="font-bold text-sm" style="color:#1a3b22">Aptitud Productiva del Suelo</h3>
-        <p class="text-xs mt-0.5" style="color:#727971">Motor Nacional (INTA): índice de aptitud por punto</p>
-      </div>
-    </div>
-    <button onclick="activarAptitudProductiva()" class="informe-btn informe-btn-primario mt-3">Activar en el mapa</button>
-  </div>
-
-  <div class="rounded-2xl border p-4 mb-3" style="background:#fff;border-color:#e2e3de">
-    <div class="flex items-center gap-3">
-      <span style="font-size:26px;line-height:1;">🌊</span>
-      <div class="flex-1">
-        <h3 class="font-bold text-sm" style="color:#1a3b22">Inspector de Riesgo Hidrológico</h3>
-        <p class="text-xs mt-0.5" style="color:#727971">Red hidráulica, IPCA, simulador de expansión, humedales</p>
-      </div>
-    </div>
-    <button onclick="IIPDIInspector.toggleModal()" class="informe-btn informe-btn-primario mt-3">Activar en el mapa</button>
-  </div>
-
-  <div class="rounded-2xl border p-4 mb-3" style="background:#fff;border-color:#e2e3de">
-    <div class="flex items-center gap-3">
-      <span style="font-size:26px;line-height:1;">🌧️</span>
-      <div class="flex-1">
-        <h3 class="font-bold text-sm" style="color:#1a3b22">Riesgo Hidrológico del Suelo</h3>
-        <p class="text-xs mt-0.5" style="color:#727971">Grilla: encharcamiento, anegamiento e inundación de tu campo</p>
-      </div>
-    </div>
-    <button onclick="irAAnalisisHidrologico()" class="informe-btn informe-btn-primario mt-3">Analizar mi campo</button>
-  </div>
-
-  <div class="rounded-2xl border p-4 mb-3" style="background:#fff;border-color:#e2e3de">
-    <div class="flex items-center gap-3">
-      <span style="font-size:26px;line-height:1;">🌊</span>
-      <div class="flex-1">
-        <h3 class="font-bold text-sm" style="color:#1a3b22">Simulador de Inundación (HAND)</h3>
-        <p class="text-xs mt-0.5" style="color:#727971">Nivel de río, escenarios históricos y animación</p>
-      </div>
-    </div>
-    <button onclick="abrirSimuladorHidro()" class="informe-btn informe-btn-primario mt-3">Abrir simulador</button>
-  </div>
-
-  <div class="rounded-2xl border p-4 mb-3" style="background:#fff;border-color:#e2e3de">
-    <div class="flex items-center gap-3">
-      <span style="font-size:26px;line-height:1;">📐</span>
-      <div class="flex-1">
-        <h3 class="font-bold text-sm" style="color:#1a3b22">Medición de Superficie</h3>
-        <p class="text-xs mt-0.5" style="color:#727971">Polígono/rectángulo, importar KML/GeoJSON</p>
-      </div>
-    </div>
-    <button onclick="irA('mapa'); MedicionSuperficie.abrirPanel();" class="informe-btn informe-btn-primario mt-3">Abrir medición</button>
-  </div>
-
-  <div class="rounded-2xl border p-4 mb-3" style="background:#fff;border-color:#e2e3de">
-    <div class="flex items-center gap-3">
-      <span style="font-size:26px;line-height:1;">🗂️</span>
-      <div class="flex-1">
-        <h3 class="font-bold text-sm" style="color:#1a3b22">Proyecto de Lotes</h3>
-        <p class="text-xs mt-0.5" style="color:#727971">Cargar varios KML/GeoJSON, navegar, analizar y comparar</p>
-      </div>
-    </div>
-    <input id="input-proyecto-kml" type="file" accept=".kml,.kmz,.geojson,.json" multiple
-      style="display:none" onchange="onCargarProyecto(event)"/>
-    <button onclick="irA('mapa'); document.getElementById('input-proyecto-kml').click();" class="informe-btn informe-btn-primario mt-3">Cargar proyecto</button>
-    <div id="capas-io-estado" style="font-size:12px;margin-top:8px;"></div>
-    <div id="capas-io-lista" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
-      <p style="font-size:12px;color:#9ca3af;margin:0;">Todavía no cargaste ninguna capa.</p>
-    </div>
-  </div>
-</div><!-- /pantalla-hidrologia -->
 
 <!-- ════════════════════════════════════════════
      INFORME EXPRESS — OVERLAY + MODAL
