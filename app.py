@@ -224,6 +224,19 @@ enso_oni = _LazyModule('enso_oni')
 _enso_disponible = enso_oni.disponible
 
 # ──────────────────────────────────────────────────────────────────────────
+# MÓDULO OPCIONAL: enso_clima
+# Estado y pronóstico ENSO/ONI para el módulo premium "Climate
+# Intelligence" del panel (frontend: card-clima-premium, /enso_estado).
+# Distinto de enso_oni (arriba): ese es para tormenta de diseño en
+# Riesgo Hídrico; este es para el ONI actual + pronóstico probabilístico
+# de NOAA/CPC. Mismo patrón de import diferido que el resto de módulos
+# opcionales: si falta enso_clima.py, este endpoint puntual devuelve
+# error, sin afectar al resto de la app.
+# ──────────────────────────────────────────────────────────────────────────
+enso_clima = _LazyModule('enso_clima')
+_enso_clima_disponible = enso_clima.disponible
+
+# ──────────────────────────────────────────────────────────────────────────
 # INICIALIZACIÓN DE EARTH ENGINE
 # ──────────────────────────────────────────────────────────────────────────
 _ee_ready = False
@@ -1637,6 +1650,7 @@ def health():
         'lisflood_binario_existe': os.path.isfile(
             os.environ.get('LISFLOOD_BIN') or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bin', 'lisflood')
         ),
+        'enso_clima_disponible': _enso_clima_disponible,
     })
 
 
@@ -1725,6 +1739,33 @@ _PROMPT_POR_MODULO = {
         "cerrado a partir del NDVI: el NDVI por sí solo no lo permite. "
         "Cerrá siempre recomendando verificación de campo si el descenso es "
         "moderado o fuerte. No hables de incendio, inundación ni sequía."
+    ),
+    # Módulo nuevo (GeoSentinel Climate Intelligence PREMIUM). A diferencia
+    # de los demás módulos, este NO es específico de un lote: el ONI/ENSO
+    # es un índice regional/nacional (NOAA/CPC), igual para toda la
+    # Argentina en un momento dado. Los datos ya vienen calculados por
+    # /enso_estado (ver enso_clima.py): ONI actual + fase, y el pronóstico
+    # probabilístico oficial por temporada. La IA solo interpreta esos
+    # números para dar contexto agrohidrológico regional -- nunca debe
+    # inventar un impacto específico para un departamento/lote que no
+    # esté respaldado por los datos recibidos.
+    'enso': (
+        "\n\nEste párrafo es EXCLUSIVAMENTE sobre el estado y pronóstico "
+        "del fenómeno ENSO/El Niño-La Niña (índice ONI, NOAA/CPC) recibido "
+        "en el JSON. Aclará primero la fase actual (El Niño, La Niña o "
+        "Neutral) y su magnitud, y después qué dicen las probabilidades "
+        "por temporada sobre su evolución esperada (se fortalece, se "
+        "debilita, se mantiene). Si se recibe 'lote_referencia', mencionalo "
+        "para dar contexto de ubicación, pero ACLARÁ EXPLÍCITAMENTE que el "
+        "ENSO es un fenómeno regional/nacional, no medido para ese lote "
+        "puntual -- nunca afirmes un impacto local específico (ej. 'en tu "
+        "lote va a haber una inundación') que no esté en los datos "
+        "recibidos: hablá en términos de mayor/menor probabilidad de "
+        "excedentes o déficit hídrico a nivel regional (NEA, Litoral, "
+        "Pampeana, etc. según corresponda), nunca como certeza. Cerrá "
+        "recomendando seguimiento agrohidrológico (lluvia, humedad de "
+        "suelo, napas) en vez de una conclusión categórica. No hables de "
+        "incendio, vegetación (NDVI) ni de los demás módulos."
     ),
 }
 
@@ -1825,6 +1866,28 @@ def interpretar_riesgo():
         return jsonify({'ok': True, 'interpretacion': texto})
     except Exception as exc:  # noqa: BLE001
         return jsonify({'ok': False, 'error': str(exc)}), 500
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 🌊 GEOSENTINEL CLIMATE INTELLIGENCE — PREMIUM
+# Estado y pronóstico ENSO/ONI (NOAA/CPC), consumido por la tarjeta
+# "Climate Intelligence" del panel (frontend: cliCargarEstado()). A
+# diferencia del resto de los módulos, NO depende de lat/lon ni de un
+# lote/polígono -- es un índice regional/nacional, igual para toda la
+# Argentina en un momento dado. Ver enso_clima.py para el detalle de las
+# dos fuentes oficiales que usa (ONI actual + pronóstico probabilístico).
+# ──────────────────────────────────────────────────────────────────────────
+@app.route('/enso_estado')
+def enso_estado():
+    if not _enso_clima_disponible:
+        return jsonify({
+            'error': ('Módulo enso_clima no disponible en el servidor — '
+                      'subí enso_clima.py junto a app.py y volvé a desplegar.'),
+        }), 503
+    try:
+        return jsonify(enso_clima.obtener_estado_enso())
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({'error': str(exc)}), 500
 
 
 # ── Historial & Seguimiento PRO — interpretación de datos ya agregados ──
