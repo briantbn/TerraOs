@@ -1408,6 +1408,42 @@
 </head>
 <body class="min-h-screen">
 
+<!-- ══════════════ TOAST — Regla 30-30-30 ══════════════
+     Tarjeta flotante (no una barra que ocupa todo el ancho), hijo
+     directo de <body> -> se ve en cualquier "pantalla" (monitor/mapa/
+     hidrología/etc.), no solo en el Monitor. Se controla con la clase
+     .toast3030-visible (nunca con "hidden": un display inline pisaba
+     esa clase y por eso antes quedaba siempre visible, vacía). Lo
+     maneja _actualizar3030Alerta() más abajo. -->
+<style>
+  #alerta-3030-banner {
+    position: fixed; top: 84px; right: 16px; z-index: 99998;
+    width: 320px; max-width: calc(100vw - 32px);
+    background: #fff; border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.22);
+    padding: 14px 14px 14px 16px;
+    display: flex; align-items: flex-start; gap: 10px;
+    opacity: 0; transform: translateY(-14px) scale(0.97);
+    pointer-events: none;
+    transition: opacity .28s ease, transform .28s ease;
+  }
+  #alerta-3030-banner.toast3030-visible {
+    opacity: 1; transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+</style>
+<div id="alerta-3030-banner">
+  <span id="alerta-3030-icono" style="font-size:22px;line-height:1;margin-top:1px;">⚠️</span>
+  <div style="flex:1;min-width:0;">
+    <p style="margin:0 0 3px;font-weight:800;font-size:13px;color:#1a1c1a;">Regla 30-30-30</p>
+    <p id="alerta-3030-texto" style="margin:0;font-size:12px;color:#575f58;line-height:1.4;">--</p>
+  </div>
+  <button onclick="_cerrar3030Banner()" aria-label="Cerrar aviso"
+    style="flex-shrink:0;background:#f2f4f1;border:none;color:#575f58;
+    width:22px;height:22px;border-radius:50%;font-size:12px;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;">✕</button>
+</div>
+
 <!-- ══════════════ AUTENTICACIÓN (Firebase) ══════════════ -->
 <style>
   #auth-gate {
@@ -2347,6 +2383,24 @@
 
       <!-- Detalle técnico — códigos del FWI System, colapsados por defecto -->
       <div id="inc-detalle" class="hidden" style="margin-top:10px;border-radius:10px;padding:10px 12px;background:#fff;border:1.5px solid #fecaca;">
+        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#93000a;margin:0 0 8px">Índice Ångström — por qué este número</p>
+        <p id="inc-angstrom-formula" style="font-size:12px;color:#1a1c1a;margin:0 0 4px;font-family:monospace;">--</p>
+        <p id="inc-angstrom-explicacion" style="font-size:11px;color:#424841;margin:0 0 8px;line-height:1.4">--</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10.5px;color:#727971;margin:0 0 12px;">
+          <div>🔴 &lt; 2.0 — Muy Probable</div>
+          <div>🟡 2.5–4.0 — Poco Probable</div>
+          <div>🟠 2.0–2.5 — Probable</div>
+          <div>🟢 ≥ 4.0 — Improbable</div>
+        </div>
+
+        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#93000a;margin:0 0 8px">Regla 30-30-30</p>
+        <p id="inc-3030-estado" style="font-size:12px;font-weight:700;margin:0 0 6px">--</p>
+        <div style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#424841;margin:0 0 12px;">
+          <span id="inc-3030-temp">--</span>
+          <span id="inc-3030-hum">--</span>
+          <span id="inc-3030-viento">--</span>
+        </div>
+
         <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#93000a;margin:0 0 8px">Códigos del FWI System (Van Wagner)</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;">
           <div><span style="color:#727971">Humedad superficial del combustible (FFMC)</span><br><b id="inc-ffmc" style="font-size:14px;color:#1a1c1a">--</b></div>
@@ -4808,6 +4862,91 @@ function verificar3030(temp, hum, viento) {
   return temp > 30 && hum < 30 && viento > 30;
 }
 
+// ── Regla 30-30-30 — evaluación detallada (parcial 2/3 vs total 3/3) ──
+// Usa los mismos comparadores que verificar3030() para que "total"
+// coincida exactamente con lo que ya reportan sesiones/informes.
+function _evaluar3030Detallado(temp, hum, viento) {
+  const tempOk   = temp   > 30;
+  const humOk    = hum    < 30;
+  const vientoOk = viento > 30;
+  const count = [tempOk, humOk, vientoOk].filter(Boolean).length;
+  let nivel = 'ninguno';
+  if (count === 3) nivel = 'total';
+  else if (count === 2) nivel = 'parcial';
+  return { tempOk, humOk, vientoOk, count, nivel };
+}
+
+// ── Banner global de alerta 30-30-30 ──
+// Se re-evalúa cada vez que llega clima nuevo (cargarDatos()). Solo
+// se muestra cuando el nivel escala (ninguno->parcial->total) o cambia
+// de tipo respecto al último mostrado; si el usuario lo cierra, no
+// vuelve a aparecer para ESE MISMO nivel hasta que escale o baje y
+// vuelva a subir.
+let _ultimoNivel3030Mostrado = null;
+
+function _actualizar3030Alerta() {
+  if (!climaActual || !climaActual.ok) return;
+  const banner = $el('alerta-3030-banner');
+  if (!banner) return;
+  const ev = _evaluar3030Detallado(climaActual.temp, climaActual.humedad, climaActual.viento);
+
+  if (ev.nivel === 'ninguno') {
+    banner.classList.remove('toast3030-visible');
+    _ultimoNivel3030Mostrado = null; // si vuelve a subir, se debe volver a mostrar
+    return;
+  }
+
+  const textoEl = $el('alerta-3030-texto');
+  const iconoEl = $el('alerta-3030-icono');
+  const partes = [];
+  if (ev.tempOk)   partes.push(`temp ${climaActual.temp}°C`);
+  if (ev.humOk)    partes.push(`hum ${climaActual.humedad}%`);
+  if (ev.vientoOk) partes.push(`viento ${climaActual.viento}km/h`);
+
+  if (ev.nivel === 'total') {
+    banner.style.borderLeft = '5px solid #dc2626';
+    iconoEl.textContent = '🔴';
+    textoEl.textContent = `ACTIVA — se cumplen los 3 criterios (${partes.join(' · ')})`;
+  } else { // parcial
+    banner.style.borderLeft = '5px solid #ea580c';
+    iconoEl.textContent = '🟠';
+    textoEl.textContent = `Parcial — 2 de 3 criterios (${partes.join(' · ')})`;
+  }
+
+  // Solo re-mostrar si el nivel cambió desde la última vez que se mostró
+  // (evita que reaparezca cada 10 min si el usuario ya lo cerró y nada cambió)
+  if (_ultimoNivel3030Mostrado !== ev.nivel) {
+    banner.classList.add('toast3030-visible');
+    _ultimoNivel3030Mostrado = ev.nivel;
+  }
+}
+
+function _cerrar3030Banner() {
+  $el('alerta-3030-banner')?.classList.remove('toast3030-visible');
+}
+
+// ── "Ver detalle técnico" — explica el número de Ángström y el estado
+//    de la Regla 30-30-30 con los valores reales medidos ──
+function _actualizarDetalleAngstrom3030(clima, ang) {
+  const fEl = $el('inc-angstrom-formula');
+  const eEl = $el('inc-angstrom-explicacion');
+  if (fEl && eEl) {
+    fEl.textContent = `I = (H/20) + ((27−T)/10) = (${clima.humedad}/20) + ((27−${clima.temp})/10) = ${ang.valor}`;
+    eEl.textContent = `Con humedad ${clima.humedad}% y temperatura ${clima.temp}°C, el índice da ${ang.valor} → clasificación "${ang.riesgo.replace(/^[^\s]+\s/, '')}". Cuanto más bajo el número, más probable es el riesgo de incendio.`;
+  }
+
+  const ev = _evaluar3030Detallado(clima.temp, clima.humedad, clima.viento);
+  const estadoEl = $el('inc-3030-estado');
+  if (estadoEl) {
+    if (ev.nivel === 'total')        { estadoEl.textContent = '🔴 ACTIVA — se cumplen los 3 criterios'; estadoEl.style.color = '#dc2626'; }
+    else if (ev.nivel === 'parcial') { estadoEl.textContent = '🟠 PARCIAL — se cumplen 2 de 3 criterios'; estadoEl.style.color = '#ea580c'; }
+    else                             { estadoEl.textContent = '✅ No activa — se cumple ' + ev.count + ' de 3 criterios'; estadoEl.style.color = '#2F855A'; }
+  }
+  setText('inc-3030-temp',   `${ev.tempOk   ? '✔' : '✘'} Temperatura: ${clima.temp}°C (umbral > 30°C)`);
+  setText('inc-3030-hum',    `${ev.humOk    ? '✔' : '✘'} Humedad: ${clima.humedad}% (umbral < 30%)`);
+  setText('inc-3030-viento', `${ev.vientoOk ? '✔' : '✘'} Viento: ${clima.viento}km/h (umbral > 30km/h)`);
+}
+
 // ── McARTHUR MARK 5 — Forest Fire Danger Index (FFDI) ───────────────
 // Índice científico australiano (McArthur, 1967; forma exponencial de
 // Noble et al., 1980), estándar de referencia para peligro y propagación
@@ -5309,6 +5448,10 @@ async function cargarDatos() {
     r3030El.textContent  = r3030 ? '⚠️ Regla 30-30-30 ACTIVA' : '✅ Regla 30-30-30 no activa';
     r3030El.style.color  = r3030 ? '#dc2626' : '#2F855A';
     r3030El.style.fontWeight = 'bold';
+    // Banner global (se ve en cualquier pantalla, no solo en el Monitor)
+    try { _actualizar3030Alerta(); } catch (e) { console.warn(e); }
+    // "Ver detalle técnico" -> explicación del Ángström + desglose 30-30-30
+    try { _actualizarDetalleAngstrom3030(clima, ang); } catch (e) { console.warn(e); }
 
     // KPI Incendios basado en Angström
     actualizarKPIIncendios(ang);

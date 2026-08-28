@@ -1205,7 +1205,7 @@
 <!-- ══════════════════════════════════════════
      RIESGO HIDROLÓGICO DEL SUELO (grilla) — PANEL
 ═══════════════════════════════════════════ -->
-<div id="rh-leyenda-panel" style="display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+<div id="rh-leyenda-panel" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
   z-index:1602;width:min(92%,300px);max-height:82%;overflow-y:auto;
   background:rgba(15,20,15,0.94);border:1px solid rgba(255,255,255,0.12);border-radius:14px;
   padding:14px;box-shadow:0 10px 40px rgba(0,0,0,0.4);backdrop-filter:blur(4px);
@@ -8637,6 +8637,20 @@ const IIPDIInspector = (() => {
 //  (sin pantalla de Hidrología separada) y omite la navegación entre
 //  lotes de un proyecto (sistema de Proyectos, todavía no portado).
 // ════════════════════════════════════════════════════════════════
+// FIX: estas variables existían en la versión PC pero nunca se habían
+// declarado acá — el módulo entero tiraba "ReferenceError: ... is not
+// defined" apenas se intentaba calcular (rhCalculando, rhDatosCampo, etc.).
+let rhPanelAbierto        = false;
+let rhNavegandoProyecto   = false; // true mientras rhAnalizarLoteActual() cambia de lote en la cadena de auto-avance, para que rhInvalidarCache() no dispare un análisis duplicado en paralelo
+let rhCalculando          = false;
+let rhDatosCampo          = null;   // { suelo, lluvia, celdas, minE, maxE, rangoE, centro }
+let rhUltimaFirmaCampo    = null;
+let rhCapaGrid            = null;   // L.layerGroup con las celdas pintadas
+let rhContornoCampo       = null;   // L.polygon con el borde del campo
+let rhEscenarioActual     = 'real'; // 'real' | '5'|'10'|...|'200' (mm de lluvia simulada)
+let rhVentanaSeleccionada = 48;     // 24 | 48 | 72 (para el escenario "Real")
+let rhAnimando            = false;
+
 // ── Registrar el resultado en el historial de sesión (alias de _registrarAnalisis) ──
 // En PC esto alimenta el sistema de "Proyectos y lotes" (AnalysisSession),
 // todavía no portado a Android. Reusa el mismo adaptador liviano que ya usa
@@ -9014,10 +9028,19 @@ async function calcularRiesgoHidrologico() {
       puntos = v;
       hasTotal = calcularHectareas(v);
     }
+  } else if (typeof proyectoActual !== 'undefined' && proyectoActual && proyectoActual.loteActual
+             && proyectoActual.loteActual.puntos && proyectoActual.loteActual.puntos.length >= 3) {
+    // FIX MÓVIL: lote cargado desde un proyecto KML/GeoJSON que todavía no
+    // se "activó" en Mi Campo (ej. porque ya había otro campo delimitado
+    // en curso). Antes esto obligaba a delimitar de nuevo o a tocar "Ver"
+    // primero — ahora se usa directo el lote seleccionado del proyecto.
+    const lote = proyectoActual.loteActual;
+    puntos = lote.puntos;
+    hasTotal = calcularHectareas(lote.puntos);
   }
 
   if (!puntos) {
-    rhSetProgreso('⚠️ Primero delimitá tu campo (menú Incendios → Delimitar), o dibujá/importá una forma en "📐 Medición de superficie", para calcular el riesgo hidrológico.');
+    rhSetProgreso('⚠️ Primero delimitá tu campo (menú Incendios → Delimitar), dibujá/importá una forma en "📐 Medición de superficie", o cargá un KML/GeoJSON, para calcular el riesgo hidrológico.');
     return;
   }
   if (!mapa) return;
@@ -9293,14 +9316,19 @@ function rhAbrirPanel() {
   const planifPanel = $el('planif-panel');
   if (planifPanel && planifPanel.style.display === 'block') planifPanel.style.display = 'none';
 
-  // FIX: reconoce como "campo listo" tanto a "Mi Campo" (campoGuardado)
+  // FIX: reconoce como "campo listo" tanto a "Mi Campo" (campoGuardado),
   // como a una forma cerrada de "📐 Medición de superficie" (dibujada o
-  // importada de un KML/GeoJSON) — antes solo miraba campoGuardado.
+  // importada de un KML/GeoJSON), como al lote actualmente seleccionado
+  // de un proyecto KML/GeoJSON cargado (aunque todavía no se haya
+  // "activado" en Mi Campo) — antes solo miraba campoGuardado.
   const medVertices = (typeof MedicionSuperficie !== 'undefined' && typeof MedicionSuperficie.getVertices === 'function')
     ? MedicionSuperficie.getVertices() : null;
+  const loteProyectoPuntos = (typeof proyectoActual !== 'undefined' && proyectoActual && proyectoActual.loteActual
+    && proyectoActual.loteActual.puntos && proyectoActual.loteActual.puntos.length >= 3)
+    ? proyectoActual.loteActual.puntos : null;
   const puntosActivos = (campoGuardado && campoGuardado.puntos && campoGuardado.puntos.length >= 3)
     ? campoGuardado.puntos
-    : (medVertices && medVertices.length >= 3 ? medVertices : null);
+    : (medVertices && medVertices.length >= 3 ? medVertices : loteProyectoPuntos);
 
   if (puntosActivos && rhDatosCampo && rhUltimaFirmaCampo === JSON.stringify(puntosActivos)) {
     // Ya había un análisis calculado para esta misma área: se había
@@ -9315,7 +9343,12 @@ function rhAbrirPanel() {
     }
     rhRecalcularClasificacion();
   } else if (puntosActivos) {
-    rhSetProgreso('Campo listo. Tocá "🌧 Calcular" para generar el análisis.');
+    // FIX MÓVIL: el campo ya está listo y no hay un cálculo cacheado para
+    // esta misma forma — antes acá solo se le pedía al usuario tocar
+    // "Calcular" a mano. Ahora se dispara solo, para que el análisis
+    // aparezca directo al abrir el panel desde el atajo.
+    rhSetProgreso('Campo listo. Calculando automáticamente...');
+    calcularRiesgoHidrologico();
   } else {
     rhSetProgreso('Delimitá tu campo (menú Incendios → Delimitar), o dibujá/importá una forma en "📐 Medición de superficie", para poder calcular el riesgo hidrológico.');
   }
@@ -9325,14 +9358,13 @@ function rhCerrarPanel() {
   rhPanelAbierto = false;
   const p = $el('rh-leyenda-panel');
   if (p) p.style.display = 'none';
-  // Dejar de "marcar el polígono" en el mapa apenas se cierra este panel:
-  // se saca la grilla de riesgo y el contorno del campo (el resultado
-  // sigue en caché — rhDatosCampo — para redibujarlo al instante si el
-  // usuario vuelve a abrir este panel sin haber cambiado el campo).
-  if (mapa) {
-    if (rhCapaGrid) { mapa.removeLayer(rhCapaGrid); rhCapaGrid = null; }
-    if (rhContornoCampo) { mapa.removeLayer(rhContornoCampo); rhContornoCampo = null; }
-  }
+  // FIX: antes, al tocar la ✕ se sacaba del mapa la grilla de colores y el
+  // contorno del campo — el resultado quedaba solo en caché (rhDatosCampo)
+  // y había que volver a abrir el panel para verlo pintado de nuevo.
+  // Ahora la grilla se deja dibujada en el mapa al cerrar el panel: el
+  // usuario puede seguir viendo dónde está el riesgo aunque no tenga el
+  // panel abierto. Se sigue sacando SOLO si se delimita/cambia el campo
+  // (ver rhInvalidarCache) o se abre otro análisis que la reemplace.
 }
 
 // Variante "suave": oculta el panel de Riesgo Hidrológico (para no amontonarlo
@@ -12889,6 +12921,12 @@ async function aplicarFiltrosGEE() {
     aplicarCapaGEE(j.tile_url, `${geeFiltros.dataset} · ${geeFiltros.banda}`);
     msg.textContent = `✅ Capa aplicada: ${geeFiltros.dataset} · ${geeFiltros.banda}${periodoAmpliadoMsg}`;
     msg.style.color = '#16a34a';
+
+    // FIX MÓVIL: cerrar el panel solo tras aplicar la capa, para que el
+    // mapa quede visible de una sin que el usuario tenga que arrastrar
+    // el panel hacia abajo manualmente. Se deja un instante el mensaje
+    // de éxito en pantalla antes de cerrar.
+    setTimeout(() => { if (typeof cerrarGeeSheet === 'function') cerrarGeeSheet(); }, 900);
 
   } catch (e) {
     msg.textContent = '🔴 Sin conexión al servidor Earth Engine. Las capas satelitales no están disponibles ahora.';
