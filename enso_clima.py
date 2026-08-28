@@ -36,6 +36,7 @@ está armada para devolver una lista vacía en vez de romper si no
 encuentra el patrón esperado, así el endpoint sigue funcionando con
 el estado actual del ONI aunque el pronóstico no esté disponible.
 """
+import html as _html_module
 import re
 import time
 
@@ -81,13 +82,38 @@ def _obtener_oni_actual():
     }
 
 
+def _html_a_texto_plano(html_crudo):
+    """Convierte HTML crudo a texto plano simple para poder aplicarle
+    regex de forma confiable: saca <script>/<style>, inserta un espacio
+    en los límites de celda/fila/salto de línea (<br>, <td>, <tr>, etc.,
+    para no pegar el contenido de dos celdas de tabla distintas) y
+    decodifica entidades HTML (&ntilde; -> ñ, &nbsp; -> espacio, etc.).
+
+    FIX: la versión anterior de este archivo aplicaba el regex
+    directamente sobre requests.get(url).text (HTML crudo, con
+    <table>/<tr>/<td> de por medio) -- nunca iba a poder matchear, porque
+    solo se había probado a mano contra el texto YA extraído/aplanado
+    (como lo devuelve un lector de página, sin tags). Esto es lo que
+    causaba que /enso_estado devolviera 'pronostico': [] en producción
+    aunque el ONI actual sí funcionara (ese viene de un .txt plano, no de
+    HTML). No se suma BeautifulSoup como dependencia nueva solo para esta
+    tabla puntual -- alcanza con esta limpieza simple."""
+    texto = re.sub(r'<(script|style)[^>]*>.*?</\1>', ' ', html_crudo, flags=re.S | re.I)
+    texto = re.sub(r'</?(br|td|th|tr|p|div|li)\b[^>]*>', ' ', texto, flags=re.I)
+    texto = re.sub(r'<[^>]+>', '', texto)
+    texto = _html_module.unescape(texto)
+    texto = re.sub(r'[ \t\r\n]+', ' ', texto).strip()
+    return texto
+
+
 def _partir_tres_porcentajes(digitos):
-    """Los 3 porcentajes de una fila vienen pegados sin separador (ej.
-    '08416' = 0 / 84 / 16), con 1 a 3 dígitos cada uno -- así que no se
-    pueden cortar con una regex de ancho fijo. Se prueban todas las formas
-    de partir la cadena en 3 partes (1-3 dígitos cada una) y se elige la
-    que suma más cerca de 100 (los 3 porcentajes de NOAA siempre suman
-    ~100). Devuelve None si ninguna combinación es razonable."""
+    """Los 3 porcentajes de una fila a veces vienen pegados sin separador
+    (ej. '08416' = 0 / 84 / 16), con 1 a 3 dígitos cada uno -- se usa
+    SOLO como fallback si _obtener_probabilidades_html() no logra
+    separarlos por espacios/celdas reales (ver ahí). Se prueban todas las
+    formas de partir la cadena en 3 partes (1-3 dígitos cada una) y se
+    elige la que suma más cerca de 100 (los 3 porcentajes de NOAA siempre
+    suman ~100). Devuelve None si ninguna combinación es razonable."""
     n = len(digitos)
     mejor, mejor_diff = None, None
     for l1 in range(1, min(3, n - 2) + 1):
@@ -107,23 +133,43 @@ def _partir_tres_porcentajes(digitos):
 
 def _obtener_probabilidades_html():
     """Parsea la tabla 'ENSO Probabilities' (Season/La Niña/Neutral/El
-    Niño) de la página de NOAA/CPC. La tabla se confirmó en texto plano
-    tipo 'AMJ...08416' (temporada + los 3 porcentajes pegados, sin
-    separador) -- ver _partir_tres_porcentajes() para el corte."""
+    Niño) de la página de NOAA/CPC. Primero limpia el HTML crudo a texto
+    plano (ver _html_a_texto_plano) y después prueba dos formas de leer
+    cada fila, porque no se puede confirmar de antemano si las 3 celdas
+    de porcentaje van a llegar separadas por espacio (celdas de tabla
+    reales, caso A -- el esperable) o pegadas sin separador (si la
+    limpieza de HTML las junta igual, caso B, mismo formato que ya se
+    había visto antes al leer la página con un extractor de texto)."""
     r = requests.get(_PROB_URL, timeout=_TIMEOUT)
     r.raise_for_status()
-    texto = r.text
-    # Extrae solo el bloque de la tabla, entre el encabezado de columnas
-    # y el link "Back to top", para no confundir números de otras partes
-    # de la página con filas de la tabla.
-    m = re.search(r'SeasonLa Ni.a(?:.*?)El Ni.o(.*?)Back to top', texto, re.S)
+    texto = _html_a_texto_plano(r.text)
+
+    m = re.search(r'Season\s*La Ni.a\s*Neutral\s*El Ni.o(.*?)Back to top', texto, re.S | re.I)
     if not m:
         return []
     bloque = m.group(1)
+
     filas = []
-    # Cada fila real: 3 letras de temporada + 3 nombres de mes pegados
-    # (ej. "AMJ Apr May Jun") + los 3 porcentajes pegados sin separador.
-    for fila in re.finditer(r'\b([A-Z]{3})\s+[A-Za-z]{3}\s+[A-Za-z]{3}\s+[A-Za-z]{3}(\d{3,9})\b', bloque):
+    # Caso A: celdas separadas por espacio, ej. "AMJ Apr May Jun 0 84 16"
+    for fila in re.finditer(
+        r'\b([A-Z]{3})\s+[A-Za-z]{3}\s+[A-Za-z]{3}\s+[A-Za-z]{3}\s+(\d{1,3})\s+(\d{1,3})\s+(\d{1,3})\b',
+        bloque,
+    ):
+        temporada, la_nina, neutral, el_nino = fila.groups()
+        filas.append({
+            'temporada': temporada,
+            'la_nina': int(la_nina),
+            'neutral': int(neutral),
+            'el_nino': int(el_nino),
+        })
+    if filas:
+        return filas
+
+    # Caso B (fallback): celdas pegadas sin separador, ej. "AMJ Apr May Jun08416"
+    for fila in re.finditer(
+        r'\b([A-Z]{3})\s+[A-Za-z]{3}\s+[A-Za-z]{3}\s+[A-Za-z]{3}(\d{3,9})\b',
+        bloque,
+    ):
         temporada, digitos = fila.groups()
         partido = _partir_tres_porcentajes(digitos)
         if partido is None:
