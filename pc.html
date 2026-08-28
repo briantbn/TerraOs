@@ -13633,17 +13633,28 @@ function aplicarPresetGEE(p) {
   aplicarFiltrosGEE();
 }
 
-async function verificarBackendGEE() {
+async function verificarBackendGEE(_intento = 1) {
   const estadoEl  = $el('gee-estado');
   const btnApl    = $el('gee-btn-aplicar');
   const btnRiesgo = $el('gee-btn-riesgo');
   const msgEl     = $el('gee-mensaje');
 
-  estadoEl.textContent = '⏳ Verificando conexión...';
+  // FIX: Render (plan free) "duerme" el backend tras ~15 min de
+  // inactividad y tarda ~30-50s en despertar en el primer request. Antes,
+  // un solo intento fallido durante ese arranque dejaba "Backend no
+  // disponible" mostrado para siempre, aunque el servidor respondiera
+  // perfecto un segundo después (confirmado con /health). Ahora se
+  // reintenta unas veces con espera creciente antes de mostrar el estado
+  // de error, y ese estado de error ahora incluye un botón para reintentar
+  // a mano en vez de tener que cerrar y volver a abrir el panel.
+  const MAX_INTENTOS = 4;
+  const ESPERA_MS = [0, 6000, 10000, 15000]; // creciente, total ~31s de tolerancia
+
+  estadoEl.textContent = _intento === 1 ? '⏳ Verificando conexión...' : `⏳ Reintentando conexión (${_intento}/${MAX_INTENTOS})...`;
   estadoEl.style.color = '#727971';
 
   try {
-    const r = await fetch(`${GEE_SERVER}/health`);
+    const r = await fetch(`${GEE_SERVER}/health`, { signal: AbortSignal.timeout(12000) });
     const j = await r.json();
     if (j.ok && j.earth_engine) {
       estadoEl.textContent = '🟢 Conectado a Earth Engine';
@@ -13661,6 +13672,10 @@ async function verificarBackendGEE() {
       msgEl.style.color = '#ca8a04';
     }
   } catch (e) {
+    if (_intento < MAX_INTENTOS) {
+      await new Promise(res => setTimeout(res, ESPERA_MS[_intento]));
+      return verificarBackendGEE(_intento + 1);
+    }
     estadoEl.textContent = '🔴 Backend no disponible';
     estadoEl.style.color = '#dc2626';
     if (btnApl)    { btnApl.disabled    = true; btnApl.style.opacity    = '0.45'; }
@@ -13668,7 +13683,8 @@ async function verificarBackendGEE() {
     msgEl.innerHTML = `
       <span style="font-size:13px;font-weight:600;color:#7f1d1d">
         ⚠️ Las capas satelitales (NDVI, NBR, Térmico, etc.) requieren conexión al servidor Earth Engine, que no está disponible en este momento.<br><br>
-        <span style="font-weight:400;color:#6b7280">Los focos NASA FIRMS y el clima funcionan normalmente.</span>
+        <span style="font-weight:400;color:#6b7280">Los focos NASA FIRMS y el clima funcionan normalmente.</span><br><br>
+        <button onclick="verificarBackendGEE()" class="veg-btn-secundario" style="padding:5px 14px;font-size:12px;">🔄 Reintentar ahora</button>
       </span>`;
   }
 }
