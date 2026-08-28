@@ -19342,7 +19342,7 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
     return `<span class="suelos-gat-badge" style="background:${bg};color:${color}">GAT ${gat}</span>`;
   }
 
-  function _suelosComponenteCard(nombre, porc, gat, iat) {
+  function _suelosComponenteCard(nombre, porc, gat, iat, taxo) {
     const iatNum = (iat !== null && iat !== undefined && iat !== '' && !isNaN(parseFloat(iat))) ? parseFloat(iat) : null;
     const banda = iatNum !== null ? _aptitudBandaIndice(iatNum) : null;
     return `
@@ -19351,6 +19351,7 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
           <span class="suelos-unidad-nombre">${nombre}</span>
           ${porc !== null && porc !== undefined && porc !== '' ? `<span class="suelos-unidad-porc">${parseFloat(porc).toFixed(0)}% de la unidad</span>` : ''}
         </div>
+        ${taxo ? `<div style="font-size:12px;color:#57605a;font-style:italic;margin-top:2px;">${taxo}</div>` : ''}
         <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
           ${_suelosGatBadge(gat)}
           ${iatNum !== null ? `<span style="font-size:10.5px;color:#9ca3af;flex-shrink:0;">IAT</span>` : ''}
@@ -19358,6 +19359,34 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
           ${iatNum !== null ? `<span style="font-size:12.5px;font-weight:800;color:${banda.color};min-width:26px;text-align:right;flex-shrink:0;">${Math.round(iatNum)}</span>` : ''}
         </div>
       </div>`;
+  }
+
+  // FIX: la carta "regional" (comp1-6/GAT/IAT, ej. Santa Fe/Córdoba/Buenos
+  // Aires) nunca mostraba la clasificación taxonómica del suelo (Orden,
+  // ej. "Argiudol", "Udipsamment árgico") aunque la fuente de INTA la
+  // traiga -- solo se leían comp{i}/comp{i}_porc/comp{i}_gat/comp{i}_iat,
+  // así que cualquier campo de taxonomía bajo otro nombre quedaba
+  // descartado en silencio. Como cada carta regional puede nombrar este
+  // campo distinto (no hay un estándar único, a diferencia de GAT/IAT que
+  // sí lo tienen), se prueban acá todos los alias razonables que usa INTA
+  // en sus distintas cartas de detalle -- mismo criterio que ya usa g()
+  // para mayúsculas/minúsculas, pero además con varios nombres de campo.
+  function _suelosTaxoComponente(g, i) {
+    const candidatos = [
+      `comp${i}_taxo`, `comp${i}_taxon`, `comp${i}_taxonomia`, `comp${i}_taxonom`,
+      `comp${i}_orden`, `comp${i}_suborden`, `comp${i}_subgrupo`, `comp${i}_ggrupo`,
+      `comp${i}_grangrupo`, `comp${i}_gran_grupo`, `comp${i}_serie`, `comp${i}_unidad`,
+      `comp${i}_denominacion`, `comp${i}_clasif`,
+      // alias con guion bajo antes del número (variante de nomenclatura)
+      `comp_${i}_taxo`, `comp_${i}_orden`, `comp_${i}_serie`,
+      // mismo patrón que usa la carta de Corrientes (taxonom_s1, taxonom_s2...)
+      `taxonom_s${i}`, `taxonomia_s${i}`, `orden_s${i}`, `serie_s${i}`,
+    ];
+    for (const campo of candidatos) {
+      const val = g(campo);
+      if (val && String(val).toUpperCase() !== 'NULL' && String(val).trim() !== '') return String(val).trim();
+    }
+    return null;
   }
 
   function mostrarResultadoRegional(props, fuente) {
@@ -19397,11 +19426,51 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
     filasEl.innerHTML += `<div style="font-size:10px;font-weight:700;color:#81a685;text-transform:uppercase;letter-spacing:.08em;padding:0 0 8px;">Composición del suelo</div>`;
 
     let huboComponentes = false;
+    let huboTaxoDetectada = false;
     for (let i = 1; i <= 6; i++) {
       const nombre = g(`comp${i}`);
       if (!nombre || String(nombre).toUpperCase() === 'NULL') continue;
       huboComponentes = true;
-      filasEl.innerHTML += _suelosComponenteCard(nombre, g(`comp${i}_porc`), g(`comp${i}_gat`), g(`comp${i}_iat`));
+      const taxo = _suelosTaxoComponente(g, i);
+      if (taxo) huboTaxoDetectada = true;
+      filasEl.innerHTML += _suelosComponenteCard(nombre, g(`comp${i}_porc`), g(`comp${i}_gat`), g(`comp${i}_iat`), taxo);
+    }
+    // FIX: si esta carta SÍ trae taxonomía pero con un nombre de campo que
+    // no está en la lista de alias de _suelosTaxoComponente (fuente nueva
+    // o distinta convención), no se pierde en silencio -- se muestra igual
+    // como texto crudo humanizado, para no ocultar el dato solo porque el
+    // nombre de columna no coincide con los conocidos.
+    if (huboComponentes && !huboTaxoDetectada) {
+      const CAMPOS_TAXO_SUELTOS = /taxo|orden|subgrupo|suborden|serie|clasif/i;
+      // FIX: algunas cartas (confirmado en Santa Fe) traen un campo de
+      // taxonomía con el ENCABEZADO de la columna en vez del dato real por
+      // polígono (ej. campo 'series' con el valor literal "Descripción de
+      // las series" repetido en todos los puntos) -- eso es un problema de
+      // carga de datos en el origen, no algo que se pueda inventar acá, así
+      // que se filtra para no mostrar ruido confuso en vez del dato real.
+      const _normalizarTxt = (s) => String(s).toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const _esValorEncabezado = (k, v) => {
+        const vn = _normalizarTxt(v);
+        if (/^descripcion de/.test(vn) || /^nombre de/.test(vn) || /^titulo de/.test(vn)) return true;
+        const kn = _normalizarTxt(k).replace(/_/g, ' ');
+        return new RegExp(`\\b${kn}\\b`).test(vn) && vn.length > kn.length + 3;
+      };
+      const encontrados = Object.entries(props)
+        .filter(([k, v]) => v && String(v).toUpperCase() !== 'NULL' && CAMPOS_TAXO_SUELTOS.test(k) && !/^comp\d/i.test(k) && !_esValorEncabezado(k, v))
+        .slice(0, 6);
+      if (encontrados.length) {
+        filasEl.innerHTML += `<p style="font-size:10.5px;color:#9ca3af;padding:2px 0 4px;">Clasificación taxonómica reportada por INTA para esta unidad:</p>`;
+        encontrados.forEach(([k, v]) => {
+          filasEl.innerHTML += `<div class="suelos-fila"><span class="suelos-label">${k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span><span class="suelos-valor">${v}</span></div>`;
+        });
+      } else {
+        // FIX: si se filtró todo por ser encabezado repetido (ver
+        // _esValorEncabezado arriba), no dejar la sección vacía en
+        // silencio -- avisar que la taxonomía no está cargada en esta
+        // carta puntual, en vez de simplemente no mostrar nada.
+        filasEl.innerHTML += `<p style="font-size:11px;color:#9ca3af;padding:2px 0 6px;font-style:italic;">Esta carta no trae la clasificación taxonómica (Orden/Serie) cargada por polígono, solo el código de unidad y el índice GAT/IAT.</p>`;
+      }
     }
     if (!huboComponentes) {
       // FIX: mismo caso que en mostrarResultado() -- la carta correcta se
@@ -19518,6 +19587,10 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
     fila('Limitante principal',     g('limit_ppal'), 'limit_ppal');
     fila('Limitante secundaria',    g('limit_secu'), 'limit_secu');
     fila('Limitante terciaria',     g('limit_terc'), 'limit_terc');
+    // Campos propios de Buenos Aires (carta completa SIMBC/Nombre_UC/...
+    // ver más abajo la composición SERIE1-6/taxo_ppal/taxo_2rio)
+    fila('Nombre de la unidad',     g('nombre_uc'),  'nombre_uc');
+    fila('Paisaje',                 g('paisaje'),    'paisaje');
 
     // Campos de otro esquema WFS provincial (ej. Entre Ríos) que a veces
     // vienen sueltos en 'props' según la hoja consultada -- mismo patrón que
@@ -19569,6 +19642,40 @@ async function inspeccionarSuelosINTA(lat, lon, mapaObjetivo) {
       if (_corrTaxonomiaRota) {
         filasEl.innerHTML += `<p style="font-size:10.5px;color:#9ca3af;padding:2px 0 6px;">⚠️ Algunos nombres taxonómicos vienen con acentos rotos desde la fuente de datos — es un problema de codificación en el origen del archivo, no de esta pantalla.</p>`;
       }
+    }
+
+    // ── Composición por componentes (ej. Buenos Aires: SERIE1-6/PORC1-6/
+    // FASE1-6/POSIC1-6, más taxo_ppal/taxo_2rio de la unidad completa) --
+    // a diferencia de la carta de Santa Fe (comp1-6), la de Buenos Aires SÍ
+    // trae taxonomía real en el archivo fuente (confirmado por el
+    // comentario del backend en suelos_inta_regional.py), pero con nombres
+    // de campo que no coinciden ni con el esquema 'comp1' de Santa Fe ni con
+    // el 'suelo_1/taxonom_s1' de Corrientes -- por eso quedaba sin mostrarse
+    // pese a estar disponible en la fuente.
+    const _baHayComponentes = g('serie1') || g('taxo_ppal');
+    if (_baHayComponentes) {
+      seccion('Composición de la unidad (INTA · Buenos Aires)');
+      for (let i = 1; i <= 6; i++) {
+        const serie = g(`serie${i}`);
+        const porc  = g(`porc${i}`);
+        const fase  = g(`fase${i}`);
+        const posic = g(`posic${i}`);
+        if (!serie || String(serie).toUpperCase() === 'NULL') continue;
+        if (_seccionPendiente) { filasEl.innerHTML += _seccionPendiente; _seccionPendiente = null; }
+        filasEl.innerHTML += `
+          <div class="suelos-unidad-card" style="border-left-color:#8BAE8B;margin-bottom:8px;">
+            <div class="suelos-unidad-header">
+              <span class="suelos-unidad-nombre">${serie}</span>
+              ${porc !== null && porc !== undefined && porc !== '' ? `<span class="suelos-unidad-porc">${parseFloat(porc).toFixed(0)}% de la unidad</span>` : ''}
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+              ${posic && String(posic).toUpperCase() !== 'NULL' ? `<span class="suelos-tag" style="background:#eceee9;color:#57605a;">${posic}</span>` : ''}
+              ${fase && String(fase).toUpperCase() !== 'NULL' && fase !== '---' ? `<span class="suelos-tag" style="background:#f3e8ff;color:#6b21a8;">Fase ${fase}</span>` : ''}
+            </div>
+          </div>`;
+      }
+      fila('Taxonomía principal',   g('taxo_ppal'), 'taxo_ppal');
+      fila('Taxonomía secundaria',  g('taxo_2rio'), 'taxo_2rio');
     }
 
     // — Unidad de suelo 1 —
