@@ -1245,6 +1245,40 @@
       style="padding:6px 2px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:10px;font-weight:700;cursor:pointer;">72 h<br><span id="rh-v72-val" style="font-size:11px;">--</span></button>
   </div>
 
+  <!-- ── Persiana: Humedad antecedente del suelo (AMC) — portado de la versión PC ── -->
+  <div style="border-top:1px solid rgba(255,255,255,.12);padding-top:10px;margin-bottom:12px;">
+    <div onclick="rhTogglePersiana('rh-amc-body','rh-amc-chevron')"
+      style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:2px;">
+      <p style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.55);margin:0;">💧 Humedad antecedente del suelo</p>
+      <span id="rh-amc-chevron" class="material-symbols-outlined" style="color:rgba(255,255,255,.55);font-size:16px;transition:transform .2s;">expand_more</span>
+    </div>
+    <div id="rh-amc-body" style="display:none;padding-top:8px;">
+      <p style="font-size:10px;color:rgba(255,255,255,.6);margin:0 0 8px;line-height:1.4;">
+        Un campo ya saturado por meses de lluvia por encima de lo normal reacciona distinto a uno que arranca seco, aunque caiga la misma lluvia puntual. Elegí la condición ANTES del escenario de arriba.
+      </p>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:10px;" id="rh-amc-btns">
+        <button onclick="rhSetAmcCondicion('seco')" data-amc="seco" class="rh-amc-btn"
+          style="padding:7px 2px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:10.5px;font-weight:700;cursor:pointer;">🟤 Seco</button>
+        <button onclick="rhSetAmcCondicion('normal')" data-amc="normal" class="rh-amc-btn"
+          style="padding:7px 2px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:#2563eb;color:#fff;font-size:10.5px;font-weight:700;cursor:pointer;">Normal</button>
+        <button onclick="rhSetAmcCondicion('saturado')" data-amc="saturado" class="rh-amc-btn"
+          style="padding:7px 2px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:10.5px;font-weight:700;cursor:pointer;">🔵 Saturado</button>
+      </div>
+      <p style="font-size:9.5px;color:rgba(255,255,255,.55);margin:0 0 4px;">¿No estás seguro? Comparalo con un promedio de referencia:</p>
+      <div style="display:flex;gap:5px;margin-bottom:6px;">
+        <input id="rh-amc-acumulado" type="number" placeholder="Acumulado (mm)"
+          style="flex:1;min-width:0;padding:6px 7px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:11px;">
+        <input id="rh-amc-promedio" type="number" placeholder="Promedio (mm)"
+          style="flex:1;min-width:0;padding:6px 7px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:11px;">
+      </div>
+      <button onclick="rhSugerirAMCPorMeses()"
+        style="width:100%;padding:6px;border-radius:8px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:10.5px;font-weight:700;cursor:pointer;margin-bottom:6px;">Sugerir según estos valores</button>
+      <p id="rh-amc-sugerencia" style="font-size:9.5px;color:rgba(255,255,255,.55);margin:0;line-height:1.4;">
+        Ej: "1100 mm acumulados este año" vs. "900 mm promedio anual de la zona" (datos de tu fuente de confianza — INTA, SMN, etc. — la app no los calcula sola).
+      </p>
+    </div>
+  </div>
+
   <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
     <div style="display:flex;gap:8px;align-items:flex-start;">
       <span style="width:12px;height:12px;border-radius:50%;background:#ffd54f;margin-top:2px;flex-shrink:0;"></span>
@@ -1263,6 +1297,7 @@
       <div><p style="font-size:11px;font-weight:700;color:#fff;margin:0;">💧 Humedal natural (INTA)</p><p style="font-size:9.5px;color:rgba(255,255,255,.6);margin:0;">Zona que vive anegada por naturaleza (≥90% prob. según INTA) — no cuenta como riesgo.</p></div>
     </div>
   </div>
+
 
   <div id="rh-proyecto-wrap" style="display:none;border-top:1px solid rgba(255,255,255,.12);padding-top:10px;margin-bottom:8px;">
     <div onclick="rhTogglePersiana('rh-proyecto-body','rh-proyecto-chevron')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
@@ -8651,6 +8686,50 @@ let rhEscenarioActual     = 'real'; // 'real' | '5'|'10'|...|'200' (mm de lluvia
 let rhVentanaSeleccionada = 48;     // 24 | 48 | 72 (para el escenario "Real")
 let rhAnimando            = false;
 
+// ── Humedad antecedente del suelo (AMC) — portado de la versión PC ──
+// Un campo ya saturado por lluvias previas reacciona distinto ante el mismo
+// escenario puntual que uno que arranca seco: se ajusta el CN (SCS Curve
+// Number) según la condición elegida a mano por el usuario (no se infiere
+// sola — la app no tiene un promedio histórico de lluvia por zona contra el
+// que compararse; el comparador de abajo usa datos que el propio usuario
+// aporta de su fuente de confianza: INTA, SMN, etc.).
+let rhAmcCondicion = 'normal'; // 'seco' (AMC I) | 'normal' (AMC II) | 'saturado' (AMC III)
+
+function rhAjusteAMC(cn2, condicion) {
+  if (condicion === 'seco')     return cn2 / (2.281 - 0.01281 * cn2);
+  if (condicion === 'saturado') return cn2 / (0.427 + 0.00573 * cn2);
+  return cn2; // 'normal' — AMC II, sin cambios
+}
+
+/** Selector manual de condición AMC (botones "Seco"/"Normal"/"Saturado" en la persiana). */
+function rhSetAmcCondicion(cond) {
+  rhAmcCondicion = cond;
+  document.querySelectorAll('.rh-amc-btn').forEach(b => {
+    const activo = b.dataset.amc === cond;
+    b.style.background = activo ? '#2563eb' : 'rgba(255,255,255,.08)';
+  });
+  if (rhDatosCampo) rhRecalcularClasificacion();
+}
+
+/** Sugerencia opcional: compara la lluvia acumulada de varios meses que el usuario
+ *  tipeó contra el promedio que él mismo indica para ese período, y a partir del
+ *  cociente sugiere (no fuerza) una condición AMC. */
+function rhSugerirAMCPorMeses() {
+  const acum = parseFloat($el('rh-amc-acumulado')?.value);
+  const prom = parseFloat($el('rh-amc-promedio')?.value);
+  const msg = $el('rh-amc-sugerencia');
+  if (!isFinite(acum) || !isFinite(prom) || prom <= 0) {
+    if (msg) msg.textContent = 'Ingresá los dos valores (acumulado y promedio) para obtener una sugerencia.';
+    return;
+  }
+  const ratio = acum / prom;
+  const cond = ratio > 1.25 ? 'saturado' : ratio < 0.85 ? 'seco' : 'normal';
+  rhSetAmcCondicion(cond);
+  const etiqueta = cond === 'saturado' ? 'Saturado' : cond === 'seco' ? 'Seco' : 'Normal';
+  if (msg) msg.textContent = `${acum.toFixed(0)} mm vs. ${prom.toFixed(0)} mm de promedio (${(ratio * 100).toFixed(0)}%) → sugerencia: ${etiqueta}. Podés cambiarla a mano si conocés mejor la situación real del campo.`;
+}
+
+
 // ── Registrar el resultado en el historial de sesión (alias de _registrarAnalisis) ──
 // En PC esto alimenta el sistema de "Proyectos y lotes" (AnalysisSession),
 // todavía no portado a Android. Reusa el mismo adaptador liviano que ya usa
@@ -9176,7 +9255,7 @@ function rhRecalcularClasificacion() {
     const tieneRelieve = c.relieve && c.relieve.elevacion !== null && c.relieve.elevacion !== undefined;
     const posRel      = tieneRelieve ? (c.relieve.elevacion - minE) / rangoE : 0.5; // sin dato → posición neutra
     const pendiente   = (tieneRelieve ? c.relieve.pendiente : null) ?? (suelo?.pendientePct || 2);
-    const cn          = Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendiente, posRel) + rhAjusteSueloDetalle(c.sueloDetalle)));
+    const cn          = rhAjusteAMC(Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendiente, posRel) + rhAjusteSueloDetalle(c.sueloDetalle))), rhAmcCondicion);
     const Q           = rhEscorrentiaSCS(P, cn);
     const clas         = rhAplicarHumedal(rhClasificar(Q), c.humedalPct);
     c.clasificacion = clas; c.cn = cn; c.Q = Q; c.tieneRelieve = tieneRelieve;
@@ -9255,7 +9334,7 @@ function rhPintarConMm(P) {
     const tieneRelieve = c.relieve && c.relieve.elevacion !== null && c.relieve.elevacion !== undefined;
     const posRel      = tieneRelieve ? (c.relieve.elevacion - minE) / rangoE : 0.5;
     const pendiente   = (tieneRelieve ? c.relieve.pendiente : null) ?? (suelo?.pendientePct || 2);
-    const cn = Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendiente, posRel) + rhAjusteSueloDetalle(c.sueloDetalle)));
+    const cn = rhAjusteAMC(Math.max(30, Math.min(98, cnBase + rhAjusteRelieve(pendiente, posRel) + rhAjusteSueloDetalle(c.sueloDetalle))), rhAmcCondicion);
     c.clasificacion = rhAplicarHumedal(rhClasificar(rhEscorrentiaSCS(P, cn)), c.humedalPct);
   });
   rhPintarGrid(celdas);
