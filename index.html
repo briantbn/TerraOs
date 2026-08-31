@@ -1279,6 +1279,20 @@
     </div>
   </div>
 
+  <!-- ── Persiana: Precipitaciones (histórica + acumulada + pronóstico, Open-Meteo) — portado de la versión PC ── -->
+  <div style="border-top:1px solid rgba(255,255,255,.12);padding-top:10px;margin-bottom:12px;">
+    <div onclick="rhTogglePersiana('rh-precip-body','rh-precip-chevron')"
+      style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:2px;">
+      <p style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.55);margin:0;">🌧️ Precipitaciones</p>
+      <span id="rh-precip-chevron" class="material-symbols-outlined" style="color:rgba(255,255,255,.55);font-size:16px;transition:transform .2s;">expand_more</span>
+    </div>
+    <div id="rh-precip-body" style="display:none;">
+      <div id="rh-precip-detalle">
+        <p style="font-size:10.5px;color:rgba(255,255,255,.6);margin:10px 0 0;">Consultando precipitación (Open-Meteo)...</p>
+      </div>
+    </div>
+  </div>
+
   <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
     <div style="display:flex;gap:8px;align-items:flex-start;">
       <span style="width:12px;height:12px;border-radius:50%;background:#ffd54f;margin-top:2px;flex-shrink:0;"></span>
@@ -5997,6 +6011,27 @@ class ProjectManager {
     if (index >= 0 && index < this.files.length) { this.currentIndex = index; await this.showCurrentLayer(); }
   }
 
+  // ── FEATURE: reordenar los lotes del proyecto a mano (arrastrar/subir/bajar).
+  // desde/hasta son índices dentro de this.files. Mueve el lote de una
+  // posición a otra, se asegura de que currentIndex siga apuntando al
+  // MISMO lote que estaba activo (aunque haya cambiado de posición en
+  // el array), y refresca las listas que dependen de este orden. ──
+  moverLote(desde, hasta) {
+    if (desde === hasta || desde < 0 || hasta < 0 ||
+        desde >= this.files.length || hasta >= this.files.length) return;
+    const loteActivo = this.loteActual;
+    const [lote] = this.files.splice(desde, 1);
+    this.files.splice(hasta, 0, lote);
+    if (loteActivo) {
+      const nuevoIndex = this.files.indexOf(loteActivo);
+      if (nuevoIndex !== -1) this.currentIndex = nuevoIndex;
+    }
+    this._persistirLotesManuales(); // el orden de los manuales se guarda; los importados no persisten entre sesiones, como ya pasaba con el resto de sus datos
+    _renderBarraProyecto();
+    _renderizarListaLotesProyecto();
+    try { rhActualizarPersianaProyecto(); } catch (e) {}
+  }
+
   // ── Quita un lote del proyecto (desde la lista "Lotes cargados") ──
   async quitarLote(index) {
     if (index < 0 || index >= this.files.length) return;
@@ -6212,6 +6247,57 @@ function _toggleNotaLoteUI(i) {
   _renderizarListaLotesProyecto();
 }
 
+// ── FEATURE: reordenar "Lotes cargados" arrastrando el mango ⋮⋮.
+// Adaptado a Android con Pointer Events (funciona con el dedo Y con mouse),
+// a diferencia del drag & drop HTML5 nativo de la versión PC (ondragstart/
+// ondrop), que la mayoría de los navegadores móviles no dispara con touch.
+let _loteDragIdx    = null; // índice del lote que se está arrastrando
+let _loteDragSobre  = null; // índice de la fila sobre la que está el dedo/mouse ahora
+
+function _loteDragStart(ev, i) {
+  ev.preventDefault();
+  _loteDragIdx = i;
+  _loteDragSobre = i;
+  try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) {}
+  const fila = ev.currentTarget.closest('.lote-fila');
+  if (fila) fila.style.opacity = '0.5';
+  document.addEventListener('pointermove', _loteDragMove);
+  document.addEventListener('pointerup', _loteDragEnd, { once: true });
+  document.addEventListener('pointercancel', _loteDragEnd, { once: true });
+}
+
+function _loteDragMove(ev) {
+  if (_loteDragIdx === null) return;
+  const cont = $el('capas-io-lista');
+  if (!cont) return;
+  const filas = Array.from(cont.querySelectorAll('.lote-fila'));
+  let destino = _loteDragSobre;
+  for (let k = 0; k < filas.length; k++) {
+    const r = filas[k].getBoundingClientRect();
+    if (ev.clientY >= r.top && ev.clientY <= r.bottom) { destino = k; break; }
+  }
+  if (destino !== _loteDragSobre) {
+    filas.forEach((f, k) => { f.style.borderTop = (k === destino) ? '3px solid #1E5E3A' : ''; });
+    _loteDragSobre = destino;
+  }
+}
+
+function _loteDragEnd() {
+  document.removeEventListener('pointermove', _loteDragMove);
+  if (_loteDragIdx !== null && _loteDragSobre !== null && _loteDragIdx !== _loteDragSobre
+      && typeof proyectoActual !== 'undefined' && proyectoActual) {
+    proyectoActual.moverLote(_loteDragIdx, _loteDragSobre);
+    // moverLote() ya vuelve a renderizar la lista entera (filas limpias,
+    // sin el borde/opacidad que dejó el arrastre).
+  } else {
+    // No se movió de lugar: solo hay que sacar el resaltado visual.
+    const cont = $el('capas-io-lista');
+    if (cont) cont.querySelectorAll('.lote-fila').forEach(f => { f.style.opacity = ''; f.style.borderTop = ''; });
+  }
+  _loteDragIdx = null;
+  _loteDragSobre = null;
+}
+
 // ── Lista "Lotes cargados" dentro del panel de capas (reemplaza la vieja lista de capas simultáneas) ──
 function _renderizarListaLotesProyecto() {
   const cont = $el('capas-io-lista');
@@ -6231,8 +6317,10 @@ function _renderizarListaLotesProyecto() {
     const notaAbierta = _lotesNotaAbierta.has(i);
     const tieneNota = !!(lote.nota && lote.nota.trim());
     return `
-    <div style="border:1.5px solid ${activo ? '#1E5E3A' : '#eceee9'};border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;${oculto ? 'opacity:0.55;' : ''}">
+    <div class="lote-fila" data-idx="${i}" style="border:1.5px solid ${activo ? '#1E5E3A' : '#eceee9'};border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;${oculto ? 'opacity:0.55;' : ''}">
       <div style="display:flex;align-items:center;gap:8px;">
+        <span onpointerdown="_loteDragStart(event, ${i})" title="Arrastrar para reordenar"
+          style="cursor:grab;touch-action:none;display:flex;align-items:center;padding:2px 4px;color:#9ca3af;font-size:15px;user-select:none;-webkit-user-select:none;">⋮⋮</span>
         <span style="width:10px;height:10px;border-radius:50%;background:${lote.color || '#c8cdc6'};flex-shrink:0;"></span>
         <span style="font-size:12px;font-weight:700;color:#1a1c1a;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_nombreCortoArchivo(lote.nombre)}</span>
         <span style="font-size:11px;">${estado}</span>
@@ -8842,6 +8930,279 @@ async function rhFetchSueloCentroide(lat, lon) {
   };
 }
 
+// ══════════════════════════════════════════════════════════════════════
+//  CONTEXTO DE PRECIPITACIÓN (histórica + acumulada + pronóstico)
+//  Portado de la versión PC. Un solo fetch a Open-Meteo cubre acumulados
+//  de 24h/3d/7d/14d/30d, última lluvia significativa, concentración
+//  reciente de la lluvia, humedad de suelo y pronóstico de 7 días.
+//  Con caché de 20 min por ubicación (misma clave que en PC).
+// ══════════════════════════════════════════════════════════════════════
+
+// Umbral de "lluvia significativa" para calcular hace cuánto llovió en
+// serio (no cualquier llovizna de 0.1mm) — constante configurable, no
+// hardcodeada en el medio del cálculo.
+const SIGNIFICANT_RAIN_MM = 1.0;
+
+const _precipContextCache = new Map();
+const PRECIP_CACHE_TTL_MS = 20 * 60 * 1000; // 20 min, razonable para no reconsultar en cada apertura de panel
+
+/**
+ * Trae y calcula el contexto de precipitación completo para un punto.
+ * Devuelve null en los mm que Open-Meteo no pudo dar (nunca inventa un 0).
+ */
+async function getPrecipitationContext(lat, lon) {
+  const clave = `${lat.toFixed(2)}_${lon.toFixed(2)}`;
+  const cacheado = _precipContextCache.get(clave);
+  if (cacheado && (Date.now() - cacheado.ts) < PRECIP_CACHE_TTL_MS) {
+    return cacheado.datos;
+  }
+
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&hourly=precipitation,soil_moisture_0_to_1cm` +
+      `&daily=precipitation_sum,precipitation_probability_max` +
+      `&timezone=auto&past_days=30&forecast_days=7`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const d = await r.json();
+
+    const diasT   = d.daily?.time || [];
+    const diasMm  = d.daily?.precipitation_sum || [];
+    const diasProb = d.daily?.precipitation_probability_max || [];
+    const hoyISO  = new Date().toISOString().slice(0, 10);
+    const idxHoy  = diasT.indexOf(hoyISO);
+
+    // Si Open-Meteo no devolvió el día de hoy (raro, pero posible), no se
+    // puede anclar el cálculo de "acumulado hasta hoy" con confianza.
+    if (idxHoy === -1 || diasMm.length === 0) {
+      return { ok: false, motivo: 'Datos de precipitación no disponibles' };
+    }
+
+    // Acumulados: suma de los últimos N días (incluye hoy), todos desde
+    // precipitation_sum diario real de Open-Meteo — nada estimado a mano.
+    function acumuladoUltimosDias(n) {
+      const desde = Math.max(0, idxHoy - n + 1);
+      const tramo = diasMm.slice(desde, idxHoy + 1).filter(v => v !== null && v !== undefined);
+      if (tramo.length === 0) return null;
+      return Math.round(tramo.reduce((a, b) => a + b, 0) * 10) / 10;
+    }
+    const precipitation3d  = acumuladoUltimosDias(3);
+    const precipitation7d  = acumuladoUltimosDias(7);
+    const precipitation14d = acumuladoUltimosDias(14);
+    const precipitation30d = acumuladoUltimosDias(30);
+
+    // 24h reales: suma horaria de las últimas 24h (más preciso que el
+    // "día calendario" para esta ventana corta específicamente).
+    const horasT = d.hourly?.time || [];
+    const horasMm = d.hourly?.precipitation || [];
+    const ahora = new Date();
+    let precipitation24h = 0, huboDatos24h = false;
+    horasT.forEach((t, i) => {
+      const h = (ahora - new Date(t)) / 3600000;
+      if (h >= 0 && h <= 24) { precipitation24h += (horasMm[i] || 0); huboDatos24h = true; }
+    });
+    precipitation24h = huboDatos24h ? Math.round(precipitation24h * 10) / 10 : null;
+
+    // Última lluvia significativa: recorre los días (de hoy hacia atrás)
+    // buscando el primero con precipitation_sum >= SIGNIFICANT_RAIN_MM.
+    let lastSignificantRain = null;
+    for (let i = idxHoy; i >= 0; i--) {
+      const mm = diasMm[i];
+      if (mm !== null && mm !== undefined && mm >= SIGNIFICANT_RAIN_MM) {
+        const diasAtras = idxHoy - i;
+        lastSignificantRain = { dias: diasAtras, mm: Math.round(mm * 10) / 10, fecha: diasT[i] };
+        break;
+      }
+    }
+
+    // Distribución temporal: qué % de la lluvia de 30 días cayó en los
+    // últimos 7 — el mismo acumulado mensual puede ser un campo recién
+    // mojado o uno que ya se secó, y esto es lo que los diferencia.
+    let recentRainConcentration = null;
+    if (precipitation30d !== null && precipitation30d > 0 && precipitation7d !== null) {
+      recentRainConcentration = Math.round((precipitation7d / precipitation30d) * 100);
+    }
+
+    // Humedad de suelo (promedio de las últimas 24h).
+    const soilHourly = d.hourly?.soil_moisture_0_to_1cm || [];
+    const soilRecent = soilHourly.filter((_, i) => {
+      const h = (ahora - new Date(horasT[i])) / 3600000;
+      return h >= 0 && h <= 24;
+    });
+    const soilMoisture = soilRecent.length > 0
+      ? Math.round((soilRecent.reduce((s, v) => s + (v || 0), 0) / soilRecent.length) * 1000) / 1000
+      : null;
+
+    // Pronóstico próximos 7 días (desde mañana): SOLO precipitation_sum y
+    // precipitation_probability_max reales de Open-Meteo, día por día.
+    const forecast7d = [];
+    let forecast7dTotal = 0, huboForecast = false;
+    for (let i = idxHoy + 1; i < diasT.length && forecast7d.length < 7; i++) {
+      const mm = diasMm[i] ?? null;
+      forecast7d.push({ fecha: diasT[i], mm, prob: diasProb[i] ?? null });
+      if (mm !== null) { forecast7dTotal += mm; huboForecast = true; }
+    }
+    forecast7dTotal = huboForecast ? Math.round(forecast7dTotal * 10) / 10 : null;
+
+    const resultado = {
+      ok: true,
+      precipitation24h, precipitation3d, precipitation7d, precipitation14d, precipitation30d,
+      lastSignificantRain, recentRainConcentration, soilMoisture,
+      forecast7d, forecast7dTotal,
+      fuente: 'Open-Meteo',
+    };
+    _precipContextCache.set(clave, { ts: Date.now(), datos: resultado });
+    return resultado;
+  } catch (e) {
+    console.warn('[Precipitación] No se pudo obtener el contexto de Open-Meteo:', e.message || e);
+    return { ok: false, motivo: 'Datos de precipitación no disponibles' };
+  }
+}
+
+// ── Condición hídrica actual (resumen en lenguaje simple) ──
+// Combina lluvia 7d/30d + última lluvia significativa (todo real, de
+// getPrecipitationContext) en una etiqueta de una palabra. Umbrales
+// OPERATIVOS propios de la app: no son una norma publicada, están para
+// dar una lectura rápida, no para reemplazar el juicio del usuario.
+function rhCondicionHidrica(ctx) {
+  if (!ctx || !ctx.ok) return { label: 'Sin datos', emoji: '⚪', color: '#9ca3af' };
+  const p7 = ctx.precipitation7d, p30 = ctx.precipitation30d;
+  if (p7 !== null && p7 >= 70) return { label: 'SATURADO', emoji: '🔵', color: '#3b82f6' };
+  if (p7 !== null && p7 >= 25) return { label: 'HÚMEDO',   emoji: '🟠', color: '#f97316' };
+  if (p30 !== null && p30 < 10 && (!ctx.lastSignificantRain || ctx.lastSignificantRain.dias >= 15)) {
+    return { label: 'SECO', emoji: '🟤', color: '#a16207' };
+  }
+  return { label: 'NORMAL', emoji: '🟢', color: '#22c55e' };
+}
+
+/** Sugerencia AUTOMÁTICA de condición AMC a partir de datos reales recientes
+ *  (7d/30d) — alternativa a rhSugerirAMCPorMeses(), que sigue disponible
+ *  para quien prefiera compararlo contra su propio promedio de referencia. */
+function rhSugerirAMCAutomatico() {
+  const msg = $el('rh-amc-sugerencia');
+  if (!_ultimoContextoPrecip || !_ultimoContextoPrecip.ok) {
+    if (msg) msg.textContent = 'Todavía no se pudo obtener la precipitación reciente de Open-Meteo para esta ubicación.';
+    return;
+  }
+  const ctx = _ultimoContextoPrecip;
+  const p7 = ctx.precipitation7d, conc = ctx.recentRainConcentration;
+  let cond = 'normal';
+  if ((p7 !== null && p7 >= 70) || (conc !== null && conc >= 70 && p7 !== null && p7 >= 30)) {
+    cond = 'saturado';
+  } else if (p7 !== null && p7 < 5 && (!ctx.lastSignificantRain || ctx.lastSignificantRain.dias >= 15)) {
+    cond = 'seco';
+  }
+  rhSetAmcCondicion(cond);
+  const etiqueta = cond === 'saturado' ? 'Saturado' : cond === 'seco' ? 'Seco' : 'Normal';
+  if (msg) {
+    msg.textContent = `Últimos 7 días: ${p7 ?? '--'} mm` +
+      (conc !== null ? ` (${conc}% de lo caído en 30 días)` : '') +
+      ` → sugerencia automática: ${etiqueta}. Podés cambiarla a mano si conocés mejor la situación real del campo.`;
+  }
+}
+
+// Último contexto de precipitación cargado (para que rhSugerirAMCAutomatico
+// no tenga que volver a pedirlo — getPrecipitationContext ya cachea igual,
+// esto solo evita un await extra en el click del botón).
+let _ultimoContextoPrecip = null;
+
+/** Arma el HTML de la tabla de pronóstico de 7 días con indicador visual por intensidad. */
+function rhFormatearFilaPronostico(dia) {
+  const fecha = new Date(dia.fecha + 'T00:00:00');
+  const diaTxt = fecha.toLocaleDateString('es-AR', { weekday: 'short' }).replace('.', '');
+  const mmTxt = dia.mm !== null ? dia.mm.toFixed(1) + ' mm' : '--';
+  const probTxt = dia.prob !== null ? dia.prob + '%' : '--';
+  let indicador = '';
+  if (dia.mm !== null) {
+    if (dia.mm >= 30) indicador = '🔴';
+    else if (dia.mm >= 15) indicador = '⚠️';
+  }
+  return `<div style="display:flex;justify-content:space-between;font-size:10.5px;color:#fff;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+    <span style="width:34px;text-transform:capitalize;">${diaTxt}</span>
+    <span style="flex:1;text-align:right;">${mmTxt}</span>
+    <span style="width:38px;text-align:right;color:rgba(255,255,255,.6);">${probTxt}</span>
+    <span style="width:16px;text-align:center;">${indicador}</span>
+  </div>`;
+}
+
+/** Pinta el bloque "🌧️ Precipitaciones" (acumulado real + pronóstico) con los datos ya traídos. */
+function rhRenderPrecipContext(ctx) {
+  _ultimoContextoPrecip = ctx;
+  const cont = $el('rh-precip-detalle');
+  if (!cont) return;
+
+  if (!ctx || !ctx.ok) {
+    cont.innerHTML = `<p style="font-size:10.5px;color:rgba(255,255,255,.6);margin:0;">Datos de precipitación no disponibles.</p>`;
+    return;
+  }
+
+  const fmt = v => (v === null || v === undefined) ? '--' : v + ' mm';
+  const condicion = rhCondicionHidrica(ctx);
+  const ultimaLluviaTxt = ctx.lastSignificantRain
+    ? (ctx.lastSignificantRain.dias === 0 ? 'hoy' : `hace ${ctx.lastSignificantRain.dias} día${ctx.lastSignificantRain.dias === 1 ? '' : 's'}`)
+    : 'sin registro en los últimos 30 días';
+
+  let html = `
+    <p style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.55);margin:10px 0 4px;">📊 Acumulado reciente</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:11px;color:#fff;margin-bottom:8px;">
+      <span style="color:rgba(255,255,255,.6);">Últimas 24 h</span><span style="text-align:right;">${fmt(ctx.precipitation24h)}</span>
+      <span style="color:rgba(255,255,255,.6);">Últimos 3 días</span><span style="text-align:right;">${fmt(ctx.precipitation3d)}</span>
+      <span style="color:rgba(255,255,255,.6);">Últimos 7 días</span><span style="text-align:right;">${fmt(ctx.precipitation7d)}</span>
+      <span style="color:rgba(255,255,255,.6);">Últimos 14 días</span><span style="text-align:right;">${fmt(ctx.precipitation14d)}</span>
+      <span style="color:rgba(255,255,255,.6);">Últimos 30 días</span><span style="text-align:right;">${fmt(ctx.precipitation30d)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10.5px;color:rgba(255,255,255,.75);margin-bottom:4px;">
+      <span>Última lluvia significativa (≥${SIGNIFICANT_RAIN_MM} mm)</span><b style="color:#fff;">${ultimaLluviaTxt}</b>
+    </div>`;
+
+  if (ctx.recentRainConcentration !== null) {
+    html += `<div style="display:flex;justify-content:space-between;font-size:10.5px;color:rgba(255,255,255,.75);margin-bottom:8px;">
+      <span>Concentración reciente (7d / 30d)</span><b style="color:#fff;">${ctx.recentRainConcentration}%</b>
+    </div>`;
+  }
+
+  html += `<div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);border-radius:8px;padding:7px 9px;margin-bottom:10px;">
+      <span style="font-size:14px;">${condicion.emoji}</span>
+      <span style="font-size:11px;font-weight:800;color:${condicion.color};">Condición hídrica: ${condicion.label}</span>
+    </div>`;
+
+  if (ctx.soilMoisture !== null) {
+    html += `<p style="font-size:10px;color:rgba(255,255,255,.55);margin:0 0 10px;">Humedad de suelo (0–1cm, prom. 24h): ${ctx.soilMoisture} m³/m³</p>`;
+  }
+
+  html += `<button onclick="rhSugerirAMCAutomatico()"
+      style="width:100%;padding:6px;border-radius:8px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:10.5px;font-weight:700;cursor:pointer;margin-bottom:10px;">🔄 Sugerir humedad antecedente con estos datos</button>`;
+
+  html += `<p style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.55);margin:0 0 4px;">🔮 Pronóstico — próximos 7 días</p>`;
+  if (ctx.forecast7d && ctx.forecast7d.length) {
+    html += ctx.forecast7d.map(rhFormatearFilaPronostico).join('');
+    html += `<div style="display:flex;justify-content:space-between;font-size:10.5px;color:rgba(255,255,255,.8);margin-top:6px;font-weight:700;">
+      <span>Total previsto</span><span>${fmt(ctx.forecast7dTotal)}</span>
+    </div>`;
+  } else {
+    html += `<p style="font-size:10px;color:rgba(255,255,255,.55);margin:0;">Pronóstico no disponible.</p>`;
+  }
+
+  html += `<p style="font-size:9px;color:rgba(255,255,255,.4);margin:10px 0 0;text-align:right;">Fuente meteorológica: Open-Meteo</p>`;
+
+  cont.innerHTML = html;
+}
+
+/** Dispara la carga del contexto de precipitación para el punto activo (centro
+ *  del campo delimitado si ya hay uno, o la ubicación actual del usuario). */
+async function rhCargarPrecipContext() {
+  const cont = $el('rh-precip-detalle');
+  if (!cont) return;
+  const lat = rhDatosCampo?.centro?.lat ?? (typeof gpsLat !== 'undefined' ? gpsLat : null);
+  const lon = rhDatosCampo?.centro?.lon ?? (typeof gpsLon !== 'undefined' ? gpsLon : null);
+  if (lat === null || lon === null || !isFinite(lat) || !isFinite(lon)) {
+    cont.innerHTML = `<p style="font-size:10.5px;color:rgba(255,255,255,.6);margin:0;">Ubicá el campo o esperá el GPS para ver la precipitación de la zona.</p>`;
+    return;
+  }
+  cont.innerHTML = `<p style="font-size:10.5px;color:rgba(255,255,255,.6);margin:0;">Consultando precipitación (Open-Meteo)...</p>`;
+  const ctx = await getPrecipitationContext(lat, lon);
+  rhRenderPrecipContext(ctx);
+}
+
 // ── Fuente 2: Lluvia acumulada (Open-Meteo horario) ──
 async function rhFetchLluvia(lat, lon) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
@@ -9432,6 +9793,7 @@ function rhAbrirPanel() {
     rhSetProgreso('Delimitá tu campo (menú Incendios → Delimitar), o dibujá/importá una forma en "📐 Medición de superficie", para poder calcular el riesgo hidrológico.');
   }
   try { rhActualizarPersianaProyecto(); } catch (e) {}
+  try { rhCargarPrecipContext(); } catch (e) {}
 }
 function rhCerrarPanel() {
   rhPanelAbierto = false;
