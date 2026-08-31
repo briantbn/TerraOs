@@ -20,6 +20,60 @@
      se usa exclusivamente para GeoSentinel Vegetation Intelligence PREMIUM. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <style>
+  /* ══ Panel lateral de Hidrología: auto-oculto (se esconde lejos del mouse) ══ */
+  #sidebar-hidro {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 320px;
+    z-index: 950;
+    transform: translateX(-100%);
+    transition: transform .28s cubic-bezier(.4,0,.2,1), box-shadow .28s ease;
+  }
+  #sidebar-hidro.abierto {
+    transform: translateX(0);
+    box-shadow: 6px 0 24px rgba(0,0,0,0.18);
+  }
+  /* Pestaña siempre visible pegada al borde izquierdo: indica que hay un
+     panel oculto y permite abrirlo también con un click (útil en touch,
+     donde no existe "hover"). Queda tapada por el panel cuando está abierto. */
+  #sidebar-hidro-tab {
+    position: absolute;
+    top: 50%; left: 0;
+    transform: translateY(-50%);
+    width: 22px; height: 68px;
+    background: #1E5E3A;
+    border-radius: 0 12px 12px 0;
+    z-index: 949;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 3px 0 10px rgba(0,0,0,0.18);
+    cursor: pointer;
+  }
+  #sidebar-hidro-tab .material-symbols-outlined { color: #fff; font-size: 18px; }
+
+  /* ══ Panel flotante "Riesgo Hidrológico / Lista de proyectos": mismo
+     comportamiento de auto-ocultado que el panel lateral. ══ */
+  #rh-leyenda-panel {
+    transition: transform .28s cubic-bezier(.4,0,.2,1), opacity .2s ease;
+  }
+  #rh-leyenda-panel.rh-oculto {
+    transform: translateX(-140%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  #rh-leyenda-tab {
+    position: absolute;
+    top: 16px; left: 0;
+    width: 22px; height: 48px;
+    background: #1E5E3A;
+    border-radius: 0 12px 12px 0;
+    z-index: 899;
+    display: none; /* lo activa el script solo mientras el panel esté abierto */
+    align-items: center; justify-content: center;
+    box-shadow: 3px 0 10px rgba(0,0,0,0.18);
+    cursor: pointer;
+  }
+  #rh-leyenda-tab .material-symbols-outlined { color: #fff; font-size: 16px; }
+
   html, body { height: 100%; overflow: hidden; }
   body { font-family: 'Inter', sans-serif; background: #F7FAF7; display: flex; flex-direction: column; }
   .material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
@@ -3657,11 +3711,15 @@
      PANTALLA: ANÁLISIS HIDROLÓGICO
 ═══════════════════════════════════════════ -->
 <div id="pantalla-hidrologia" class="pantalla" style="flex:1;min-height:0;overflow:hidden;">
-<div style="display:flex;flex-direction:row;flex:1;min-height:0;height:100%;overflow:hidden;">
+<div style="display:flex;flex-direction:row;flex:1;min-height:0;height:100%;overflow:hidden;position:relative;">
 
-  <!-- Panel izquierdo: controles de análisis -->
-  <aside style="width:320px;flex-shrink:0;background:#fff;border-right:1.5px solid #E2E8F0;overflow-y:auto;">
-    <div style="padding:16px;display:flex;flex-direction:column;gap:16px;">
+  <!-- Panel izquierdo: controles de análisis.
+       Auto-oculto: por defecto queda deslizado fuera de la vista (translateX -100%)
+       y se despliega cuando el mouse se acerca al borde izquierdo o pasa por
+       encima del panel (ver script #sidebar-hidro-autohide más abajo). La
+       pestaña #sidebar-hidro-tab queda siempre visible en el borde como pista. -->
+  <aside id="sidebar-hidro" style="background:#fff;border-right:1.5px solid #E2E8F0;overflow-y:auto;">
+    <div style="padding:16px;display:flex;flex-direction:column;gap:16px;width:320px;box-sizing:border-box;">
 
       <!-- Sesión de análisis activa (antes flotaba fija arriba a la
            derecha; ahora es el primer bloque del panel izquierdo, junto
@@ -3897,6 +3955,11 @@
     </div>
   </aside>
 
+  <!-- Pestaña fija que indica el panel oculto; también sirve para abrirlo con click -->
+  <div id="sidebar-hidro-tab" onclick="document.getElementById('sidebar-hidro').classList.toggle('abierto')" title="Mostrar panel">
+    <span class="material-symbols-outlined">chevron_right</span>
+  </div>
+
   <!-- Panel derecho: mapa -->
   <section id="mapa-hidro-container" style="position:relative;flex:1;min-height:0;background:#E2E8F0;overflow:hidden;">
     <div id="mapa-hidrologia" style="width:100%;height:100%;"></div>
@@ -4104,6 +4167,12 @@
           style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,.1);color:#fff;font-weight:700;font-size:11.5px;border:1px solid rgba(255,255,255,.2);cursor:pointer;">▶</button>
       </div>
       <p id="rh-progreso" style="font-size:10.5px;color:rgba(255,255,255,.65);text-align:center;margin:8px 0 0;line-height:1.4;"></p>
+    </div>
+
+    <!-- Pestaña de auto-ocultado para el panel flotante de Riesgo Hidrológico.
+         Solo se muestra (vía JS) mientras ese panel está activo. -->
+    <div id="rh-leyenda-tab" onclick="document.getElementById('rh-leyenda-panel').classList.toggle('rh-oculto')" title="Mostrar panel">
+      <span class="material-symbols-outlined">chevron_right</span>
     </div>
 
     <!-- ══ Panel flotante: Medición de Superficie ══ -->
@@ -21309,6 +21378,121 @@ function toggleMedidorHidro() { _medidorHidro.toggle('btnh-medidor'); }
     document.addEventListener('DOMContentLoaded', initSplitter);
   } else {
     initSplitter();
+  }
+})();
+// ════════════════════════════════════════════════════════════════
+
+
+// ════════════════════════════════════════════════════════════════
+// Panel lateral de Hidrología: auto-oculto según proximidad del mouse.
+// Se despliega si el cursor entra en una franja de EDGE_ZONE px pegada
+// al borde izquierdo, o si el cursor pasa por encima del panel ya
+// abierto (así no se cierra mientras el usuario lo está usando). Se
+// cierra con un pequeño retraso (CLOSE_DELAY) al alejarse, para evitar
+// que parpadee al pasar rápido cerca del borde.
+(function() {
+  const EDGE_ZONE   = 48;  // px desde el borde izquierdo que abren el panel
+  const CLOSE_DELAY = 260; // ms de margen antes de cerrar
+  let closeTimer = null;
+
+  function initSidebarHidroAutoHide() {
+    const fila   = document.querySelector('#pantalla-hidrologia > div');
+    const aside  = document.getElementById('sidebar-hidro');
+    const tab    = document.getElementById('sidebar-hidro-tab');
+    if (!fila || !aside || !tab) return;
+
+    function estaActivaPantallaHidro() {
+      const p = document.getElementById('pantalla-hidrologia');
+      return p && p.classList.contains('activa');
+    }
+    function abrir() {
+      clearTimeout(closeTimer);
+      aside.classList.add('abierto');
+    }
+    function programarCierre() {
+      clearTimeout(closeTimer);
+      closeTimer = setTimeout(() => aside.classList.remove('abierto'), CLOSE_DELAY);
+    }
+
+    fila.addEventListener('mousemove', (e) => {
+      if (!estaActivaPantallaHidro()) return;
+      const rect = fila.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      if (x <= EDGE_ZONE) {
+        abrir();
+      } else if (!aside.matches(':hover') && !tab.matches(':hover')) {
+        programarCierre();
+      }
+    });
+    fila.addEventListener('mouseleave', programarCierre);
+
+    // Mantener abierto mientras el mouse esté sobre el panel o la pestaña
+    aside.addEventListener('mouseenter', abrir);
+    aside.addEventListener('mouseleave', programarCierre);
+    tab.addEventListener('mouseenter', abrir);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSidebarHidroAutoHide);
+  } else {
+    initSidebarHidroAutoHide();
+  }
+})();
+// ════════════════════════════════════════════════════════════════
+
+
+// ════════════════════════════════════════════════════════════════
+// Panel flotante "Riesgo Hidrológico / Lista de proyectos" (rh-leyenda-panel):
+// mismo criterio de auto-ocultado. Este panel se activa/desactiva por su
+// cuenta (rhAbrirPanel/rhCerrarPanel/rhOcultarPanel poniendo display block/none);
+// acá solo controlamos, MIENTRAS esté activo, si se desliza afuera o no según
+// dónde esté el mouse, y mostramos/ocultamos su pestañita en consecuencia.
+(function() {
+  const EDGE_ZONE   = 280; // px desde el borde izquierdo (cubre el ancho del panel, 250px + margen)
+  const CLOSE_DELAY = 260;
+  let closeTimer = null;
+
+  function initRhLeyendaAutoHide() {
+    const cont  = document.getElementById('mapa-hidro-container');
+    const panel = document.getElementById('rh-leyenda-panel');
+    const tab   = document.getElementById('rh-leyenda-tab');
+    if (!cont || !panel || !tab) return;
+
+    function panelActivo() {
+      return panel.style.display === 'block';
+    }
+    function abrir() {
+      clearTimeout(closeTimer);
+      panel.classList.remove('rh-oculto');
+    }
+    function programarCierre() {
+      clearTimeout(closeTimer);
+      closeTimer = setTimeout(() => panel.classList.add('rh-oculto'), CLOSE_DELAY);
+    }
+
+    cont.addEventListener('mousemove', (e) => {
+      if (!panelActivo()) { tab.style.display = 'none'; return; }
+      tab.style.display = 'flex';
+      const rect = cont.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const dentroFranjaVertical = y >= 8 && y <= 8 + panel.offsetHeight + 40;
+      if (x <= EDGE_ZONE && dentroFranjaVertical) {
+        abrir();
+      } else if (!panel.matches(':hover') && !tab.matches(':hover')) {
+        programarCierre();
+      }
+    });
+
+    panel.addEventListener('mouseenter', abrir);
+    panel.addEventListener('mouseleave', programarCierre);
+    tab.addEventListener('mouseenter', abrir);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRhLeyendaAutoHide);
+  } else {
+    initRhLeyendaAutoHide();
   }
 })();
 // ════════════════════════════════════════════════════════════════
