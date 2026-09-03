@@ -207,12 +207,13 @@
   }
   #btn-abrir-herramientas-mapa:active { transform: scale(0.92); }
   #herramientas-mapa-backdrop {
-    display: none; position: absolute; inset: 0; z-index: 1040; background: rgba(0,0,0,0.15);
+    display: none; position: fixed; inset: 0; z-index: 1040; background: rgba(0,0,0,0.15);
   }
   #herramientas-mapa-backdrop.activo { display: block; }
   #panel-herramientas-mapa {
-    display: none; position: absolute; top: 62px; right: 12px; z-index: 1050;
-    width: min(80%, 250px); max-height: calc(100% - 78px); overflow-y: auto;
+    display: none; position: fixed; top: 62px; right: 12px; z-index: 1050;
+    width: min(80%, 250px); max-height: calc(100vh - 78px); max-height: calc(100dvh - 78px);
+    overflow-y: auto;
     background: #fff; border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.28);
     font-family: 'Inter', sans-serif;
   }
@@ -422,23 +423,24 @@
 
   /* ── PANEL CAPAS GEE ── */
   #gee-sheet-backdrop {
-    position: absolute; inset: 0; z-index: 1500;
+    position: fixed; inset: 0; z-index: 1500;
     background: rgba(0,0,0,0.35);
     display: none;
   }
-  #gee-sheet-backdrop.activo { display: block; }
+  #gee-sheet-backdrop.activa { display: block; }
 
   #gee-sheet {
-    position: absolute; left: 0; right: 0; bottom: 0; z-index: 1600;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 1600;
     background: #fafaf5;
     border-radius: 20px 20px 0 0;
     box-shadow: 0 -4px 24px rgba(0,0,0,0.2);
     max-height: 78%;
+    max-height: 78dvh;
     overflow-y: auto;
     transform: translateY(100%);
     transition: transform .25s ease;
   }
-  #gee-sheet.activo { transform: translateY(0); }
+  #gee-sheet.activa { transform: translateY(0); }
 
   #gee-sheet-handle {
     width: 40px; height: 5px; border-radius: 3px;
@@ -13262,10 +13264,10 @@ const GEE_BANDAS = [
 ];
 
 const GEE_PRESETS = [
-  { nombre: 'Incendios actuales', dias: 1,  dataset: 'VIIRS',    banda: 'Thermal' },
-  { nombre: 'Sequedad (60 días)', dias: 60, dataset: 'Sentinel', banda: 'NDVI' },
-  { nombre: 'Análisis 90 días',   dias: 90, dataset: 'Sentinel', banda: 'NDVI' },
-  { nombre: 'Áreas quemadas',     dias: 60, dataset: 'Sentinel', banda: 'NBR' },
+  { nombre: 'Incendios actuales', dias: 1,  dataset: 'MODIS',    banda: 'Thermal' },
+  { nombre: 'Sequedad (7 días)',  dias: 7,  dataset: 'Sentinel', banda: 'NDVI' },
+  { nombre: 'Análisis mensual',   dias: 30, dataset: 'Sentinel', banda: 'NDVI' },
+  { nombre: 'Áreas quemadas',     dias: 30, dataset: 'Sentinel', banda: 'NBR' },
 ];
 
 let geeFiltros = {
