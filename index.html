@@ -5482,6 +5482,13 @@ function toggleMedidorMapa() { _medidorMapa.toggle('btn-medidor'); }
 //  mapa de Hidrología separado todavía) y registra los resultados en
 //  el historial liviano de sesión en vez del sistema de Proyectos.
 // ════════════════════════════════════════════════════════════════
+// FIX: estas tres variables se usaban en toda la sección de Aptitud
+// Productiva (el botón 🌾 de consulta puntual y el interruptor de la capa
+// completa) pero nunca se habían declarado — tiraban "ReferenceError: ...
+// is not defined" apenas se tocaba cualquiera de los dos botones.
+let _aptitudActiva = false;
+let _aptitudCapaActiva = false;
+let _aptitudCapaLayer = null;
 let _marcadorAptitud = null;
 let _aptitudCapaTimeout = null;
 const APTITUD_ZOOM_MIN_CAPA = 10;
@@ -6694,7 +6701,16 @@ function _setPoligonosClicables(mapaObj, clicable) {
 let _mapaObjetivoAptitud = null; // mapa (satelital o hidrología) donde se hizo la última consulta
 
 function activarAptitudProductiva() {
-  if (!mapa) return;
+  // FIX: antes, si tocabas este botón antes de haber entrado al menos una
+  // vez a "Mapa satelital" en la sesión, `mapa` todavía no existía y la
+  // función cortaba acá sin avisar nada — el botón parecía "no hacer nada",
+  // y aunque después entraras al mapa y tocaras un punto, el modo nunca
+  // había quedado armado. Ahora, si el mapa no está listo, se inicializa
+  // (navegando a esa pantalla) antes de seguir.
+  if (!mapa) {
+    irA('mapa');
+    if (!mapa) return; // por si algo impidió inicializar el mapa igual
+  }
   _aptitudActiva = !_aptitudActiva;
   const btn = $el('btn-aptitud-productiva');
   if (_aptitudActiva) {
@@ -16612,7 +16628,12 @@ function suelosTagColor(campo, valor) {
 }
 
 function activarInspectorSuelos() {
-  if (!mapa) return;
+  // FIX: mismo problema que tenía Aptitud Productiva — si `mapa` todavía
+  // no existía, el botón no hacía nada en silencio.
+  if (!mapa) {
+    irA('mapa');
+    if (!mapa) return;
+  }
   _inspectorSuelosActivo = !_inspectorSuelosActivo;
   const btn = $el('btn-inspector-suelos');
   if (_inspectorSuelosActivo) {
