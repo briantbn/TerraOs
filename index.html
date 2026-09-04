@@ -797,6 +797,43 @@
 </head>
 <body class="min-h-screen">
 
+<!-- ══════════════ TOAST — Regla 30-30-30 ══════════════
+     Tarjeta flotante (no una barra que ocupa todo el ancho), hijo
+     directo de <body> -> se ve en cualquier "pantalla" (monitor/mapa/
+     hidrología/etc.), no solo en el Monitor. Se controla con la clase
+     .toast3030-visible (nunca con "hidden": un display inline pisaba
+     esa clase y por eso antes quedaba siempre visible, vacía). Lo
+     maneja _actualizar3030Alerta() más abajo. -->
+<style>
+  #alerta-3030-banner {
+    position: fixed; top: 84px; right: 16px; z-index: 99998;
+    width: 320px; max-width: calc(100vw - 32px);
+    background: #fff; border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.22);
+    padding: 14px 14px 14px 16px;
+    display: flex; align-items: flex-start; gap: 10px;
+    opacity: 0; transform: translateY(-14px) scale(0.97);
+    pointer-events: none;
+    transition: opacity .28s ease, transform .28s ease;
+  }
+  #alerta-3030-banner.toast3030-visible {
+    opacity: 1; transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+</style>
+<div id="alerta-3030-banner">
+  <span id="alerta-3030-icono" style="font-size:22px;line-height:1;margin-top:1px;">⚠️</span>
+  <div style="flex:1;min-width:0;">
+    <p style="margin:0 0 3px;font-weight:800;font-size:13px;color:#1a1c1a;">Regla 30-30-30</p>
+    <p id="alerta-3030-texto" style="margin:0;font-size:12px;color:#575f58;line-height:1.4;">--</p>
+  </div>
+  <button onclick="_cerrar3030Banner()" aria-label="Cerrar aviso"
+    style="flex-shrink:0;background:#f2f4f1;border:none;color:#575f58;
+    width:22px;height:22px;border-radius:50%;font-size:12px;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;">✕</button>
+</div>
+
+
 <!-- ══════════════ AUTENTICACIÓN (Firebase) ══════════════ -->
 <style>
   #auth-gate {
@@ -3475,6 +3512,70 @@ function verificar3030(temp, hum, viento) {
   return temp > 30 && hum < 30 && viento > 30;
 }
 
+// ── Regla 30-30-30 — evaluación detallada (parcial 2/3 vs total 3/3) ──
+// Usa los mismos comparadores que verificar3030() para que "total"
+// coincida exactamente con lo que ya reportan sesiones/informes.
+// Portado de la versión PC.
+function _evaluar3030Detallado(temp, hum, viento) {
+  const tempOk   = temp   > 30;
+  const humOk    = hum    < 30;
+  const vientoOk = viento > 30;
+  const count = [tempOk, humOk, vientoOk].filter(Boolean).length;
+  let nivel = 'ninguno';
+  if (count === 3) nivel = 'total';
+  else if (count === 2) nivel = 'parcial';
+  return { tempOk, humOk, vientoOk, count, nivel };
+}
+
+// ── Banner global de alerta 30-30-30 ── (portado de la versión PC)
+// Se re-evalúa cada vez que llega clima nuevo (cargarDatos()). Solo
+// se muestra cuando el nivel escala (ninguno->parcial->total) o cambia
+// de tipo respecto al último mostrado; si el usuario lo cierra, no
+// vuelve a aparecer para ESE MISMO nivel hasta que escale o baje y
+// vuelva a subir.
+let _ultimoNivel3030Mostrado = null;
+
+function _actualizar3030Alerta() {
+  if (!climaActual || !climaActual.ok) return;
+  const banner = $el('alerta-3030-banner');
+  if (!banner) return;
+  const ev = _evaluar3030Detallado(climaActual.temp, climaActual.humedad, climaActual.viento);
+
+  if (ev.nivel === 'ninguno') {
+    banner.classList.remove('toast3030-visible');
+    _ultimoNivel3030Mostrado = null; // si vuelve a subir, se debe volver a mostrar
+    return;
+  }
+
+  const textoEl = $el('alerta-3030-texto');
+  const iconoEl = $el('alerta-3030-icono');
+  const partes = [];
+  if (ev.tempOk)   partes.push(`temp ${climaActual.temp}°C`);
+  if (ev.humOk)    partes.push(`hum ${climaActual.humedad}%`);
+  if (ev.vientoOk) partes.push(`viento ${climaActual.viento}km/h`);
+
+  if (ev.nivel === 'total') {
+    banner.style.borderLeft = '5px solid #dc2626';
+    iconoEl.textContent = '🔴';
+    textoEl.textContent = `ACTIVA — se cumplen los 3 criterios (${partes.join(' · ')})`;
+  } else { // parcial
+    banner.style.borderLeft = '5px solid #ea580c';
+    iconoEl.textContent = '🟠';
+    textoEl.textContent = `Parcial — 2 de 3 criterios (${partes.join(' · ')})`;
+  }
+
+  // Solo re-mostrar si el nivel cambió desde la última vez que se mostró
+  // (evita que reaparezca cada 10 min si el usuario ya lo cerró y nada cambió)
+  if (_ultimoNivel3030Mostrado !== ev.nivel) {
+    banner.classList.add('toast3030-visible');
+    _ultimoNivel3030Mostrado = ev.nivel;
+  }
+}
+
+function _cerrar3030Banner() {
+  $el('alerta-3030-banner')?.classList.remove('toast3030-visible');
+}
+
 // ── HOTSPOTS NASA FIRMS ─────────────────────────
 // Parsea la respuesta CSV de FIRMS (la API de área NO tiene formato JSON)
 function parseFirmsCSV(texto) {
@@ -4010,6 +4111,8 @@ async function cargarDatos() {
     r3030El.textContent  = r3030 ? '⚠️ Regla 30-30-30 ACTIVA' : '✅ Regla 30-30-30 no activa';
     r3030El.style.color  = r3030 ? '#dc2626' : '#16a34a';
     r3030El.style.fontWeight = 'bold';
+    // Banner global (se ve en cualquier pantalla, no solo en el Monitor) — portado de la versión PC
+    try { _actualizar3030Alerta(); } catch (e) { console.warn(e); }
 
     // KPI Incendios basado en Angström
     actualizarKPIIncendios(ang);
@@ -5671,6 +5774,7 @@ function renderResultadoLote(resultado) {
     r3030El.style.fontWeight = 'bold';
   }
   climaActual = clima; // otros módulos (inundación, sequía) leen esta variable existente
+  try { _actualizar3030Alerta(); } catch (e) { console.warn(e); }
   mostrarHotspots(hotspots || []);
   actualizarFocosCampo(hotspots || []);
 }
