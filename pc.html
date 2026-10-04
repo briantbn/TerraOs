@@ -6320,6 +6320,9 @@ const IIPDIInspector = (() => {
     // se lo comía el popup de la celda (mismo mecanismo que ya se aplica a `mapa`).
     if (mapaHidrologia && typeof _setPoligonosClicables === 'function') _setPoligonosClicables(mapaHidrologia, !activo);
     if (activo) {
+      // FIX: cerrar cualquier popup (ej. "Suelo (INTA)") que haya quedado abierto sobre el análisis.
+      try { if (mapaHidrologia) mapaHidrologia.closePopup(); } catch (e) {}
+      try { if (typeof mapa !== 'undefined' && mapa) mapa.closePopup(); } catch (e) {}
       // Exclusión mutua con las otras herramientas de click sobre el mapa
       // de hidrología (Aptitud Productiva / Inspector de Suelos INTA /
       // Medición de superficie): si alguna quedó a mitad de una medición,
@@ -12846,7 +12849,21 @@ function rhPintarGrid(celdas) {
     const rect = L.rectangle([[c.lat0, c.lon0], [c.lat1, c.lon1]], {
       stroke: false, fillColor: c.clasificacion.color, fillOpacity: opacidad, interactive: true
     }).addTo(rhCapaGrid);
-    rect.bindPopup(() => rhSueloDetallePopupHTML(c), { maxWidth: 280 });
+    // FIX: antes bindPopup abría SIEMPRE el cartel "Suelo (INTA)" y se comía el clic,
+    // por eso el Inspector de Riesgo Hidrológico no podía consultar encima del análisis.
+    // Ahora el popup solo se abre si no hay ninguna herramienta de click activa; si la hay,
+    // el clic burbujea al mapa y la herramienta (Inspector, Aptitud, Suelos INTA) consulta el punto.
+    rect.on('click', (ev) => {
+      const hayHerramientaActiva =
+        (typeof IIPDIInspector !== 'undefined' && IIPDIInspector.estaActivo && IIPDIInspector.estaActivo())
+        || (typeof _aptitudActiva !== 'undefined' && _aptitudActiva)
+        || (typeof _inspectorSuelosActivo !== 'undefined' && _inspectorSuelosActivo);
+      if (hayHerramientaActiva) return;
+      L.popup({ maxWidth: 280 })
+        .setLatLng(ev.latlng)
+        .setContent(rhSueloDetallePopupHTML(c))
+        .openOn(mapaHidrologia);
+    });
   });
 }
 

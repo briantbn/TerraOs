@@ -563,6 +563,17 @@
     cursor: pointer; display: flex; align-items: center; justify-content: center;
   }
   .pi-cerrar:active { transform: scale(0.9); }
+  /* Navegación <> entre incendios (dentro del panel de detalle) */
+  .pi-nav { display: flex; align-items: center; gap: 4px; margin: 0 6px; flex-shrink: 0; }
+  .pi-nav-btn {
+    background: #f4f4ef; border: none; border-radius: 50%;
+    width: 22px; height: 22px; font-size: 15px; font-weight: 800; color: #1E5E3A;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    line-height: 1; padding: 0;
+  }
+  .pi-nav-btn:active { transform: scale(0.9); }
+  .pi-nav-btn:disabled { opacity: .35; cursor: default; }
+  .pi-nav-contador { font-size: 11px; font-weight: 800; color: #424841; white-space: nowrap; min-width: 30px; text-align: center; }
   .pi-body { padding: 10px 14px 14px; }
   .pi-badge-activo {
     display: inline-block; font-size: 11px; font-weight: 800;
@@ -793,9 +804,113 @@
     border-color: #d97706 !important;
     box-shadow: 0 0 0 3px rgba(180,120,40,0.25);
   }
+
+  /* ── TOUR GUIADO (carrusel de pasos) ── */
+  #tour-overlay {
+    display: none; position: fixed; inset: 0; z-index: 9000;
+    background: rgba(20,24,20,0.62);
+    align-items: center; justify-content: center;
+  }
+  #tour-modal {
+    position: relative;
+    z-index: 9500; background: #F7FAF7; border-radius: 18px;
+    padding: 22px 22px 20px; width: calc(100% - 56px); max-width: 340px;
+    max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    box-shadow: 0 14px 50px rgba(0,0,0,0.35);
+    border: 1.5px solid #E2E8F0;
+    display: flex; flex-direction: column;
+  }
+  #tour-modal .tour-progreso {
+    font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: #81a685; margin: 0 0 10px;
+  }
+  #tour-modal h3 {
+    font-size: 18px; font-weight: 800; color: #1E5E3A; margin: 0 0 10px; line-height: 1.25;
+  }
+  #tour-modal p {
+    font-size: 14px; color: #424841; line-height: 1.55; margin: 0 0 16px;
+  }
+  #tour-icon-wrap {
+    width: 100%; aspect-ratio: 16/10; border-radius: 12px; overflow: hidden;
+    background: linear-gradient(135deg, #1a3b22, #2F855A);
+    border: 1.5px solid #E2E8F0;
+    margin: 0 0 16px; display: flex; align-items: center; justify-content: center;
+  }
+  #tour-icon-wrap span { font-size: 56px; filter: drop-shadow(0 3px 6px rgba(0,0,0,.35)); }
+  #tour-dots {
+    display: flex; justify-content: center; gap: 6px; margin: 0 0 16px;
+  }
+  #tour-dots span {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #d4d6d0; transition: background .2s, transform .2s;
+  }
+  #tour-dots span.activo {
+    background: #1E5E3A; transform: scale(1.25);
+  }
+  #tour-nav {
+    display: flex; align-items: center; gap: 10px;
+  }
+  #tour-btn-prev, #tour-btn-next {
+    width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; border: 1.5px solid #d4d6d0;
+    background: #fff; color: #1E5E3A; font-weight: 800; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all .2s ease;
+  }
+  #tour-btn-prev:disabled, #tour-btn-next:disabled {
+    opacity: .35; cursor: default;
+  }
+  #tour-btn-prev:active:not(:disabled), #tour-btn-next:active:not(:disabled) { transform: scale(0.93); }
+  #tour-btn-entendido {
+    flex: 1; padding: 13px; border-radius: 12px; border: none;
+    background: #1E5E3A; color: #fff; font-weight: 700; font-size: 14px;
+    cursor: pointer; transition: all .2s ease;
+  }
+  #tour-btn-entendido:active { transform: scale(0.97); }
+  #tour-btn-cerrar {
+    position: absolute; top: 14px; right: 14px;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    background: #f0f0eb; border: 1.5px solid #d4d6d0;
+    border-radius: 50%; cursor: pointer;
+    font-size: 15px; color: #424841; line-height: 1;
+    transition: background .2s, transform .15s;
+    z-index: 1;
+  }
+  #tour-btn-cerrar:active { transform: scale(0.9); }
+  #btn-ayuda-tour {
+    width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.08); border: 1.5px solid rgba(255,255,255,0.15);
+    border-radius: 10px; cursor: pointer; font-size: 18px; flex-shrink: 0;
+  }
+  #btn-ayuda-tour:active { transform: scale(0.92); }
 </style>
 </head>
 <body class="min-h-screen">
+
+<!-- ══════════════════════════════════════════
+     TOUR GUIADO — CARRUSEL DE PASOS
+     Hijo directo de <body> a propósito: así se puede abrir desde
+     cualquier pantalla (Monitor/Mapa/Hidrología/etc.), no solo cuando
+     la pantalla del mapa está activa (antes quedaba adentro de
+     #pantalla-mapa, que tiene display:none cuando no es la pantalla
+     activa, y el modal nunca se veía).
+═══════════════════════════════════════════ -->
+<div id="tour-overlay">
+  <div id="tour-modal">
+    <button id="tour-btn-cerrar" onclick="cerrarTour(false)" title="Cerrar tour">✕</button>
+    <p id="tour-progreso" class="tour-progreso">1 / 8</p>
+    <h3 id="tour-titulo"></h3>
+    <div id="tour-icon-wrap"><span id="tour-icon"></span></div>
+    <p id="tour-texto"></p>
+    <div id="tour-dots"></div>
+    <div id="tour-nav">
+      <button id="tour-btn-prev" onclick="retrocederTour()" aria-label="Anterior">‹</button>
+      <button id="tour-btn-entendido" onclick="avanzarTour()">Siguiente</button>
+      <button id="tour-btn-next" onclick="avanzarTour()" aria-label="Siguiente">›</button>
+    </div>
+  </div>
+</div>
 
 <!-- ══════════════ TOAST — Regla 30-30-30 ══════════════
      Tarjeta flotante (no una barra que ocupa todo el ancho), hijo
@@ -1149,6 +1264,7 @@
   </div>
   <div class="flex items-center gap-3">
     <span id="badge-offline" class="hidden text-xs font-bold px-2 py-1 rounded-full" style="background:#fef08a;color:#78350f">SIN SEÑAL</span>
+    <button onclick="reiniciarTour()" id="btn-ayuda-tour" title="Ayuda / tour guiado" aria-label="Ayuda">❓</button>
     <button onclick="activarInspectorSuelos()" id="btn-inspector-suelos"
       title="Inspector de suelos INTA"
       style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;
@@ -1477,6 +1593,15 @@
 <!-- ══════════════════════════════════════════
      MEDICIÓN DE SUPERFICIE — PANEL
 ═══════════════════════════════════════════ -->
+<style>
+  .medsup-asa-vertice {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; border: 2.5px solid #7c3aed;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.45);
+    cursor: grab;
+  }
+  .medsup-asa-vertice:active { cursor: grabbing; }
+</style>
 <div id="medsup-panel" style="display:none;position:fixed;left:8px;top:140px;
   z-index:1602;width:min(72%,240px);max-height:calc(100vh - 156px);overflow-y:auto;
   background:rgba(15,20,15,0.94);border:1px solid rgba(255,255,255,0.12);border-radius:14px;
@@ -1501,36 +1626,34 @@
   <input id="medsup-input-importar" type="file" accept=".kml,.kmz,.geojson,.json"
     style="display:none" onchange="MedicionSuperficie.importarArchivo(event)"/>
 
-  <p id="medsup-instruccion" style="font-size:10.5px;color:rgba(255,255,255,.65);margin:0 0 8px;line-height:1.4;"></p>
+  <p id="medsup-instruccion" style="font-size:10.5px;color:rgba(255,255,255,.65);margin:0 0 6px;line-height:1.4;"></p>
+  <p style="font-size:9.5px;color:rgba(255,255,255,.45);margin:0 0 8px;line-height:1.4;">💡 Tocá una forma para seleccionarla, mantené <b>Shift</b> y click en otra para fusionarlas en una sola (mismo nombre, un solo archivo al exportar).</p>
 
   <div style="display:flex;gap:6px;margin-bottom:10px;">
     <button id="medsup-btn-finalizar" onclick="MedicionSuperficie.finalizarPoligono()" style="display:none;flex:1;padding:7px;border-radius:8px;background:#2F855A;color:#fff;font-weight:700;font-size:10.5px;border:none;cursor:pointer;">✅ Finalizar</button>
-    <button onclick="MedicionSuperficie.limpiar()" style="flex:1;padding:7px;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;font-weight:700;font-size:10.5px;border:1px solid rgba(255,255,255,.2);cursor:pointer;">🗑 Limpiar</button>
+    <button onclick="MedicionSuperficie.limpiarTodo()" style="flex:1;padding:7px;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;font-weight:700;font-size:10.5px;border:1px solid rgba(255,255,255,.2);cursor:pointer;">🗑 Limpiar todo</button>
   </div>
 
   <div id="medsup-resultados" style="display:none;border-top:1px solid rgba(255,255,255,.12);padding-top:10px;margin-bottom:10px;">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
-      <div style="background:rgba(255,255,255,.06);border-radius:8px;padding:7px;text-align:center;">
-        <p style="font-size:9px;color:rgba(255,255,255,.55);margin:0;text-transform:uppercase;">Hectáreas</p>
-        <p id="medsup-ha" style="font-size:14px;font-weight:800;color:#fff;margin:2px 0 0;">--</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
+      <div style="background:rgba(124,58,237,.18);border-radius:8px;padding:7px;text-align:center;">
+        <p style="font-size:9px;color:rgba(255,255,255,.6);margin:0;text-transform:uppercase;">Formas</p>
+        <p id="medsup-total-cant" style="font-size:14px;font-weight:800;color:#fff;margin:2px 0 0;">0</p>
       </div>
-      <div style="background:rgba(255,255,255,.06);border-radius:8px;padding:7px;text-align:center;">
-        <p style="font-size:9px;color:rgba(255,255,255,.55);margin:0;text-transform:uppercase;">km²</p>
-        <p id="medsup-km2" style="font-size:14px;font-weight:800;color:#fff;margin:2px 0 0;">--</p>
+      <div style="background:rgba(124,58,237,.18);border-radius:8px;padding:7px;text-align:center;">
+        <p style="font-size:9px;color:rgba(255,255,255,.6);margin:0;text-transform:uppercase;">Total ha</p>
+        <p id="medsup-total-ha" style="font-size:14px;font-weight:800;color:#fff;margin:2px 0 0;">0</p>
       </div>
-      <div style="background:rgba(255,255,255,.06);border-radius:8px;padding:7px;text-align:center;">
-        <p style="font-size:9px;color:rgba(255,255,255,.55);margin:0;text-transform:uppercase;">m²</p>
-        <p id="medsup-m2" style="font-size:12px;font-weight:800;color:#fff;margin:2px 0 0;">--</p>
-      </div>
-      <div style="background:rgba(255,255,255,.06);border-radius:8px;padding:7px;text-align:center;">
-        <p style="font-size:9px;color:rgba(255,255,255,.55);margin:0;text-transform:uppercase;">Perímetro</p>
-        <p id="medsup-perim" style="font-size:12px;font-weight:800;color:#fff;margin:2px 0 0;">--</p>
+      <div style="background:rgba(124,58,237,.18);border-radius:8px;padding:7px;text-align:center;">
+        <p style="font-size:9px;color:rgba(255,255,255,.6);margin:0;text-transform:uppercase;">Total km²</p>
+        <p id="medsup-total-km2" style="font-size:14px;font-weight:800;color:#fff;margin:2px 0 0;">0</p>
       </div>
     </div>
+    <div id="medsup-lista-formas" style="max-height:180px;overflow-y:auto;margin-bottom:10px;"></div>
     <div style="margin-bottom:8px;">
-      <label style="font-size:9px;color:rgba(255,255,255,.55);text-transform:uppercase;display:block;margin-bottom:3px;">Nombre del archivo</label>
-      <input id="medsup-nombre-archivo" type="text" placeholder="Ej: Primer lote a observar"
-        style="width:100%;padding:7px 9px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:11px;outline:none;box-sizing:border-box;"/>
+      <label for="medsup-nombre" style="font-size:9px;color:rgba(255,255,255,.55);margin:0 0 4px;text-transform:uppercase;display:block;">Nombre del archivo a exportar</label>
+      <input id="medsup-nombre" type="text" maxlength="80" placeholder="Ej: Lote Norte, Campo 3..."
+        style="width:100%;box-sizing:border-box;padding:7px 8px;border-radius:8px;background:rgba(255,255,255,.08);color:#fff;font-weight:600;font-size:11px;border:1px solid rgba(255,255,255,.2);outline:none;"/>
     </div>
     <div style="display:flex;gap:6px;">
       <button onclick="MedicionSuperficie.exportar('geojson')"
@@ -1676,6 +1799,10 @@
       <button id="rh-btn-analizar-lote" onclick="rhAnalizarLoteActual()"
         style="width:100%;padding:9px;border-radius:10px;background:#2563eb;color:#fff;font-weight:700;font-size:11.5px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
         <span class="material-symbols-outlined" style="font-size:15px;">search</span> Analizar
+      </button>
+      <button id="rh-btn-analizar-todo" onclick="rhAnalizarTodosLosLotes()"
+        style="width:100%;margin-top:6px;padding:9px;border-radius:10px;background:rgba(255,255,255,.1);color:#fff;font-weight:700;font-size:11.5px;border:1px solid rgba(255,255,255,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+        <span class="material-symbols-outlined" style="font-size:15px;">play_arrow</span> Analizar todo (todos los lotes)
       </button>
       <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:10.5px;color:rgba(255,255,255,.65);cursor:pointer;">
         <input type="checkbox" id="rh-proyecto-autoavanzar" style="accent-color:#2563eb;">
@@ -3077,6 +3204,11 @@
           <span class="material-symbols-outlined" style="color:#ff3b30;font-size:18px">local_fire_department</span>
           <span>Incendio activo</span>
         </div>
+        <div class="pi-nav" id="pi-nav">
+          <button class="pi-nav-btn" id="pi-nav-prev" onclick="navegarIncendio(-1)" title="Foco anterior">‹</button>
+          <span class="pi-nav-contador" id="pi-nav-contador">1 / 1</span>
+          <button class="pi-nav-btn" id="pi-nav-next" onclick="navegarIncendio(1)" title="Foco siguiente">›</button>
+        </div>
         <button class="pi-cerrar" onclick="cerrarPanelIncendio()">✕</button>
       </div>
       <div class="pi-body" id="pi-body"></div>
@@ -3330,6 +3462,7 @@ const GEE_SERVER  = 'https://terraos-1.onrender.com';
 let gpsLat = null, gpsLon = null, gpsListo = false;
 let climaActual = null;
 let ultimoRiesgoInundacion = null;
+let ultimoRiesgoSequia = null; // { score, nivel, ndvi, lluvia30, humSuelo, ... } — se guarda en actualizarSequiaYVegetacion(), lo usa el informe técnico para armar el payload de interpretación por IA
 
 // ── MENÚ HAMBURGUESA ────────────────────────────
 let menuAbierto = false;
@@ -3772,17 +3905,28 @@ function filterHotspotsByJurisdiction(hotspots, geometry) {
   });
 }
 
-// Radio de influencia alrededor del polígono del campo, cuando hay uno
-// delimitado (KML/GeoJSON). Reemplaza al filtro por jurisdicción
-// administrativa en ese caso: ver aplicarFiltroJurisdiccion().
-const FOCOS_BUFFER_CAMPO_KM = 30;
+// Buffer alrededor del campo/lote, cuando hay uno delimitado (KML/GeoJSON).
+// Reemplaza al filtro por jurisdicción administrativa en ese caso: ver
+// aplicarFiltroJurisdiccion().
+//
+// FIX (a pedido): antes esto era un buffer real de 30 km medido desde el
+// BORDE del polígono (turf.buffer en kilómetros) — para un lote grande (una
+// jurisdicción entera, por ejemplo), eso terminaba incluyendo focos a 30, 40
+// o más km del CENTRO del lote, bien lejos de la zona naranja punteada que
+// se ve en el mapa ("Zona buffer 30% adicional"). Ahora el filtro usa
+// exactamente ESE mismo polígono (expandirPoligono al 130%, igual que
+// dibujarCampoEnMapa) — un foco solo pasa el filtro si cae dentro del campo
+// o dentro de esa zona de vigilancia dibujada; lo que quede afuera del
+// buffer visible ya no se muestra ni cuenta.
+const FOCOS_BUFFER_CAMPO_FACTOR = 1.30;
 
 /**
  * aplicarFiltroJurisdiccion(): decide qué focos crudos de FIRMS se muestran.
  *
  * Si hay un campo/lote delimitado (campoGuardado) y el punto consultado
- * corresponde a ese campo, filtra por PROXIMIDAD REAL al polígono dibujado
- * (buffer de FOCOS_BUFFER_CAMPO_KM), no por jurisdicción administrativa.
+ * corresponde a ese campo, filtra por proximidad al polígono REALMENTE
+ * DIBUJADO en el mapa: adentro del lote, o dentro de su buffer de vigilancia
+ * (el mismo polígono naranja punteado del 30% adicional) — nada más lejos.
  * Si NO hay campo delimitado (consulta por GPS/punto suelto), se mantiene
  * el filtro por jurisdicción administrativa (FAO GAUL).
  */
@@ -3809,17 +3953,25 @@ async function aplicarFiltroJurisdiccion(hotspotsCrudos, lat, lon) {
                            puntoLat >= bbox[1] - margen && puntoLat <= bbox[3] + margen;
 
       if (esEsteCampo) {
-        const zonaInfluencia = turf.buffer(poligonoCampo, FOCOS_BUFFER_CAMPO_KM, { units: 'kilometers' });
+        // Mismo polígono que dibujarCampoEnMapa() dibuja como "Zona buffer
+        // 30%" (expandirPoligono al 130% desde el centroide) — así el
+        // filtro de focos coincide exactamente con lo que se ve en el mapa.
+        const puntosBuffer = expandirPoligono(campoGuardado.puntos, FOCOS_BUFFER_CAMPO_FACTOR);
+        const anilloBuffer = puntosBuffer.map(p => [p.lon, p.lat]);
+        const primeroB = anilloBuffer[0], ultimoB = anilloBuffer[anilloBuffer.length - 1];
+        if (primeroB[0] !== ultimoB[0] || primeroB[1] !== ultimoB[1]) anilloBuffer.push(primeroB);
+        const zonaInfluencia = turf.polygon([anilloBuffer]);
+
         const filtrados = hotspotsCrudos.filter(h => {
           const flat = parseFloat(h.latitude), flon = parseFloat(h.longitude);
           if (isNaN(flat) || isNaN(flon)) return false;
-          try { return turf.booleanPointInPolygon(turf.point([flon, flat]), zonaInfluencia); }
+          try { return turf.booleanPointInPolygon(turf.point([flon, flat]), zonaInfluencia, { ignoreBoundary: false }); }
           catch (e) { return false; }
         });
         ultimaJurisdiccionInfo = {
           pais: null,
-          jurisdiccion: `Campo delimitado (±${FOCOS_BUFFER_CAMPO_KM} km)`,
-          nivel: 'Proximidad al polígono',
+          jurisdiccion: 'Campo delimitado (buffer 30%)',
+          nivel: 'Dentro del lote o su zona de vigilancia',
           encontrados: filtrados.length,
           descartados: totalCrudo - filtrados.length,
         };
@@ -4843,6 +4995,42 @@ function abrirPanelIncendio(id) {
   panelIncendioAbiertoId = inc.id;
   const panel = $el('panel-incendio-lateral');
   if (panel) panel.classList.add('abierto');
+  actualizarNavIncendioUI();
+}
+
+/** Actualiza el contador "X / N" y habilita/deshabilita las flechas <> del panel de detalle. */
+function actualizarNavIncendioUI() {
+  const nav = $el('pi-nav');
+  const contador = $el('pi-nav-contador');
+  const btnPrev = $el('pi-nav-prev');
+  const btnNext = $el('pi-nav-next');
+  if (!nav || !contador || !btnPrev || !btnNext) return;
+  const total = incendiosActivos.length;
+  if (total <= 1) { nav.style.display = 'none'; return; }
+  nav.style.display = 'flex';
+  const idx = incendiosActivos.findIndex(i => i.id === panelIncendioAbiertoId);
+  contador.textContent = `${idx >= 0 ? idx + 1 : 1} / ${total}`;
+  // La lista es circular (< > dan la vuelta), así que nunca quedan deshabilitados
+  // salvo que solo haya un incendio (caso ya cubierto arriba).
+  btnPrev.disabled = false;
+  btnNext.disabled = false;
+}
+
+/** Botones <> del panel: pasa al incendio anterior/siguiente sin cerrar el panel ni volver a la lista. */
+function navegarIncendio(delta) {
+  const total = incendiosActivos.length;
+  if (total <= 1) return;
+  let idx = incendiosActivos.findIndex(i => i.id === panelIncendioAbiertoId);
+  if (idx === -1) idx = 0;
+  idx = (idx + delta + total) % total;
+  const inc = incendiosActivos[idx];
+  if (!inc) return;
+  clearTimeout(timerFaseUnoFuego);
+  if (mapa) mapa.flyTo([inc.lat, inc.lon], mapa.getZoom() < 11 ? 12 : mapa.getZoom(), { duration: 0.6 });
+  mostrarConoFuego(inc, false);
+  renderPanelIncendioBody(inc);
+  panelIncendioAbiertoId = inc.id;
+  actualizarNavIncendioUI();
 }
 
 function cerrarPanelIncendio() {
@@ -5116,7 +5304,7 @@ function procesarIncendiosActivos(hotspots) {
     if (!inc.municipio) {
       obtenerLugar(lat, lon).then(nombre => {
         inc.municipio = nombre || 'Zona rural';
-        if (panelIncendioAbiertoId === inc.id) renderPanelIncendioBody(inc);
+        if (panelIncendioAbiertoId === inc.id) { renderPanelIncendioBody(inc); actualizarNavIncendioUI(); }
         const listaEl = $el('panel-lista-incendios');
         if (listaEl && listaEl.classList.contains('abierto')) abrirListaIncendios();
       });
@@ -5133,6 +5321,7 @@ function procesarIncendiosActivos(hotspots) {
     if (incAbierto) {
       renderPanelIncendioBody(incAbierto);
       mostrarConoFuego(incAbierto, false);
+      actualizarNavIncendioUI();
     } else {
       panelIncendioAbiertoId = null;
       _cerrarPanelesFuegoUI();
@@ -6066,9 +6255,18 @@ class ProjectManager {
     });
     lote.layer.addTo(mapa);
 
-    // FIX: mismo caso que en dibujarCampoEnMapa — si la regla ya está
-    // activa, el polígono del lote recién dibujado no debe robar el clic.
-    if (typeof _medidorMapa !== 'undefined' && _medidorMapa.estaActivo()) {
+    // FIX: mismo caso que en dibujarCampoEnMapa — si el medidor, la capa de
+    // aptitud, el Inspector de Riesgo Hidrológico o el Inspector de Suelos
+    // YA estaban activos, el polígono del lote recién dibujado no debe
+    // robar el clic (antes solo se chequeaba el medidor, así que con
+    // cualquiera de las otras tres herramientas prendidas el polígono del
+    // lote volvía a quedar clicable en cada redibujo —p.ej. al cambiar de
+    // lote del proyecto con "1/3 → 2/3 → 3/3"— y su cartel "Lote del
+    // proyecto" tapaba el cartel real de la herramienta activa).
+    if ((typeof _medidorMapa !== 'undefined' && _medidorMapa.estaActivo())
+        || (typeof _aptitudCapaActiva !== 'undefined' && _aptitudCapaActiva)
+        || (typeof IIPDIInspector !== 'undefined' && IIPDIInspector.estaActivo())
+        || (typeof _inspectorSuelosActivo !== 'undefined' && _inspectorSuelosActivo)) {
       _setPoligonosClicables(mapa, false);
     }
   }
@@ -6673,11 +6871,13 @@ function _toggleNotaLoteUI(i) {
 // ondrop), que la mayoría de los navegadores móviles no dispara con touch.
 let _loteDragIdx    = null; // índice del lote que se está arrastrando
 let _loteDragSobre  = null; // índice de la fila sobre la que está el dedo/mouse ahora
+let _loteDragCont   = 'capas-io-lista'; // id del contenedor donde se está arrastrando (hay más de una lista con esta función: "Lotes cargados" y la del panel de Riesgo Hidrológico)
 
-function _loteDragStart(ev, i) {
+function _loteDragStart(ev, i, contId) {
   ev.preventDefault();
   _loteDragIdx = i;
   _loteDragSobre = i;
+  _loteDragCont = contId || 'capas-io-lista';
   try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) {}
   const fila = ev.currentTarget.closest('.lote-fila');
   if (fila) fila.style.opacity = '0.5';
@@ -6688,7 +6888,7 @@ function _loteDragStart(ev, i) {
 
 function _loteDragMove(ev) {
   if (_loteDragIdx === null) return;
-  const cont = $el('capas-io-lista');
+  const cont = $el(_loteDragCont);
   if (!cont) return;
   const filas = Array.from(cont.querySelectorAll('.lote-fila'));
   let destino = _loteDragSobre;
@@ -6711,7 +6911,7 @@ function _loteDragEnd() {
     // sin el borde/opacidad que dejó el arrastre).
   } else {
     // No se movió de lugar: solo hay que sacar el resaltado visual.
-    const cont = $el('capas-io-lista');
+    const cont = $el(_loteDragCont);
     if (cont) cont.querySelectorAll('.lote-fila').forEach(f => { f.style.opacity = ''; f.style.borderTop = ''; });
   }
   _loteDragIdx = null;
@@ -6739,7 +6939,7 @@ function _renderizarListaLotesProyecto() {
     return `
     <div class="lote-fila" data-idx="${i}" style="border:1.5px solid ${activo ? '#1E5E3A' : '#eceee9'};border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;${oculto ? 'opacity:0.55;' : ''}">
       <div style="display:flex;align-items:center;gap:8px;">
-        <span onpointerdown="_loteDragStart(event, ${i})" title="Arrastrar para reordenar"
+        <span onpointerdown="_loteDragStart(event, ${i}, 'capas-io-lista')" title="Arrastrar para reordenar"
           style="cursor:grab;touch-action:none;display:flex;align-items:center;padding:2px 4px;color:#9ca3af;font-size:15px;user-select:none;-webkit-user-select:none;">⋮⋮</span>
         <span style="width:10px;height:10px;border-radius:50%;background:${lote.color || '#c8cdc6'};flex-shrink:0;"></span>
         <span style="font-size:12px;font-weight:700;color:#1a1c1a;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_nombreCortoArchivo(lote.nombre)}</span>
@@ -6825,6 +7025,12 @@ function activarAptitudProductiva() {
     if ($el('btn-inspector-iipdi')?.classList.contains('activo') && typeof IIPDIInspector !== 'undefined') IIPDIInspector.toggle();
     btn.classList.add('activo');
     mapa.getContainer().style.cursor = 'crosshair';
+    // FIX: esto faltaba -- a diferencia de la capa de Aptitud y del Inspector
+    // de Suelos, este modo de consulta puntual nunca desactivaba el clic de
+    // "Mi campo", el buffer y los lotes del proyecto, así que ese polígono
+    // se comía el clic con su propio cartel en vez de dejarlo pasar al motor
+    // de aptitud.
+    if (typeof _setPoligonosClicables === 'function') _setPoligonosClicables(mapa, false);
     // Si ya estás en el mapa, te quedás ahí. Solo navega por defecto si se
     // activó desde otra pantalla (ej. el Monitor).
     const enMapaSat = $el('pantalla-mapa')?.classList.contains('activa');
@@ -6840,6 +7046,10 @@ function desactivarAptitudProductiva() {
   _aptitudActiva = false;
   $el('btn-aptitud-productiva')?.classList.remove('activo');
   if (mapa) mapa.getContainer().style.cursor = '';
+  // FIX: restaurar el clic normal de los polígonos al salir del modo,
+  // sea porque se tocó el botón de nuevo o porque ya se hizo la consulta
+  // (aptitudConsultarPunto llama a esta función al primer clic exitoso).
+  if (typeof _setPoligonosClicables === 'function' && mapa) _setPoligonosClicables(mapa, true);
 }
 function cerrarModalAptitud(e) {
   if (e && e.target !== e.currentTarget) return;
@@ -7668,10 +7878,18 @@ const IIPDIInspector = (() => {
       mapa.getContainer().style.cursor = activo ? 'crosshair' : '';
     }
     if (activo) {
+      // FIX: cerrar cualquier cartel que haya quedado abierto sobre el análisis.
+      try { if (mapa) mapa.closePopup(); } catch (e) {}
       // Exclusión mutua con las otras herramientas de click sobre el mapa
       // de hidrología (Aptitud Productiva / Inspector de Suelos INTA /
       // Medición de superficie): si alguna quedó a mitad de una medición,
       // se corta acá para que no compartan el mismo click.
+      //
+      // IMPORTANTE: esto va ANTES de tocar _setPoligonosClicables — cada una
+      // de estas restaura el clic normal de los polígonos al desactivarse
+      // (desactivarAptitudProductiva lo hace), así que si el bloqueo final
+      // de más abajo corriera primero, estas lo pisarían y los polígonos
+      // quedarían clicables de nuevo mientras el Inspector sigue activo.
       if (typeof _aptitudActiva !== 'undefined' && _aptitudActiva && typeof desactivarAptitudProductiva === 'function') {
         desactivarAptitudProductiva();
       }
@@ -7694,6 +7912,14 @@ const IIPDIInspector = (() => {
     // conserva hasta que el usuario marque un punto nuevo (ahí sí se limpia,
     // al principio de consultar()). Antes se borraba acá y se perdía el
     // análisis solo por cerrar y volver a abrir el panel.
+
+    // FIX: mientras el Inspector está activo, los polígonos con popup propio
+    // ("Mi campo", buffer, lotes del proyecto) dejan pasar el click en vez
+    // de abrir su cartel y comerse el evento — mismo mecanismo que ya usa la
+    // capa de Aptitud Productiva y la Medición de superficie. Va al final,
+    // después de la exclusión mutua de más arriba, para que ninguna de esas
+    // llamadas (que restauran el clic al desactivarse) lo pise.
+    if (mapa && typeof _setPoligonosClicables === 'function') _setPoligonosClicables(mapa, !activo);
   }
 
   // Apaga el modo "click en el mapa" del Inspector SIN togglear nada más —
@@ -7705,7 +7931,10 @@ const IIPDIInspector = (() => {
     activo = false;
     const btn = boton();
     if (btn) btn.classList.remove('activo');
-    if (mapa) mapa.getContainer().style.cursor = '';
+    if (mapa) {
+      mapa.getContainer().style.cursor = '';
+      if (typeof _setPoligonosClicables === 'function') _setPoligonosClicables(mapa, true);
+    }
   }
 
   // Botón "Inspector de Riesgo Hidrológico" del panel lateral: ahora sí
@@ -8189,6 +8418,16 @@ const IIPDIInspector = (() => {
 
   function iniciar() {
     if (mapa) mapa.on('click', onClickMapa);
+    // FIX: red de seguridad — si se (re)dibuja cualquier capa (campo, lote, grilla de suelo,
+    // contorno) con el inspector ya activo, queda sin capturar clics para que el punto llegue al inspector.
+    if (mapa) mapa.on('layeradd', function (ev) {
+      if (!activo) return;
+      const ly = ev.layer;
+      if (ly instanceof L.Path) {
+        const aplicar = () => { const el = ly.getElement && ly.getElement(); if (el) el.style.pointerEvents = 'none'; };
+        aplicar(); setTimeout(aplicar, 0);
+      }
+    });
   }
 
   // Se llama desde el <select id="ipca-elemento-expuesto">: recalcula el
@@ -9175,6 +9414,7 @@ const IIPDIInspector = (() => {
     toggleHumedalAnomalia,
     toggleDegradacionAguada, toggleRiesgoOcultoExtent,
     toggleListaRed,
+    estaActivo: () => activo,
   };
 })();
 
@@ -9927,7 +10167,7 @@ async function calcularRiesgoHidrologico() {
     // Contorno del campo sobre el mapa de Hidrología
     if (rhContornoCampo) { mapa.removeLayer(rhContornoCampo); rhContornoCampo = null; }
     rhContornoCampo = L.polygon(puntos.map(p => [p.lat, p.lon]), {
-      color: '#2dd4ff', weight: 2, fillOpacity: 0
+      color: '#2dd4ff', weight: 2, fillOpacity: 0, interactive: false
     }).addTo(mapa);
     mapa.fitBounds(rhContornoCampo.getBounds(), { padding: [40, 40] });
 
@@ -10207,7 +10447,7 @@ function rhAbrirPanel() {
     if (mapa) {
       if (rhContornoCampo) { mapa.removeLayer(rhContornoCampo); }
       rhContornoCampo = L.polygon(puntosActivos.map(p2 => [p2.lat, p2.lon]), {
-        color: '#2dd4ff', weight: 2, fillOpacity: 0
+        color: '#2dd4ff', weight: 2, fillOpacity: 0, interactive: false
       }).addTo(mapa);
     }
     rhRecalcularClasificacion();
@@ -10318,8 +10558,29 @@ async function rhIrALote(i) {
 
 // ── Analiza el riesgo hidrológico del lote actualmente activo en proyectoActual ──
 // (campoGuardado ya apunta a ese lote gracias a showCurrentLayer(); reutiliza calcularRiesgoHidrologico() tal cual).
-async function rhAnalizarLoteActual() {
+//
+// FIX: con el checkbox "Ir al siguiente al finalizar" tildado, esto debe
+// analizar SIEMPRE de arriba a abajo (lote 1 → último), sin importar en
+// qué lote estuvieras parado al tocar "Analizar" -- antes arrancaba la
+// cadena desde el lote actual (normalmente el último cargado, ya que
+// loadFiles() deja el proyecto posicionado ahí), y como nextLayer() no
+// tiene a dónde avanzar desde el último, la cadena terminaba apenas
+// empezaba: parecía que "arrancaba del último y no de arriba a abajo".
+// Por eso, si esto es el inicio de la cadena (no una llamada recursiva
+// encadenándose a sí misma) y el checkbox está tildado, primero salta al
+// lote 0 antes de analizar nada.
+async function rhAnalizarLoteActual(esInicioDeCadena = true) {
   if (typeof proyectoActual === 'undefined' || !proyectoActual || proyectoActual.files.length === 0) return;
+  if (rhAnalizandoTodo) return; // ya hay una corrida de "Analizar todo" en curso
+
+  const auto = $el('rh-proyecto-autoavanzar');
+  if (esInicioDeCadena && auto && auto.checked && proyectoActual.currentIndex !== 0) {
+    rhNavegandoProyecto = true;
+    try { await proyectoActual.goTo(0); } finally { rhNavegandoProyecto = false; }
+  }
+  const btnTodo = esInicioDeCadena ? $el('rh-btn-analizar-todo') : null;
+  if (btnTodo) btnTodo.disabled = true;
+
   const btn = $el('rh-btn-analizar-lote');
   const htmlOriginal = btn ? btn.innerHTML : null;
   if (btn) {
@@ -10336,7 +10597,6 @@ async function rhAnalizarLoteActual() {
   if (lote) { lote.analizado = true; } // marca visual en la lista, aunque el resultado en sí vive en rhDatosCampo
   rhRenderListaProyectos();
 
-  const auto = $el('rh-proyecto-autoavanzar');
   if (auto && auto.checked && proyectoActual.currentIndex < proyectoActual.files.length - 1) {
     rhNavegandoProyecto = true;
     try {
@@ -10344,11 +10604,49 @@ async function rhAnalizarLoteActual() {
     } finally {
       rhNavegandoProyecto = false;
     }
-    await rhAnalizarLoteActual(); // encadena: analiza también el siguiente lote, y así hasta el final de la lista
+    await rhAnalizarLoteActual(false); // false = ya no es el inicio, no volver a saltar a 0
   }
+  if (btnTodo) btnTodo.disabled = false; // se re-habilita cuando termina toda la cadena (el await de arriba ya resolvió)
 }
 
-// ── Lista buscable de todos los lotes cargados, con salto directo ──
+// ── "Analizar todo" automático: recorre TODOS los lotes del proyecto de
+// arriba a abajo (lote 0 → último), sin importar el estado del checkbox ni
+// en qué lote estés parado ahora. Reutiliza rhAnalizarLoteActual() por
+// dentro, saltando primero al lote 0 igual que arriba. ──
+let rhAnalizandoTodo = false;
+async function rhAnalizarTodosLosLotes() {
+  if (typeof proyectoActual === 'undefined' || !proyectoActual || proyectoActual.files.length === 0) return;
+  if (rhAnalizandoTodo) return;
+  rhAnalizandoTodo = true;
+  const btnTodo = $el('rh-btn-analizar-todo');
+  const htmlOriginal = btnTodo ? btnTodo.innerHTML : null;
+  if (btnTodo) {
+    btnTodo.disabled = true;
+    btnTodo.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px">hourglass_empty</span> Analizando todos…';
+  }
+  const btnUno = $el('rh-btn-analizar-lote');
+  if (btnUno) btnUno.disabled = true;
+
+  rhNavegandoProyecto = true;
+  try { await proyectoActual.goTo(0); } finally { rhNavegandoProyecto = false; }
+
+  for (let i = 0; i < proyectoActual.files.length; i++) {
+    await calcularRiesgoHidrologico();
+    const lote = proyectoActual.loteActual;
+    if (lote) lote.analizado = true;
+    rhRenderListaProyectos();
+    if (i < proyectoActual.files.length - 1) {
+      rhNavegandoProyecto = true;
+      try { await proyectoActual.nextLayer(); } finally { rhNavegandoProyecto = false; }
+    }
+  }
+
+  rhAnalizandoTodo = false;
+  if (btnTodo && htmlOriginal !== null) { btnTodo.disabled = false; btnTodo.innerHTML = htmlOriginal; }
+  if (btnUno) btnUno.disabled = false;
+}
+
+// ── Lista buscable de todos los lotes cargados, con salto directo y arrastre para reordenar ──
 function rhRenderListaProyectos() {
   const cont = $el('rh-lista-items');
   if (!cont || typeof proyectoActual === 'undefined' || !proyectoActual) return;
@@ -10365,17 +10663,30 @@ function rhRenderListaProyectos() {
     return;
   }
 
+  // Nota: el arrastre (⋮⋮) reordena proyectoActual.files directamente, así
+  // que solo tiene sentido mostrarlo sin filtro de búsqueda activo — si no,
+  // arrastrar una fila filtrada movería el lote a una posición equivocada
+  // respecto de los lotes ocultos por el filtro.
+  const conDragHandle = filtro === '';
+
   cont.innerHTML = items.map(({ lote, i }) => {
     const activo = i === proyectoActual.currentIndex;
     const area = (lote.puntos && lote.puntos.length >= 3) ? `${calcularHectareas(lote.puntos).toFixed(1)} ha` : '—';
+    const manija = conDragHandle
+      ? `<span onpointerdown="_loteDragStart(event, ${i}, 'rh-lista-items')" title="Arrastrar para reordenar"
+           style="cursor:grab;touch-action:none;display:flex;align-items:center;padding:0 2px;color:rgba(255,255,255,.5);font-size:14px;user-select:none;-webkit-user-select:none;flex-shrink:0;">⋮⋮</span>`
+      : '';
     return `
-      <button onclick="rhIrALote(${i})" title="${_nombreCortoArchivo(lote.nombre)}"
-        style="display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;
-        padding:6px 8px;border-radius:8px;border:1px solid ${activo ? '#2563eb' : 'rgba(255,255,255,.15)'};
-        background:${activo ? 'rgba(37,99,235,.25)' : 'rgba(255,255,255,.05)'};color:#fff;font-size:11px;cursor:pointer;">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${lote.analizado ? '✓ ' : ''}${_nombreCortoArchivo(lote.nombre)}</span>
-        <span style="flex-shrink:0;color:rgba(255,255,255,.6);">${area}</span>
-      </button>`;
+      <div class="lote-fila" data-idx="${i}" style="display:flex;align-items:center;gap:4px;">
+        ${manija}
+        <button onclick="rhIrALote(${i})" title="${_nombreCortoArchivo(lote.nombre)}"
+          style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex:1;min-width:0;text-align:left;
+          padding:6px 8px;border-radius:8px;border:1px solid ${activo ? '#2563eb' : 'rgba(255,255,255,.15)'};
+          background:${activo ? 'rgba(37,99,235,.25)' : 'rgba(255,255,255,.05)'};color:#fff;font-size:11px;cursor:pointer;">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${lote.analizado ? '✓ ' : ''}${_nombreCortoArchivo(lote.nombre)}</span>
+          <span style="flex-shrink:0;color:rgba(255,255,255,.6);">${area}</span>
+        </button>
+      </div>`;
   }).join('');
 }
 
@@ -11566,11 +11877,42 @@ async function _extraerGeoJSONDeArchivo(archivo) {
 
 const MedicionSuperficie = (() => {
   let modo = null;          // 'poligono' | 'rectangulo'
-  let vertices = [];        // [{lat, lon}]
-  let marcadores = [];      // L.circleMarker[]
-  let lineaEnCurso = null;  // L.polyline (mientras se dibuja)
-  let poligonoFinal = null; // L.polygon (forma cerrada)
+  let vertices = [];        // [{lat, lon}] — SOLO la forma que se está dibujando ahora (sin cerrar)
+  let marcadores = [];      // L.circleMarker[] (mientras se dibuja la forma en curso)
+  let lineaEnCurso = null;  // L.polyline (mientras se dibuja la forma en curso)
   let cerrado = false;
+
+  // MEJORA (a pedido, igual que en la versión PC): antes solo se podía tener
+  // UNA forma medida a la vez — dibujar/importar una nueva borraba la
+  // anterior. Ahora `formas` guarda TODAS las formas cerradas (dibujadas a
+  // mano, importadas o fusionadas) y todas quedan visibles juntas en el
+  // mapa, cada una con su propio color, sus propias asas editables y su
+  // propia hectárea — más una fila de totales.
+  //
+  // Fusión de formas con toque/click + teclado Shift: tocar una forma para
+  // seleccionarla (queda con borde punteado), mantener SHIFT y tocar otra
+  // forma → se fusionan en una sola, mismo nombre, un solo ítem en la lista
+  // y un solo Feature al exportar (GeoJSON/KML). Usa el motor de geometría
+  // real de Turf.js (ya estaba cargado en la app) para la unión — si las
+  // formas se tocan/superponen da un polígono simple; si están separadas
+  // (ej. 2 zonas de anegamiento sin tocarse) el resultado es "multi-parte":
+  // se dibujan como partes separadas en el mapa pero son UNA sola forma/archivo.
+  //
+  // Por eso cada forma ahora es: { id, anillos: [ [{lat,lon},...], ... ],
+  // capas: [L.polygon, ...] (una capa por anillo), asas, nombre, has, km2,
+  // m2, perimKm, _color }. anillos.length === 1 en el caso normal (una forma
+  // dibujada a mano); > 1 solo cuando es el resultado de fusionar formas que
+  // no se tocan entre sí.
+  let formas = [];
+  let contadorFormas = 0;
+  let idAncla = null; // id de la forma seleccionada (borde punteado), esperando un SHIFT+click en otra para fusionar
+  const COLORES_FORMAS = ['#7c3aed', '#0ea5e9', '#f59e0b', '#ec4899', '#22c55e', '#ef4444', '#14b8a6', '#a855f7'];
+
+  const iconoAsa = L.divIcon({
+    className: 'medsup-asa-vertice',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
 
   function setProgreso(txt) { const el = $el('medsup-progreso'); if (el) el.textContent = txt || ''; }
   function setInstruccion(txt) { const el = $el('medsup-instruccion'); if (el) el.textContent = txt || ''; }
@@ -11583,29 +11925,256 @@ const MedicionSuperficie = (() => {
     });
   }
 
+  // Limpia SOLO lo que pertenece a la forma en curso (marcadores + línea
+  // punteada mientras se dibuja) — las formas ya cerradas (`formas`) no se
+  // tocan acá, así conviven varias en el mapa al mismo tiempo.
   function limpiarCapasMapa() {
     if (!mapa) return;
     marcadores.forEach(m => mapa.removeLayer(m));
     marcadores = [];
     if (lineaEnCurso) { mapa.removeLayer(lineaEnCurso); lineaEnCurso = null; }
-    if (poligonoFinal) { mapa.removeLayer(poligonoFinal); poligonoFinal = null; }
   }
 
+  /** Suma hectáreas y perímetro de todos los anillos de una forma (una forma multi-parte es la suma simple de sus partes). */
+  function haYPerimDeAnillos(anillos) {
+    let has = 0, perimKm = 0;
+    anillos.forEach(ring => { has += calcularHectareas(ring); perimKm += calcularPerimetroKm(ring); });
+    return { has, perimKm };
+  }
+
+  // Recalcula hectáreas/km²/m²/perímetro de UNA forma (sumando todos sus
+  // anillos) y redibuja sus polígonos en el mapa. Se usa tanto al cerrarla
+  // como cada vez que se arrastra una de sus asas.
+  function actualizarForma(forma) {
+    forma.capas.forEach((capa, i) => capa.setLatLngs(forma.anillos[i].map(p => [p.lat, p.lon])));
+    const { has, perimKm } = haYPerimDeAnillos(forma.anillos);
+    forma.has = has; forma.km2 = has / 100; forma.m2 = has * 10000; forma.perimKm = perimKm;
+    renderListaFormas();
+  }
+
+  // Crea, para cada vértice de cada anillo de una forma ya cerrada, un asa
+  // (L.marker arrastrable) que permite reubicarlo a mano. Al soltar, se
+  // recalcula esa forma puntual (las demás no se tocan).
+  function crearAsasEditables(forma) {
+    forma.asas.forEach(a => mapa.removeLayer(a));
+    forma.asas = [];
+    forma.anillos.forEach((ring, ri) => {
+      ring.forEach((v, vi) => {
+        const asa = L.marker([v.lat, v.lon], { icon: iconoAsa, draggable: true }).addTo(mapa);
+        asa.on('drag', (e) => {
+          const { lat, lng: lon } = e.target.getLatLng();
+          forma.anillos[ri][vi] = { lat, lon };
+          actualizarForma(forma);
+        });
+        forma.asas.push(asa);
+      });
+    });
+  }
+
+  function estiloNormal(forma) {
+    forma.capas.forEach(c => c.setStyle({ color: forma._color, weight: 2.5, fillColor: forma._color, fillOpacity: 0.18, dashArray: null }));
+  }
+  function estiloSeleccionada(forma) {
+    forma.capas.forEach(c => c.setStyle({ weight: 4, dashArray: '8,6' }));
+  }
+  function deseleccionarAncla() {
+    if (idAncla === null) return;
+    const anterior = formas.find(f => f.id === idAncla);
+    if (anterior) estiloNormal(anterior);
+    idAncla = null;
+    setProgreso('');
+  }
+  // Escape cancela la selección en curso (para fusionar) en cualquier momento.
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && idAncla !== null) deseleccionarAncla(); });
+
+  // Click sobre una forma en el mapa: sin SHIFT selecciona/deselecciona esa
+  // forma como "ancla" (borde punteado); con SHIFT y ya habiendo una ancla
+  // seleccionada, fusiona la ancla con la forma recién clickeada.
+  function alClickForma(forma, evtOriginal) {
+    if (modo !== null) return; // mientras se está dibujando una forma nueva, el click es para eso, no para seleccionar
+    const conShift = !!(evtOriginal && evtOriginal.shiftKey);
+    if (conShift && idAncla !== null && idAncla !== forma.id) {
+      fusionarFormas(idAncla, forma.id);
+      return;
+    }
+    if (idAncla === forma.id) { deseleccionarAncla(); return; }
+    if (idAncla !== null) {
+      const anterior = formas.find(f => f.id === idAncla);
+      if (anterior) estiloNormal(anterior);
+    }
+    idAncla = forma.id;
+    estiloSeleccionada(forma);
+    setProgreso('🔗 Forma seleccionada — mantené SHIFT y tocá otra forma para fusionarla con esta (Esc para cancelar).');
+  }
+
+  // Crea las capas de una forma (una L.polygon por anillo) y les conecta el
+  // click de selección/fusión. Se usa tanto al cerrar un trazo nuevo como
+  // al terminar una fusión.
+  function crearFormaEnMapa(idx, anillos, color, nombre) {
+    const capas = anillos.map(ring => L.polygon(ring.map(p => [p.lat, p.lon]), {
+      color, weight: 2.5, fillColor: color, fillOpacity: 0.18,
+    }).addTo(mapa));
+    const forma = { id: idx, anillos, capas, asas: [], nombre, _color: color };
+    capas.forEach(capa => capa.on('click', (e) => {
+      L.DomEvent.stopPropagation(e); // que el click en la forma no se propague al mapa y la deseleccione en el mismo tap
+      alClickForma(forma, e.originalEvent);
+    }));
+    return forma;
+  }
+
+  // Dibuja/actualiza la lista de formas en el panel, con nombre editable,
+  // hectáreas y botón para borrar esa forma puntual — y la fila de totales.
+  function renderListaFormas() {
+    const cont = $el('medsup-lista-formas');
+    if (cont) {
+      cont.innerHTML = formas.map(f => `
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.08)">
+          <span style="width:10px;height:10px;border-radius:3px;background:${f._color};flex-shrink:0"></span>
+          <input value="${(f.nombre || '').replace(/"/g, '&quot;')}" maxlength="60" oninput="MedicionSuperficie.renombrarForma(${f.id}, this.value)"
+                 style="flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:3px 6px;color:#fff;font-size:10.5px"/>
+          <span style="font-size:10.5px;color:#fff;white-space:nowrap">${(f.has || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} ha${f.anillos.length > 1 ? ` (${f.anillos.length} partes)` : ''}</span>
+          <button onclick="MedicionSuperficie.eliminarForma(${f.id})" title="Eliminar esta forma"
+                  style="background:none;border:none;color:#f87171;cursor:pointer;font-size:13px;padding:2px 4px;line-height:1">✕</button>
+        </div>`).join('');
+    }
+    const totalHa = formas.reduce((s, f) => s + (f.has || 0), 0);
+    setText('medsup-total-cant', formas.length);
+    setText('medsup-total-ha', totalHa.toLocaleString('es-AR', { maximumFractionDigits: 1 }));
+    setText('medsup-total-km2', (totalHa / 100).toLocaleString('es-AR', { maximumFractionDigits: 2 }));
+    const res = $el('medsup-resultados');
+    if (res) res.style.display = formas.length ? 'block' : 'none';
+  }
+
+  function renombrarForma(id, nombre) {
+    const f = formas.find(x => x.id === id);
+    if (f) f.nombre = nombre;
+  }
+
+  function eliminarForma(id) {
+    const idx = formas.findIndex(f => f.id === id);
+    if (idx === -1) return;
+    const f = formas[idx];
+    f.capas.forEach(c => mapa.removeLayer(c));
+    f.asas.forEach(a => mapa.removeLayer(a));
+    if (idAncla === id) idAncla = null;
+    formas.splice(idx, 1);
+    renderListaFormas();
+  }
+
+  // Convierte el anillo interno [{lat,lon},...] al formato [lon,lat] que
+  // exige GeoJSON, cerrando el anillo (primer punto == último) si hiciera
+  // falta — Leaflet no guarda el punto de cierre duplicado, pero GeoJSON sí
+  // lo requiere. La usan tanto la exportación como la fusión con Turf.js.
+  function _coordsAnilloCerrado(ring) {
+    const coords = ring.map(p => [p.lon, p.lat]);
+    const primero = coords[0], ultimo = coords[coords.length - 1];
+    if (!ultimo || primero[0] !== ultimo[0] || primero[1] !== ultimo[1]) coords.push(primero);
+    return coords;
+  }
+
+  /** Arma un Feature (Polygon o MultiPolygon según tenga 1 o varios anillos) a partir de una forma — para pasarle a turf.union(). */
+  function _formaAFeatureTurf(forma) {
+    if (forma.anillos.length === 1) {
+      return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [_coordsAnilloCerrado(forma.anillos[0])] } };
+    }
+    return { type: 'Feature', properties: {}, geometry: { type: 'MultiPolygon', coordinates: forma.anillos.map(ring => [_coordsAnilloCerrado(ring)]) } };
+  }
+
+  /** Extrae los anillos EXTERIORES (se ignoran huecos, no aplica a formas de campo típicas) de una geometría GeoJSON Polygon/MultiPolygon, como listas de {lat,lon}. */
+  function _geometriaAAnillos(geom) {
+    const anillos = [];
+    if (!geom) return anillos;
+    if (geom.type === 'Polygon') anillos.push(geom.coordinates[0]);
+    else if (geom.type === 'MultiPolygon') geom.coordinates.forEach(poly => anillos.push(poly[0]));
+    return anillos.filter(a => a && a.length >= 3).map(anillo => anillo.map(([lon, lat]) => ({ lat, lon })));
+  }
+
+  // Fusiona 2 formas en una sola, usando la unión geométrica real de
+  // Turf.js. Si las formas se tocan o se superponen, el resultado es un
+  // polígono simple (un solo anillo); si están separadas (ej. 2 zonas de
+  // riesgo sin tocarse), el resultado queda "multi-parte": se ven como
+  // formas separadas en el mapa, pero cuentan como UNA sola forma — mismo
+  // nombre, un solo ítem en la lista, un solo Feature al exportar.
+  function fusionarFormas(idA, idB) {
+    const a = formas.find(f => f.id === idA);
+    const b = formas.find(f => f.id === idB);
+    if (!a || !b) return;
+    if (typeof turf === 'undefined' || typeof turf.union !== 'function') {
+      alert('No se pudo cargar la librería de geometría (Turf.js) para fusionar formas — revisá tu conexión a internet.');
+      return;
+    }
+    let unido;
+    try {
+      unido = turf.union(_formaAFeatureTurf(a), _formaAFeatureTurf(b));
+    } catch (err) {
+      alert('No se pudieron fusionar esas 2 formas: ' + (err.message || err));
+      return;
+    }
+    const nuevosAnillos = unido ? _geometriaAAnillos(unido.geometry) : [];
+    if (!nuevosAnillos.length) { alert('No se pudieron fusionar esas 2 formas.'); return; }
+
+    [a, b].forEach(f => {
+      f.capas.forEach(c => mapa.removeLayer(c));
+      f.asas.forEach(m => mapa.removeLayer(m));
+    });
+    formas = formas.filter(f => f.id !== idA && f.id !== idB);
+
+    // La forma fusionada hereda el nombre de la que ya tenía uno propio (si
+    // el usuario había renombrado alguna); si ninguna fue renombrada, usa
+    // el de la "ancla" (la primera que se había clickeado).
+    const tieneNombrePropio = f => f.nombre && !/^Forma \d+$/.test(f.nombre);
+    const nombreFusion = tieneNombrePropio(a) ? a.nombre : (tieneNombrePropio(b) ? b.nombre : a.nombre);
+
+    const idx = ++contadorFormas;
+    const forma = crearFormaEnMapa(idx, nuevosAnillos, a._color, nombreFusion);
+    formas.push(forma);
+    actualizarForma(forma);
+    crearAsasEditables(forma);
+
+    idAncla = null;
+    const nota = nuevosAnillos.length > 1 ? ' (quedan dibujadas por separado, pero son UNA sola forma/archivo)' : '';
+    setInstruccion(`🔗 Se fusionaron 2 formas en "${forma.nombre}"${nota}. Quedan ${formas.length} forma(s) en total.`);
+    setProgreso('');
+    renderListaFormas();
+  }
+
+  // Cancela SOLO el trazo en curso (si se estaba dibujando algo a medio
+  // terminar) — las formas ya cerradas quedan en el mapa. Es lo que se usa
+  // internamente antes de empezar una forma nueva, y lo que llaman las
+  // demás herramientas de click (Aptitud/Inspector/IIPDI) para su
+  // exclusión mutua, sin borrar formas ya medidas.
   function limpiar() {
     if (mapa) mapa.off('click', onClickMapa);
+    // FIX: al terminar/cancelar el trazo, se restaura el clic normal de
+    // los polígonos con popup ("Mi campo", buffer, lotes del proyecto, etc.)
+    // que se había desactivado en iniciar() para poder dibujar.
+    if (typeof _setPoligonosClicables === 'function') _setPoligonosClicables(mapa, true);
     limpiarCapasMapa();
     modo = null; vertices = []; cerrado = false;
     marcarBotonActivo(null);
     setInstruccion('');
     setProgreso('');
     $el('medsup-btn-finalizar').style.display = 'none';
-    $el('medsup-resultados').style.display = 'none';
-    const inputNombre = $el('medsup-nombre-archivo');
-    if (inputNombre) inputNombre.value = '';
+  }
+
+  // Esto es lo que dispara el botón "🗑 Limpiar todo": borra el trazo en
+  // curso Y TODAS las formas ya cerradas — vuelve el panel a cero.
+  function limpiarTodo() {
+    limpiar();
+    formas.forEach(f => {
+      f.capas.forEach(c => mapa.removeLayer(c));
+      f.asas.forEach(a => mapa.removeLayer(a));
+    });
+    formas = [];
+    idAncla = null;
+    renderListaFormas();
+    const nombreInput = $el('medsup-nombre');
+    if (nombreInput) nombreInput.value = '';
   }
 
   function iniciar(nuevoModo) {
-    limpiar();
+    limpiar(); // solo cancela el trazo en curso — las formas ya cerradas quedan en el mapa
+    deseleccionarAncla(); // no queda una selección de fusión "colgada" mientras se dibuja una forma nueva
     // Exclusión mutua: si el Inspector de Riesgo Hidrológico (u otra
     // herramienta de click) estaba activo, se apaga acá — así un click
     // sobre el mapa solo lo procesa la Regla, no las dos a la vez.
@@ -11629,6 +12198,10 @@ const MedicionSuperficie = (() => {
       ? 'Hacé clic en el mapa para marcar cada vértice. Cuando tengas al menos 3, tocá "✅ Finalizar".'
       : 'Hacé clic en dos esquinas opuestas del rectángulo.');
     if (mapa) mapa.on('click', onClickMapa);
+    // FIX: mientras se dibuja (clic a clic) "Mi campo", su buffer, los
+    // lotes del proyecto y demás polígonos con popup dejan pasar el clic
+    // al mapa, en vez de abrir su popup y "comerse" el clic.
+    if (typeof _setPoligonosClicables === 'function') _setPoligonosClicables(mapa, false);
   }
 
   function agregarMarcador(lat, lon) {
@@ -11669,109 +12242,121 @@ const MedicionSuperficie = (() => {
     if (modo === 'poligono' && vertices.length >= 3) cerrarForma();
   }
 
+  // Cierra la forma en curso y la AGREGA a `formas` (no reemplaza a las
+  // anteriores). Devuelve la forma recién creada.
   function cerrarForma() {
     cerrado = true;
     if (mapa) mapa.off('click', onClickMapa);
-    limpiarCapasMapa();
-    poligonoFinal = L.polygon(vertices.map(p => [p.lat, p.lon]), {
-      color: '#7c3aed', weight: 2.5, fillColor: '#7c3aed', fillOpacity: 0.15,
-    }).addTo(mapa);
-    mapa.fitBounds(poligonoFinal.getBounds(), { padding: [40, 40] });
+    // FIX: la forma ya quedó cerrada — se restaura el clic normal de
+    // "Mi campo" y demás polígonos con popup (dejaron de "pasar de largo"
+    // el clic, ya no hace falta mientras no se esté dibujando).
+    if (typeof _setPoligonosClicables === 'function') _setPoligonosClicables(mapa, true);
+    limpiarCapasMapa(); // solo saca los marcadores/línea punteada del trazo en curso
 
-    const has = calcularHectareas(vertices);
-    const km2 = has / 100;
-    const m2  = has * 10000;
-    const perimKm = calcularPerimetroKm(vertices);
+    const idx = ++contadorFormas;
+    const color = COLORES_FORMAS[(idx - 1) % COLORES_FORMAS.length];
+    const forma = crearFormaEnMapa(idx, [vertices.slice()], color, `Forma ${idx}`);
+    formas.push(forma);
+    crearAsasEditables(forma);
+    actualizarForma(forma);
 
-    setText('medsup-ha', has.toLocaleString('es-AR', { maximumFractionDigits: 1 }));
-    setText('medsup-km2', km2.toLocaleString('es-AR', { maximumFractionDigits: 2 }));
-    setText('medsup-m2', Math.round(m2).toLocaleString('es-AR'));
-    setText('medsup-perim', perimKm < 1 ? `${Math.round(perimKm * 1000)} m` : `${perimKm.toFixed(2)} km`);
+    // Encuadra TODAS las formas juntas (no solo la recién cerrada), así se
+    // ven las 2/3/20 formas a la vez.
+    const grupo = L.featureGroup(formas.flatMap(f => f.capas));
+    mapa.fitBounds(grupo.getBounds(), { padding: [40, 40] });
 
+    vertices = []; modo = null; cerrado = false;
+    marcarBotonActivo(null);
     $el('medsup-btn-finalizar').style.display = 'none';
-    $el('medsup-resultados').style.display = 'block';
-    setInstruccion('Forma cerrada. Podés limpiar para dibujar otra.');
+    setInstruccion(`Forma #${idx} agregada (van ${formas.length}). Tocá "Polígono" o "Rectángulo" para agregar otra, click+SHIFT+click sobre 2 formas para fusionarlas, arrastrá los puntos violeta para ajustar cualquiera, o "🗑 Limpiar todo" para borrar todas.`);
+    renderListaFormas();
+    return forma;
   }
 
-  // Exporta la forma cerrada actual (dibujada o importada) a GeoJSON/KML.
-  // Reutiliza _descargarTexto/tokml, ya definidos más abajo en el archivo
-  // (son 'function' declarations -> hoisted, no importa el orden real).
+  // Exporta TODAS las formas cerradas (dibujadas, importadas y/o
+  // fusionadas) juntas, como una FeatureCollection con una Feature por
+  // forma — cada una con su nombre y hectáreas en las propiedades. Una
+  // forma fusionada "multi-parte" exporta como un único Feature MultiPolygon
+  // (no como 2 Features separados).
   function exportar(formato) {
-    if (!poligonoFinal) {
-      alert('Todavía no hay una forma cerrada para exportar. Dibujá un polígono/rectángulo, o importá un KML/GeoJSON primero.');
+    if (formas.length === 0) {
+      alert('Todavía no hay ninguna forma cerrada para exportar. Dibujá un polígono/rectángulo, o importá un KML/GeoJSON primero.');
       return;
     }
-    const geojson = poligonoFinal.toGeoJSON();
-    const nombreBase = _nombreArchivoMedSup();
+    const nombreInput = $el('medsup-nombre');
+    const nombreCrudo = nombreInput ? nombreInput.value.trim() : '';
+    const nombreArchivo = nombreCrudo
+      ? nombreCrudo.normalize('NFD').replace(/[\u0300-\u036f]/g, '') // saca tildes
+          .replace(/[^a-zA-Z0-9 _-]/g, '') // saca caracteres raros
+          .trim().replace(/\s+/g, '_') || 'medicion_superficie'
+      : 'medicion_superficie';
+
+    const featureCollection = {
+      type: 'FeatureCollection',
+      features: formas.map(f => ({
+        type: 'Feature',
+        properties: { name: f.nombre || `Forma ${f.id}`, hectareas: Math.round((f.has || 0) * 10) / 10 },
+        geometry: f.anillos.length === 1
+          ? { type: 'Polygon', coordinates: [_coordsAnilloCerrado(f.anillos[0])] }
+          : { type: 'MultiPolygon', coordinates: f.anillos.map(ring => [_coordsAnilloCerrado(ring)]) },
+      })),
+    };
+
     if (formato === 'geojson') {
-      _descargarTexto(`${nombreBase}.geojson`, JSON.stringify(geojson, null, 2), 'application/geo+json');
+      _descargarTexto(`${nombreArchivo}.geojson`, JSON.stringify(featureCollection, null, 2), 'application/geo+json');
     } else {
       if (typeof tokml === 'undefined') { alert('No se pudo cargar el conversor a KML (revisá tu conexión a internet).'); return; }
-      _descargarTexto(`${nombreBase}.kml`, tokml(geojson), 'application/vnd.google-earth.kml+xml');
+      _descargarTexto(`${nombreArchivo}.kml`, tokml(featureCollection), 'application/vnd.google-earth.kml+xml');
     }
   }
 
-  // Toma lo escrito en el campo "Nombre del archivo" (ej: "Primer lote a
-  // observar") y lo convierte en un nombre de archivo válido: saca tildes,
-  // saca caracteres no permitidos en nombres de archivo (Windows incluido) y
-  // cambia los espacios por guiones bajos. Si lo dejó vacío, usa el nombre
-  // por defecto de siempre.
-  function _nombreArchivoMedSup() {
-    const input = $el('medsup-nombre-archivo');
-    const crudo = (input?.value || '').trim();
-    if (!crudo) return 'medicion_superficie';
-    const limpio = crudo
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[\\/:*?"<>|]/g, '')
-      .trim()
-      .replace(/\s+/g, '_')
-      .slice(0, 80);
-    return limpio || 'medicion_superficie';
-  }
-
-  // Toma el primer polígono que encuentre dentro de un GeoJSON (Feature,
-  // FeatureCollection o Geometry suelta) y lo devuelve como [{lat,lon}, ...]
-  // -- incluye Polygon y MultiPolygon (en ese caso, el primer polígono del
-  // grupo). Si el archivo trae varias formas, solo se usa la primera: esta
-  // herramienta mide UNA superficie por vez, igual que dibujándola a mano.
-  function _primerPoligonoComoVertices(geojson) {
-    function anilloDeGeometria(geom) {
-      if (!geom) return null;
-      if (geom.type === 'Polygon') return geom.coordinates[0];
-      if (geom.type === 'MultiPolygon') return geom.coordinates[0][0];
-      return null;
+  // Extrae TODOS los polígonos que encuentre dentro de un GeoJSON (Feature,
+  // FeatureCollection, Geometry suelta, GeometryCollection) como una lista
+  // de [{lat,lon}, ...] -- incluye Polygon y cada parte de un MultiPolygon.
+  // Si el KML/GeoJSON trae varias formas (ej. 20 lotes), se agregan todas.
+  function _todosLosPoligonosComoVertices(geojson) {
+    const anillos = [];
+    function extraerDeGeometria(geom) {
+      if (!geom) return;
+      if (geom.type === 'Polygon') anillos.push(geom.coordinates[0]);
+      else if (geom.type === 'MultiPolygon') geom.coordinates.forEach(poly => anillos.push(poly[0]));
+      else if (geom.type === 'GeometryCollection') (geom.geometries || []).forEach(extraerDeGeometria);
     }
     let feats;
     if (geojson.type === 'FeatureCollection') feats = geojson.features || [];
     else if (geojson.type === 'Feature') feats = [geojson];
     else feats = [{ geometry: geojson }];
-    for (const f of feats) {
-      const anillo = anilloDeGeometria(f.geometry);
-      if (anillo && anillo.length >= 3) {
-        return anillo.map(([lon, lat]) => ({ lat, lon }));
-      }
-    }
-    return null;
+    feats.forEach(f => extraerDeGeometria(f.geometry));
+    return anillos.filter(a => a && a.length >= 3).map(anillo => anillo.map(([lon, lat]) => ({ lat, lon })));
   }
 
-  // Importa un .kml/.kmz/.geojson/.json y lo muestra como si se hubiera
-  // dibujado a mano: calcula hectáreas/km²/m²/perímetro igual que
-  // cerrarForma(). Reutiliza _extraerGeoJSONDeArchivo (mismo parser que
-  // usa el panel "Cargar o exportar capas" del mapa satelital).
+  // Importa un .kml/.kmz/.geojson/.json: cada polígono que traiga el
+  // archivo se agrega como una forma más (no reemplaza a las que ya había
+  // en el mapa). Reutiliza _extraerGeoJSONDeArchivo (mismo parser que usa
+  // el panel "Cargar o exportar capas" del mapa satelital).
   async function importarArchivo(event) {
     const archivo = event.target.files && event.target.files[0];
     event.target.value = ''; // permite volver a elegir el mismo archivo después
     if (!archivo) return;
     try {
       const geojson = await _extraerGeoJSONDeArchivo(archivo);
-      const nuevosVertices = _primerPoligonoComoVertices(geojson);
-      if (!nuevosVertices) {
+      const listasVertices = _todosLosPoligonosComoVertices(geojson);
+      if (!listasVertices.length) {
         alert('El archivo no contiene ningún polígono. Usá un .kml/.kmz/.geojson con al menos una forma cerrada.');
         return;
       }
-      limpiar();
-      vertices = nuevosVertices;
-      cerrarForma();
+      const nombreBase = archivo.name.replace(/\.(kml|kmz|geojson|json)$/i, '');
+      listasVertices.forEach((verts, i) => {
+        vertices = verts;
+        const forma = cerrarForma();
+        forma.nombre = listasVertices.length > 1 ? `${nombreBase} ${i + 1}` : nombreBase;
+      });
+      renderListaFormas();
+      // Precarga el nombre con el del archivo importado (sin extensión),
+      // como punto de partida — el usuario lo puede editar antes de exportar.
+      const nombreInput = $el('medsup-nombre');
+      if (nombreInput) nombreInput.value = nombreBase;
+      setProgreso(listasVertices.length > 1 ? `✅ Se importaron ${listasVertices.length} formas.` : '');
     } catch (err) {
       alert('No se pudo importar el archivo: ' + err.message);
     }
@@ -11789,25 +12374,39 @@ const MedicionSuperficie = (() => {
     if (planifPanel && planifPanel.style.display === 'block') planifPanel.style.display = 'none';
     const p = $el('medsup-panel');
     if (p) p.style.display = 'block';
+    renderListaFormas();
   }
   function cerrarPanel() {
-    // Antes esto llamaba a limpiar() y borraba del mapa la forma recién
-    // dibujada/importada apenas se cerraba el panel (con la ✕ o al abrir
-    // otra herramienta). Ahora la forma queda fija en el mapa: solo se
-    // oculta el panel. Para borrarla de verdad está el botón "🗑 Limpiar".
+    // La(s) forma(s) quedan fijas en el mapa: solo se oculta el panel. Para
+    // borrarlas de verdad está el botón "🗑 Limpiar todo".
     const p = $el('medsup-panel');
     if (p) p.style.display = 'none';
   }
 
-  // Devuelve los vértices de la forma YA CERRADA (dibujada a mano o
-  // importada de un KML/GeoJSON), o null si todavía no hay ninguna forma
-  // cerrada. Lo usa calcularRiesgoHidrologico() como fuente alternativa
-  // de área cuando no hay un campo delimitado con "Mi Campo".
+  // Devuelve los vértices de la forma cerrada MÁS RECIENTE (la última
+  // dibujada, importada, editada o fusionada), o null si todavía no hay
+  // ninguna. Lo usa calcularRiesgoHidrologico() como fuente alternativa de
+  // área cuando no hay un campo delimitado con "Mi Campo". Si esa forma es
+  // "multi-parte" (fusión de formas que no se tocan), no hay un único límite
+  // de "campo" posible — se toma el anillo más grande como aproximación,
+  // ya que el riesgo hidrológico evalúa un solo polígono por vez.
   function getVertices() {
-    return cerrado && vertices.length >= 3 ? vertices : null;
+    if (formas.length === 0) return null;
+    const ultima = formas[formas.length - 1];
+    if (ultima.anillos.length === 1) return ultima.anillos[0];
+    let mayor = ultima.anillos[0], mayorHa = calcularHectareas(mayor);
+    ultima.anillos.forEach(ring => {
+      const ha = calcularHectareas(ring);
+      if (ha > mayorHa) { mayor = ring; mayorHa = ha; }
+    });
+    return mayor;
   }
 
-  return { iniciar, finalizarPoligono, limpiar, abrirPanel, cerrarPanel, exportar, importarArchivo, getVertices };
+  return {
+    iniciar, finalizarPoligono, limpiar, limpiarTodo, abrirPanel, cerrarPanel,
+    exportar, importarArchivo, getVertices, renombrarForma, eliminarForma,
+    estaActivo: () => modo !== null && !cerrado,
+  };
 })();
 
 
@@ -11848,6 +12447,25 @@ async function interpretarModuloIA(modulo, datos, _esReintento = false) {
   }
 }
 
+// jsPDF con la fuente Helvetica base (sin fuentes propias embebidas) no sabe
+// dibujar emojis — cada uno sale como bytes sueltos (mojibake tipo "Ø=ÜÍ"),
+// y además rompe el cálculo de ancho de línea de doc.splitTextToSize(),
+// haciendo que el texto se corte o se superponga (parece "cambiar de
+// fuente" a mitad de un párrafo). Se limpia antes de mandar cualquier texto
+// a doc.text()/autoTable, reemplazando el tilde (✓) por un guion legible y
+// sacando el resto. Función global: la usan generarInformeSesionPDF() y
+// generarInformeTecnicoPDF() por igual.
+function _limpiarEmojiPDF(txt) {
+  if (txt === null || txt === undefined) return txt;
+  return String(txt)
+    .replace(/[✓✔]/g, '-')
+    .replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\uFE0F\u200D]/gu, '')
+    .replace(/\(\s*\)/g, '')          // paréntesis vacíos que quedan al sacar un emoji/símbolo de adentro
+    .replace(/\s+([,.;:])/g, '$1')    // espacio colgante antes de coma/punto
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
 async function generarInformeSesionPDF() {
   const btn = $el('btn-informe-sesion');
   const original = btn ? btn.textContent : null;
@@ -11885,20 +12503,7 @@ async function generarInformeSesionPDF() {
     const grisTexto   = [66, 72, 65];
     const grisClaro   = [114, 121, 113];
 
-    // jsPDF con la fuente Helvetica base (sin fuentes propias embebidas) no
-    // sabe dibujar emojis — cada uno sale como bytes sueltos (mojibake tipo
-    // "Ø=ÜÍ"). Se limpian antes de mandar cualquier texto a doc.text()/autoTable,
-    // reemplazando el tilde (✓) por un guion legible y sacando el resto.
-    function _limpiarEmojiPDF(txt) {
-      if (txt === null || txt === undefined) return txt;
-      return String(txt)
-        .replace(/[✓✔]/g, '-')
-        .replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\uFE0F\u200D]/gu, '')
-        .replace(/\(\s*\)/g, '')          // paréntesis vacíos que quedan al sacar un emoji/símbolo de adentro
-        .replace(/\s+([,.;:])/g, '$1')    // espacio colgante antes de coma/punto
-        .replace(/[ \t]{2,}/g, ' ')
-        .trim();
-    }
+    // (usa la función global _limpiarEmojiPDF definida más arriba)
 
     function salto(min) { if (y + min > 280) { doc.addPage(); y = 18; } }
     function titulo(txt, size, color, gap) {
@@ -14092,6 +14697,23 @@ function dibujarCampoEnMapa(puntos) {
     $el('mapa-campo-nombre').textContent = campoGuardado?.nombre || 'Mi campo';
     $el('mapa-campo-has').textContent    = (campoGuardado?.has || '--') + ' ha';
   }
+
+  // FIX: si el medidor, la capa de aptitud, el Inspector de Riesgo
+  // Hidrológico o el Inspector de Suelos ya estaban activos cuando se dibuja
+  // este campo, el polígono recién creado nace "clicable" (roba el clic) —
+  // se deja sin clic también, igual que los que ya estaban en el mapa.
+  if (typeof _medidorMapa !== 'undefined' && _medidorMapa.estaActivo()) {
+    _setPoligonosClicables(mapa, false);
+  }
+  if (typeof _aptitudCapaActiva !== 'undefined' && _aptitudCapaActiva) {
+    _setPoligonosClicables(mapa, false);
+  }
+  if (typeof IIPDIInspector !== 'undefined' && IIPDIInspector.estaActivo()) {
+    _setPoligonosClicables(mapa, false);
+  }
+  if (typeof _inspectorSuelosActivo !== 'undefined' && _inspectorSuelosActivo) {
+    _setPoligonosClicables(mapa, false);
+  }
 }
 
 // ── Actualizar focos dentro del campo y buffer ──
@@ -15397,8 +16019,112 @@ async function actualizarRiesgoInundacion() {
   obtenerIIPDIParaMonitor(gpsLat, gpsLon);
 }
 
+// ── TOUR GUIADO — CARRUSEL DE PASOS ──────────────
+// No existía en la versión Android (solo en la de PC). Se arma con pasos
+// propios de esta versión: iconos en vez de capturas de pantalla, para no
+// mostrar imágenes de una interfaz distinta a la que el usuario tiene enfrente.
+const TOUR_STEPS = [
+  {
+    icon: '🔥',
+    titulo: 'Focos de incendio en tiempo real',
+    texto: 'GeoSentinel muestra los focos activos detectados por los satélites NASA FIRMS (S-NPP · NOAA-20 · NOAA-21), con distancia, dirección y velocidad de propagación estimada.'
+  },
+  {
+    icon: '🧭',
+    titulo: 'Detalle y navegación entre focos',
+    texto: 'Tocá un foco para ver su ficha completa: viento, temperatura, humedad, nivel de riesgo y cono de propagación. Si hay varios focos activos, usá las flechas ‹ › del panel para pasar de uno a otro.'
+  },
+  {
+    icon: '🌊',
+    titulo: 'Riesgo de Inundación',
+    texto: 'Analiza relieve (HAND, TWI), lluvias acumuladas y humedad del suelo para estimar la probabilidad de anegamiento en tu campo o en cualquier punto del mapa.'
+  },
+  {
+    icon: '🌾',
+    titulo: 'Aptitud Productiva del Suelo',
+    texto: 'Activá la capa de aptitud del suelo (🌾) para ver de un vistazo qué tan apta es cada zona, o usá la consulta puntual para tocar el mapa y ver el detalle de un punto exacto.'
+  },
+  {
+    icon: '🌱',
+    titulo: 'Inspector de Suelos INTA',
+    texto: 'Tocá el botón 🌱 y después un punto del mapa para consultar los datos de suelo INTA de esa ubicación: serie, capacidad de uso, textura y más.'
+  },
+  {
+    icon: '📐',
+    titulo: 'Medición de superficie',
+    texto: 'Dibujá polígonos o rectángulos sobre el mapa para medir hectáreas, combinar varias formas con Shift+clic, y exportarlas como KML o GeoJSON.'
+  },
+  {
+    icon: '📁',
+    titulo: 'Proyectos y lotes',
+    texto: 'Cargá un KML/GeoJSON con uno o varios lotes desde "Proyecto" para analizarlos todos juntos: incendios, inundación y aptitud del suelo por cada lote.'
+  },
+  {
+    icon: '🛰️',
+    titulo: 'Capas satelitales',
+    texto: 'Desde el mapa satelital podés activar capas de Google Earth Engine (humedad, vegetación, elevación) y consultar todo el historial de análisis guardado de tu campo.'
+  },
+];
+let tourPasoActual = 0;
+
+function iniciarTour(forzado) {
+  if (!forzado && localStorage.getItem('geosentinel_tour_completed') === 'true') return;
+  tourPasoActual = 0;
+  const _tourOv = $el('tour-overlay'); if (_tourOv) _tourOv.style.display = 'flex';
+  mostrarPasoTour(0);
+}
+
+function mostrarPasoTour(i) {
+  const paso = TOUR_STEPS[i];
+  if (!paso) { cerrarTour(true); return; }
+
+  const _ticon = $el('tour-icon'); if (_ticon) _ticon.textContent = paso.icon;
+  const _tt   = $el('tour-titulo'); if (_tt) _tt.textContent = paso.titulo;
+  const _ttx  = $el('tour-texto'); if (_ttx) _ttx.textContent = paso.texto;
+  const _tp   = $el('tour-progreso'); if (_tp) _tp.textContent = `${i + 1} / ${TOUR_STEPS.length}`;
+  const _tbe  = $el('tour-btn-entendido'); if (_tbe) _tbe.textContent = (i === TOUR_STEPS.length - 1) ? 'Finalizar' : 'Siguiente';
+
+  const _prev = $el('tour-btn-prev'); if (_prev) _prev.disabled = (i === 0);
+  const _next = $el('tour-btn-next'); if (_next) _next.disabled = (i === TOUR_STEPS.length - 1);
+
+  const dotsEl = $el('tour-dots');
+  if (dotsEl) {
+    dotsEl.innerHTML = TOUR_STEPS.map((_, idx) =>
+      `<span class="${idx === i ? 'activo' : ''}"></span>`).join('');
+  }
+  const _modal = $el('tour-modal'); if (_modal) _modal.scrollTop = 0;
+}
+
+function avanzarTour() {
+  if (tourPasoActual >= TOUR_STEPS.length - 1) {
+    cerrarTour(true);
+    return;
+  }
+  tourPasoActual++;
+  mostrarPasoTour(tourPasoActual);
+}
+
+function retrocederTour() {
+  if (tourPasoActual <= 0) return;
+  tourPasoActual--;
+  mostrarPasoTour(tourPasoActual);
+}
+
+function cerrarTour(completado) {
+  const _tourOv2 = $el('tour-overlay'); if (_tourOv2) _tourOv2.style.display = 'none';
+  if (completado || completado === false) localStorage.setItem('geosentinel_tour_completed', 'true');
+}
+
+function reiniciarTour() {
+  iniciarTour(true);
+}
+
 // ── Cargar campo guardado ──
 cargarCampoGuardado();
+
+// ── Tour guiado: se muestra solo la primera vez ──
+setTimeout(() => iniciarTour(false), 1200);
+
 
 // ════════════════════════════════════════════════
 //  LEYENDA FLOTANTE GEE
@@ -16106,6 +16832,7 @@ async function actualizarSequiaYVegetacion() {
   const humSuelo = (datosOM && datosOM.ok) ? datosOM.humSuelo : null;
 
   const riesgoSequia = calcularRiesgoSequia(gee.veg, gee.lluvia, humSuelo);
+  ultimoRiesgoSequia = riesgoSequia;
   renderizarSequia(riesgoSequia);
 
   const estadoVeg = calcularEstadoVegetacion(gee.veg);
@@ -16226,23 +16953,6 @@ async function generarInformeTecnicoPDF() {
     const imagenMapa = await capturarCampoMapa();
     if (pantallaOrigen && pantallaOrigen !== pantallaActual) irA(pantallaOrigen);
 
-    // ── 3. Índice TerraOS (salud ambiental 0-100) ──────────────
-    btn.textContent = 'Generando PDF...';
-    const scoresDisponibles = [];
-    if (incendio)            scoresDisponibles.push(incendio.score);
-    if (inundacion)          scoresDisponibles.push(inundacion.score);
-    if (seqScore !== null)   scoresDisponibles.push(seqScore);
-
-    let indiceTerraOS = null, clasifIndice = null, colorIndice = null, accionIndice = null;
-    if (scoresDisponibles.length > 0) {
-      const promedioRiesgo = scoresDisponibles.reduce((a,b) => a+b, 0) / scoresDisponibles.length;
-      indiceTerraOS = Math.round(100 - promedioRiesgo);
-      if      (indiceTerraOS >= 80) { clasifIndice = 'ÓPTIMO';              colorIndice = [22,163,74];  accionIndice = 'Mantener monitoreo de rutina'; }
-      else if (indiceTerraOS >= 60) { clasifIndice = 'ESTABLE CON ALERTAS'; colorIndice = [202,138,4];  accionIndice = 'Monitorear'; }
-      else if (indiceTerraOS >= 40) { clasifIndice = 'EN RIESGO';           colorIndice = [234,88,12];  accionIndice = 'Intensificar vigilancia'; }
-      else                          { clasifIndice = 'CRÍTICO';             colorIndice = [220,38,38];  accionIndice = 'Acción inmediata recomendada'; }
-    }
-
     // ── 4. Armar el documento PDF ──────────────────────────────
     btn.textContent = 'Redactando informe...';
     const { jsPDF } = window.jspdf;
@@ -16261,13 +16971,13 @@ async function generarInformeTecnicoPDF() {
     function titulo(txt, size, color, gap) {
       doc.setFont('helvetica', 'bold'); doc.setFontSize(size);
       doc.setTextColor(...color);
-      doc.text(txt, margin, y);
+      doc.text(_limpiarEmojiPDF(txt), margin, y);
       y += gap;
     }
     function parrafo(txt, size = 10) {
       doc.setFont('helvetica', 'normal'); doc.setFontSize(size);
       doc.setTextColor(...grisTexto);
-      const lineas = doc.splitTextToSize(txt, pageW - margin*2);
+      const lineas = doc.splitTextToSize(_limpiarEmojiPDF(txt), pageW - margin*2);
       salto(lineas.length * 5 + 4);
       doc.text(lineas, margin, y);
       y += lineas.length * 5 + 4;
@@ -16279,7 +16989,7 @@ async function generarInformeTecnicoPDF() {
       doc.rect(margin, y - 4, 3, 6, 'F');
       doc.setFont('helvetica', 'bold'); doc.setFontSize(11.5);
       doc.setTextColor(...verdeOscuro);
-      doc.text(txt, margin + 6, y);
+      doc.text(_limpiarEmojiPDF(txt), margin + 6, y);
       y += 7;
     }
 
@@ -16315,11 +17025,6 @@ async function generarInformeTecnicoPDF() {
 
     // — Resumen ejecutivo —
     seccion('RESUMEN EJECUTIVO');
-    if (clasifIndice) {
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-      doc.setTextColor(...colorIndice);
-      doc.text(`Estado General: ${clasifIndice}`, margin, y); y += 7;
-    }
     const radioConsulta = '~550 km (bbox 5°)';
     const resumenPartes = [];
     if (focosConDist.length > 0) {
@@ -16341,7 +17046,6 @@ async function generarInformeTecnicoPDF() {
       ['Riesgo de inundación', inundacion ? inundacion.nivel.replace(/^[^\s]+ /, '') : 'Sin datos'],
       ['Riesgo de sequía', seqNivel ? seqNivel.replace(/^[^\s]+ /, '') : 'Sin datos'],
       ['Vegetación (NDVI)', vegNivel ? `${vegNivel.replace(/^[^\s]+ /, '')} · NDVI ${vegNDVI}` : 'Sin datos'],
-      ['Estado general (Índice GeoSentinel)', clasifIndice || 'Sin datos suficientes'],
     ];
     doc.autoTable({
       startY: y, margin: { left: margin, right: margin },
@@ -16452,6 +17156,64 @@ async function generarInformeTecnicoPDF() {
     });
     y += 4;
 
+    // — Interpretación técnica por IA (mismo backend/modelo que usa el
+    // Informe de Sesión: /interpretar_riesgo, vía Groq) — un párrafo en
+    // lenguaje llano por cada módulo con datos disponibles. Reemplaza al
+    // viejo "Índice GeoSentinel" (que era un promedio inventado sin
+    // respaldo científico): esto es una interpretación real de los datos
+    // reales de cada módulo, no un puntaje combinado inventado. ──
+    seccion('INTERPRETACIÓN TÉCNICA (IA)');
+    const modulosIA = [];
+    if (incendio) {
+      modulosIA.push({
+        label: 'Incendio', tipo: 'incendio',
+        datos: {
+          angstrom: incendio.ang.valor, riesgo_angstrom: incendio.ang.riesgo,
+          regla_30_30_30: incendio.r3030, focos_totales: incendio.focosCerca,
+        },
+      });
+    }
+    if (inundacion) {
+      const datosOMInund = ultimoRiesgoInundacion?.datosOM;
+      modulosIA.push({
+        label: 'Inundación', tipo: 'inundacion',
+        datos: {
+          nivel: inundacion.nivel, score: inundacion.score,
+          lluvia_24h_mm: datosOMInund?.lluvia24, lluvia_72h_mm: datosOMInund?.lluvia72,
+          humedad_suelo: datosOMInund?.humSuelo, pronostico_24h_mm: datosOMInund?.pronostico24,
+        },
+      });
+    }
+    if (seqScore !== null) {
+      modulosIA.push({
+        label: 'Sequía', tipo: 'sequia',
+        datos: {
+          nivel: seqNivel, score: seqScore,
+          lluvia_30d_mm: ultimoRiesgoSequia?.lluvia30, humedad_suelo: ultimoRiesgoSequia?.humSuelo,
+        },
+      });
+    }
+
+    if (modulosIA.length === 0) {
+      parrafo('No hay suficientes datos calculados todavía para pedir una interpretación por IA.');
+    } else {
+      let algunaInterpretacion = false;
+      for (const m of modulosIA) {
+        btn.textContent = `Consultando IA (${m.label})...`;
+        const interpretacion = await interpretarModuloIA(m.tipo, m.datos);
+        if (interpretacion) {
+          algunaInterpretacion = true;
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...verdeOscuro);
+          salto(6); doc.text(m.label, margin, y); y += 5;
+          parrafo(interpretacion, 9.5);
+        }
+      }
+      if (!algunaInterpretacion) {
+        parrafo('No se pudo obtener la interpretación por IA en este momento (sin conexión con el servidor). El resto del informe se generó igual, con los datos reales calculados por la app.', 9);
+      }
+      btn.textContent = 'Redactando informe...';
+    }
+
     // — Evaluación operativa —
     seccion('EVALUACIÓN OPERATIVA');
     let probFoco = 'Sin datos suficientes';
@@ -16484,17 +17246,17 @@ async function generarInformeTecnicoPDF() {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...grisTexto);
     recs.forEach(r => {
       salto(7);
-      doc.setTextColor(...verdeOscuro); doc.text('✓', margin, y);
+      doc.setTextColor(...verdeOscuro); doc.text('-', margin, y);
       doc.setTextColor(...grisTexto);
-      const l = doc.splitTextToSize(r, pageW - margin*2 - 6);
+      const l = doc.splitTextToSize(_limpiarEmojiPDF(r), pageW - margin*2 - 6);
       doc.text(l, margin + 6, y);
       y += l.length * 5 + 2;
     });
 
     // — Conclusión —
     seccion('CONCLUSIÓN');
-    parrafo(clasifIndice
-      ? `El área monitoreada presenta un estado general "${clasifIndice}" según el Índice GeoSentinel (${indiceTerraOS}/100). ${resumenPartes.join(' ')} Se recomienda continuar el monitoreo desde la app y verificar en campo las alertas señaladas.`
+    parrafo(resumenPartes.length > 0
+      ? `${resumenPartes.join(' ')} Se recomienda continuar el monitoreo desde la app y verificar en campo las alertas señaladas.`
       : 'No hay datos suficientes en este momento para emitir una conclusión. Verificá la conexión GPS y a internet, y volvé a generar el informe.');
 
     // — Captura del mapa, si se pudo obtener —
@@ -16509,33 +17271,12 @@ async function generarInformeTecnicoPDF() {
       } catch (e) { /* si falla el embed, seguimos sin romper el resto del PDF */ }
     }
 
-    // — Índice TerraOS —
-    seccion('ÍNDICE GEOSENTINEL — SALUD AMBIENTAL DEL ÁREA');
-    if (indiceTerraOS !== null) {
-      salto(30);
-      doc.setFillColor(230,231,226);
-      doc.roundedRect(margin, y, pageW - margin*2 - 20, 7, 2, 2, 'F');
-      doc.setFillColor(...colorIndice);
-      doc.roundedRect(margin, y, (pageW - margin*2 - 20) * (indiceTerraOS/100), 7, 2, 2, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...grisTexto);
-      doc.text(`${indiceTerraOS}/100`, pageW - margin - 18, y + 5.5);
-      y += 12;
-      doc.setFontSize(10); doc.setTextColor(...colorIndice);
-      doc.text(`Clasificación: ${clasifIndice}`, margin, y); y += 6;
-      doc.setTextColor(...grisTexto);
-      doc.text(`Acción sugerida: ${accionIndice}`, margin, y); y += 6;
-      doc.setFontSize(8); doc.setTextColor(...grisClaro);
-      doc.text('Calculado combinando los scores reales de incendio, inundación y sequía disponibles en este momento.', margin, y);
-    } else {
-      parrafo('No hay suficientes datos calculados para generar el Índice GeoSentinel en este momento.');
-    }
-
     // — Pie —
     const totalPaginas = doc.internal.getNumberOfPages();
     for (let p = 1; p <= totalPaginas; p++) {
       doc.setPage(p);
       doc.setFontSize(7.5); doc.setTextColor(...grisClaro);
-      doc.text('Generado automáticamente por GeoSentinel 🛰️ — Documento de apoyo, no reemplaza verificación en campo ni informes oficiales.', margin, 290);
+      doc.text(_limpiarEmojiPDF('Generado automáticamente por GeoSentinel — Documento de apoyo, no reemplaza verificación en campo ni informes oficiales.'), margin, 290);
       doc.text(`${p}/${totalPaginas}`, pageW - margin - 6, 290);
     }
 
@@ -16745,6 +17486,12 @@ function activarInspectorSuelos() {
     if ($el('btn-inspector-iipdi')?.classList.contains('activo') && typeof IIPDIInspector !== 'undefined') IIPDIInspector.toggle();
     btn.classList.add('activo');
     mapa.getContainer().style.cursor = 'crosshair';
+    // FIX: esto faltaba por completo -- a diferencia de Aptitud Productiva
+    // (capa) y el Inspector de Riesgo Hidrológico, este toggle nunca
+    // desactivaba el clic de los polígonos, así que el lote del proyecto (o
+    // "Mi campo") seguía comiéndose el clic con su propio cartel en vez de
+    // dejarlo pasar al Inspector de Suelos.
+    if (typeof _setPoligonosClicables === 'function') _setPoligonosClicables(mapa, false);
     // Si el mapa no está visible, navegar a él
     const pantallasMapa = $el('pantalla-mapa');
     if (pantallasMapa && !pantallasMapa.classList.contains('activa')) {
@@ -16754,6 +17501,7 @@ function activarInspectorSuelos() {
   } else {
     btn.classList.remove('activo');
     mapa.getContainer().style.cursor = '';
+    if (typeof _setPoligonosClicables === 'function') _setPoligonosClicables(mapa, true);
   }
 }
 
@@ -16771,6 +17519,10 @@ async function inspeccionarSuelosINTA(lat, lon) {
   const btn = $el('btn-inspector-suelos');
   btn.classList.remove('activo');
   mapa.getContainer().style.cursor = '';
+  // FIX: se auto-apaga después de una consulta (es de "un solo click"), así
+  // que hay que restaurar el clic de los polígonos acá también -- si no,
+  // quedaban bloqueados para siempre después de la primera consulta exitosa.
+  if (typeof _setPoligonosClicables === 'function') _setPoligonosClicables(mapa, true);
 
   // Marcador en el punto clickeado
   if (_marcadorSuelos) mapa.removeLayer(_marcadorSuelos);
